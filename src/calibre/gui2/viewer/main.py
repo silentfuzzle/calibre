@@ -182,6 +182,8 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
     def __init__(self, pathtoebook=None, debug_javascript=False, open_at=None,
                  start_in_fullscreen=False):
         MainWindow.__init__(self, None)
+        self.adventurousReader = True
+        self.absPos = 1.
         self.setupUi(self)
         self.view.initialize_view(debug_javascript)
         self.view.magnification_changed.connect(self.magnification_changed)
@@ -258,8 +260,12 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
         self.action_forward.triggered[bool].connect(self.forward)
         self.action_preferences.triggered.connect(self.do_config)
         self.pos.editingFinished.connect(self.goto_page_num)
-        self.vertical_scrollbar.valueChanged[int].connect(lambda
-                x:self.goto_page(x/100.))
+        if (self.adventurousReader == False):
+            self.vertical_scrollbar.valueChanged[int].connect(lambda
+                    x:self.goto_page(x/100.))
+        else:
+            self.vertical_scrollbar.valueChanged[int].connect(lambda
+                    x:self.scrollbar_goto_page(x/100.))
         self.search.search.connect(self.find)
         self.search.focus_to_library.connect(lambda: self.view.setFocus(Qt.OtherFocusReason))
         self.toc.pressed[QModelIndex].connect(self.toc_clicked)
@@ -659,16 +665,26 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
             QApplication.clipboard().setText(self.selected_text)
 
     def back(self, x):
-        pos = self.history.back(self.pos.value())
+        if (self.adventurousReader == True):
+            pos = self.history.back(self.absPos)
+        else:
+            pos = self.history.back(self.pos.value())
         if pos is not None:
             self.goto_page(pos)
 
     def goto_page_num(self):
-        num = self.pos.value()
-        self.goto_page(num)
+        if (self.adventurousReader == False):
+            num = self.pos.value()
+            self.goto_page(num)
+        else:
+            num = self.pos.value() + self.current_page.start_page
+            self.goto_page(num, allow_page_turn=False)
 
     def forward(self, x):
-        pos = self.history.forward(self.pos.value())
+        if (self.adventurousReader == True):
+            pos = self.history.forward(self.absPos)
+        else:
+            pos = self.history.forward(self.pos.value())
         if pos is not None:
             self.goto_page(pos)
 
@@ -677,19 +693,30 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
 
     def goto_end(self):
         self.goto_page(self.pos.maximum())
-
-    def goto_page(self, new_page, loaded_check=True):
+        
+    def scrollbar_goto_page(self, new_page):
+        if self.current_page is not None:
+            self.goto_page(new_page+self.current_page.start_page-1, allow_page_turn=False)
+            
+    def goto_page(self, new_page, loaded_check=True, allow_page_turn=True):
         if self.current_page is not None or not loaded_check:
             for page in self.iterator.spine:
-                if new_page >= page.start_page and new_page <= page.max_page:
+                checkPages = (new_page >= page.start_page and new_page <= page.max_page)
+                if checkPages:
                     try:
-                        frac = float(new_page-page.start_page)/(page.pages-1)
+                        if (self.adventurousReader == False):
+                            frac = float(new_page-page.start_page)/(page.pages-1)
+                        else:
+                            frac = float(new_page-page.start_page)/(page.pages)
                     except ZeroDivisionError:
                         frac = 0
                     if page == self.current_page:
                         self.view.scroll_to(frac)
                     else:
-                        self.load_path(page, pos=frac)
+                        if (allow_page_turn == True):
+                            self.load_path(page, pos=frac)
+                        else:
+                            self.view.scroll_to(float(self.current_page.max_page-self.current_page.start_page)/(self.current_page.pages))
 
     def open_ebook(self, checked):
         files = choose_files(self, 'ebook viewer open dialog',
@@ -757,14 +784,20 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
 
     def internal_link_clicked(self, frac):
         self.update_page_number()  # Ensure page number is accurate as it is used for history
-        self.history.add(self.pos.value())
+        if (self.adventurousReader == True):
+            self.history.add(self.absPos)
+        else:
+            self.history.add(self.pos.value())
 
     def link_clicked(self, url):
         path = os.path.abspath(unicode(url.toLocalFile()))
         frag = None
         if path in self.iterator.spine:
             self.update_page_number()  # Ensure page number is accurate as it is used for history
-            self.history.add(self.pos.value())
+            if (self.adventurousReader == True):
+                self.history.add(self.absPos)
+            else:
+                self.history.add(self.pos.value())
             path = self.iterator.spine[self.iterator.spine.index(path)]
             if url.hasFragment():
                 frag = unicode(url.fragment())
@@ -798,6 +831,13 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
             return -1
         self.current_page = self.iterator.spine[index]
         self.current_index = index
+        if (self.adventurousReader == True):
+            numPages = self.current_page.pages + 1
+            if (self.current_page.pages == 1):
+                numPages = 1
+            self.pos.setMaximum(numPages)
+            self.pos.setSuffix(' / %d'%numPages)
+            self.set_vscrollbar_min(self.current_page.start_page)
         self.set_page_number(self.view.scroll_fraction)
         QTimer.singleShot(100, self.update_indexing_state)
         if self.pending_search is not None:
@@ -867,6 +907,8 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
     def load_path(self, path, pos=0.0):
         self.open_progress_indicator(_('Laying out %s')%self.current_title)
         self.view.load_path(path, pos=pos)
+        if (self.adventurousReader == True and self.current_page is not None):
+            self.set_vscrollbar_min(self.current_page.start_page)
 
     def viewport_resize_started(self, event):
         old, curr = event.size(), event.oldSize()
@@ -1051,13 +1093,12 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
             self.current_title = title
             self.setWindowTitle(self.base_window_title+' - '+title +
                     ' [%s]'%self.iterator.book_format)
-            self.pos.setMaximum(sum(self.iterator.pages))
-            self.pos.setSuffix(' / %d'%sum(self.iterator.pages))
-            self.vertical_scrollbar.setMinimum(100)
-            self.vertical_scrollbar.setMaximum(100*sum(self.iterator.pages))
-            self.vertical_scrollbar.setSingleStep(10)
-            self.vertical_scrollbar.setPageStep(100)
-            self.set_vscrollbar_value(1)
+            if (self.adventurousReader == False):
+                self.pos.setMaximum(sum(self.iterator.pages))
+                self.pos.setSuffix(' / %d'%sum(self.iterator.pages))
+            else:
+                self.pos.setMaximum(1)
+            self.set_vscrollbar_min(100)
             self.current_index = -1
             QApplication.instance().alert(self, 5000)
             previous = self.set_bookmarks(self.iterator.bookmarks)
@@ -1065,7 +1106,8 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
                 self.goto_bookmark(previous)
             else:
                 if open_at is None:
-                    self.next_document()
+                    self.curr_document()
+                    #self.next_document()
                 else:
                     if open_at > self.pos.maximum():
                         open_at = self.pos.maximum()
@@ -1073,6 +1115,18 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
                         open_at = self.pos.minimum()
                     self.goto_page(open_at, loaded_check=False)
 
+    def set_vscrollbar_min(self, min):
+        pageStep = 100
+        if (self.adventurousReader == False): 
+            self.vertical_scrollbar.setMaximum(pageStep*sum(self.iterator.pages))
+            self.set_vscrollbar_value(1)
+            self.vertical_scrollbar.setMinimum(min)
+        else:
+            self.vertical_scrollbar.setMaximum(pageStep*self.pos.maximum())
+            self.vertical_scrollbar.setMinimum(pageStep)
+        self.vertical_scrollbar.setSingleStep(10)
+        self.vertical_scrollbar.setPageStep(pageStep)
+        
     def set_vscrollbar_value(self, pagenum):
         self.vertical_scrollbar.blockSignals(True)
         self.vertical_scrollbar.setValue(int(pagenum*100))
@@ -1080,9 +1134,16 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
 
     def set_page_number(self, frac):
         if getattr(self, 'current_page', None) is not None:
-            page = self.current_page.start_page + frac*float(self.current_page.pages-1)
+            
+            if (self.adventurousReader == False):
+                page = self.current_page.start_page + frac*float(self.current_page.pages-1)
+                self.set_vscrollbar_value(page)
+            else:
+                page = frac*float(self.current_page.pages) + 1
+                self.absPos = self.current_page.start_page + frac*float(self.current_page.pages)
+                self.set_vscrollbar_value(page)
+                
             self.pos.set_value(page)
-            self.set_vscrollbar_value(page)
 
     def scrolled(self, frac, onload=False):
         self.set_page_number(frac)
@@ -1090,14 +1151,19 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
             ap = self.view.document.read_anchor_positions()
             self.update_indexing_state(ap)
 
-    def next_document(self):
+    def curr_document(self):
         if (hasattr(self, 'current_index') and self.current_index <
                 len(self.iterator.spine) - 1):
             self.load_path(self.iterator.spine[self.current_index+1])
+    
+    def next_document(self):
+        if (self.adventurousReader == False):
+            self.curr_document()
 
     def previous_document(self):
-        if hasattr(self, 'current_index') and self.current_index > 0:
-            self.load_path(self.iterator.spine[self.current_index-1], pos=1.0)
+        if (self.adventurousReader == False):
+            if hasattr(self, 'current_index') and self.current_index > 0:
+                self.load_path(self.iterator.spine[self.current_index-1], pos=1.0)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
