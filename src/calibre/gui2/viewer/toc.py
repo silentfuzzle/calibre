@@ -6,46 +6,44 @@ from __future__ import (unicode_literals, division, absolute_import,
 __license__   = 'GPL v3'
 __copyright__ = '2012, Kovid Goyal <kovid@kovidgoyal.net>'
 __docformat__ = 'restructuredtext en'
+# Adventurous Reader modifications added by Emily Palmieri <silentfuzzle@gmail.com>
 
 import re
 from PyQt4.Qt import (QStandardItem, QStandardItemModel, Qt, QFont,
-        QTreeView)
+        QWebView, pyqtSlot, QObject, QString)
+from calibre.ebooks.oeb.display.webview import load_html
 
 from calibre.ebooks.metadata.toc import TOC as MTOC
-
-class TOCView(QTreeView):
+       
+class TOCView (QWebView):
 
     def __init__(self, *args):
-        QTreeView.__init__(self, *args)
-        self.setStyleSheet('''
-                QTreeView {
-                    background-color: palette(window);
-                    color: palette(window-text);
-                    border: none;
-                }
-                QTreeView::item {
-                    border: 1px solid transparent;
-                    padding-top:0.5ex;
-                    padding-bottom:0.5ex;
-                }
-
-                QTreeView::item:hover {
-                    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #e7effd, stop: 1 #cbdaf1);
-                    border: 1px solid #bfcde4;
-                    border-radius: 6px;
-                }
-                QHeaderView::section {
-                    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                                    stop:0 #616161, stop: 0.5 #505050,
-                                                    stop: 0.6 #434343, stop:1 #656565);
-                    color: white;
-                    padding-left: 4px;
-                    padding-top: 0.5ex;
-                    padding-bottom: 0.5ex;
-                    border: 1px solid #6c6c6c;
-                    font-weight: bold;
-                }
-        ''')
+        QWebView.__init__(self, *args)
+        
+        self.manager = None
+        self.loadFinished.connect(self.load_finished)
+        
+    def load_network(self, jsonCode):
+        self.jsonCode = jsonCode
+        path = 'C:/Users/Emily/Documents/GitHub/calibre/resources/adventurous_map_viewer/book_renderer.html'
+        load_html(path, self, codec=getattr(path, 'encoding', 'utf-8'), mime_type=getattr(path,
+        'mime_type', 'text/html'))
+        
+    def load_finished(self):
+        self.page().mainFrame().addToJavaScriptWindowObject("container", self)
+        
+        jScript = """dataLoaded({jsonCode}); """
+        jScriptFormat = jScript.format(jsonCode=str(self.jsonCode))
+        self.page().mainFrame().evaluateJavaScript(jScriptFormat)
+        
+    def set_manager(self, manager):
+        self.manager = manager
+        
+    @pyqtSlot(float)
+    def change_page(self, page):
+        print ("changed page: " + str(page))
+        if self.manager is not None:
+            self.manager.goto_page(page)
 
 class TOCItem(QStandardItem):
 

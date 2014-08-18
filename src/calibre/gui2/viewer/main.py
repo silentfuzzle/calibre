@@ -1,5 +1,6 @@
 __license__   = 'GPL v3'
 __copyright__ = '2008, Kovid Goyal <kovid at kovidgoyal.net>'
+# Adventurous Reader modifications added by Emily Palmieri <silentfuzzle@gmail.com>
 
 import traceback, os, sys, functools, textwrap
 from functools import partial
@@ -15,6 +16,7 @@ from calibre.gui2.viewer.main_ui import Ui_EbookViewer
 from calibre.gui2.viewer.printing import Printing
 from calibre.gui2.viewer.bookmarkmanager import BookmarkManager
 from calibre.gui2.viewer.toc import TOC
+from calibre.gui2.viewer.book_network import EBookNetwork
 from calibre.gui2.widgets import ProgressIndicator
 from calibre.gui2.main_window import MainWindow
 from calibre.gui2 import (Application, ORG_NAME, APP_UID, choose_files,
@@ -268,7 +270,9 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
                     x:self.scrollbar_goto_page(x/100.))
         self.search.search.connect(self.find)
         self.search.focus_to_library.connect(lambda: self.view.setFocus(Qt.OtherFocusReason))
-        self.toc.pressed[QModelIndex].connect(self.toc_clicked)
+        #TODO
+        #if (adventurousReader == False):
+        #    self.toc.pressed[QModelIndex].connect(self.toc_clicked)
         self.reference.goto.connect(self.goto)
 
         self.bookmarks_menu = QMenu()
@@ -802,6 +806,9 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
             if url.hasFragment():
                 frag = unicode(url.fragment())
             if path != self.current_page:
+                edgeAdded = self.ebook_network.add_edge(self.current_page.start_page, path.start_page)
+                if (edgeAdded):
+                    self.toc.load_network(self.ebook_network.data)
                 self.pending_anchor = frag
                 self.load_path(path)
             else:
@@ -887,8 +894,9 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
             items = self.toc_model.update_indexing_state(self.current_index,
                         self.view.viewport_rect, anchor_positions,
                         self.view.document.in_paged_mode)
-            if items:
-                self.toc.scrollTo(items[-1].index())
+            #TODO
+            #if (items and adventurousReader == False):
+            #    self.toc.scrollTo(items[-1].index())
             if pgns is not None:
                 self.pending_goto_next_section = None
                 # Check that we actually progressed
@@ -1070,12 +1078,20 @@ class EbookViewer(MainWindow, Ui_EbookViewer):
                 title = os.path.splitext(os.path.basename(pathtoebook))[0]
             if self.iterator.toc:
                 self.toc_model = TOC(self.iterator.spine, self.iterator.toc)
-                self.toc.setModel(self.toc_model)
+                #TODO
+                #if (adventurousReader == False):
+                #    self.toc.setModel(self.toc_model)
+                #else:
+                self.ebook_network = EBookNetwork(self.iterator.spine, self.iterator.toc, title, pathtoebook)
+                self.toc.set_manager(self)
+                self.toc.load_network(self.ebook_network.data)
                 if self.show_toc_on_open:
                     self.action_table_of_contents.setChecked(True)
             else:
                 self.toc_model = TOC(self.iterator.spine)
-                self.toc.setModel(self.toc_model)
+                #TODO
+                #if (adventurousReader == False):
+                #    self.toc.setModel(self.toc_model)
                 self.action_table_of_contents.setChecked(False)
             if isbytestring(pathtoebook):
                 pathtoebook = force_unicode(pathtoebook, filesystem_encoding)
