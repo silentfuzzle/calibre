@@ -126,3 +126,48 @@ def link_stylesheets(container, names, sheets, remove=False, mtype='text/css'):
             container.dirty(name)
 
     return changed_names
+
+def lead_text(top_elem, num_words=10):
+    ''' Return the leading text contained in top_elem (including descendants)
+    upto a maximum of num_words words. More efficient than using
+    etree.tostring(method='text') as it does not have to serialize the entire
+    sub-tree rooted at top_elem.'''
+    pat = re.compile(r'\s+', flags=re.UNICODE)
+    words = []
+
+    def get_text(x, attr='text'):
+        ans = getattr(x, attr)
+        if ans:
+            words.extend(filter(None, pat.split(ans)))
+
+    stack = [(top_elem, 'text')]
+    while stack and len(words) < num_words:
+        elem, attr = stack.pop()
+        get_text(elem, attr)
+        if attr == 'text':
+            if elem is not top_elem:
+                stack.append((elem, 'tail'))
+            stack.extend(reversed(list((c, 'text') for c in elem.iterchildren('*'))))
+    return ' '.join(words[:num_words])
+
+def parse_css(data, fname='<string>', is_declaration=False, decode=None, log_level=None, css_preprocessor=None):
+    if log_level is None:
+        import logging
+        log_level = logging.WARNING
+    from cssutils import CSSParser, log
+    from calibre.ebooks.oeb.base import _css_logger
+    log.setLevel(log_level)
+    log.raiseExceptions = False
+    if isinstance(data, bytes):
+        data = data.decode('utf-8') if decode is None else decode(data)
+    if css_preprocessor is not None:
+        data = css_preprocessor(data)
+    parser = CSSParser(loglevel=log_level,
+                        # We dont care about @import rules
+                        fetcher=lambda x: (None, None), log=_css_logger)
+    if is_declaration:
+        data = parser.parseStyle(data, validate=False)
+    else:
+        data = parser.parseString(data, href=fname, validate=False)
+    return data
+

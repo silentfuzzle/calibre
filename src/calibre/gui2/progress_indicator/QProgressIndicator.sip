@@ -3,12 +3,10 @@
 
 %Module(name=progress_indicator, version=1)
 
-%Import QtCore/QtCoremod.sip
-%Import QtGui/QtGuimod.sip
+%Import QtWidgets/QtWidgetsmod.sip
 
 %ModuleHeaderCode
-int load_style(QString &path, QString &name);
-bool do_notify(QObject *receiver, QEvent *event);
+int load_style(QHash<int,QString> icon_map);
 void set_no_activate_on_click(QWidget *widget);
 void set_touch_menu_style(QWidget *widget, int margin);
 %End
@@ -58,9 +56,6 @@ protected:
 
 };
 
-int load_style(QString &path, QString &name);
-
-bool do_notify(QObject *receiver, QEvent *event);
-
+int load_style(QHash<int,QString> icon_map);
 void set_no_activate_on_click(QWidget *widget);
 void set_touch_menu_style(QWidget *widget, int margin=20);

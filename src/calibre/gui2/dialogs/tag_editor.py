@@ -3,13 +3,12 @@ __copyright__ = '2008, Kovid Goyal <kovid at kovidgoyal.net>'
 
 from functools import partial
 
-from PyQt4.QtCore import SIGNAL, Qt
-from PyQt4.QtGui import QDialog
+from PyQt5.Qt import Qt, QDialog
 
 from calibre.gui2.dialogs.tag_editor_ui import Ui_TagEditor
 from calibre.gui2 import question_dialog, error_dialog, gprefs
 from calibre.constants import islinux
-from calibre.utils.icu import sort_key, primary_find
+from calibre.utils.icu import sort_key, primary_contains
 
 class TagEditor(QDialog, Ui_TagEditor):
 
@@ -51,11 +50,11 @@ class TagEditor(QDialog, Ui_TagEditor):
             if tag not in tags:
                 self.available_tags.addItem(tag)
 
-        self.connect(self.apply_button,   SIGNAL('clicked()'), self.apply_tags)
-        self.connect(self.unapply_button, SIGNAL('clicked()'), self.unapply_tags)
-        self.connect(self.add_tag_button, SIGNAL('clicked()'), self.add_tag)
-        self.connect(self.delete_button,  SIGNAL('clicked()'), self.delete_tags)
-        self.connect(self.add_tag_input,  SIGNAL('returnPressed()'), self.add_tag)
+        self.apply_button.clicked.connect(lambda: self.apply_tags())
+        self.unapply_button.clicked.connect(lambda: self.unapply_tags())
+        self.add_tag_button.clicked.connect(self.add_tag)
+        self.delete_button.clicked.connect(lambda: self.delete_tags())
+        self.add_tag_input.returnPressed[()].connect(self.add_tag)
         # add the handlers for the filter input clear buttons
         for x in ('available', 'applied'):
             getattr(self, '%s_filter_input_clear_btn' % x).clicked.connect(getattr(self, '%s_filter_input' % x).clear)
@@ -66,8 +65,8 @@ class TagEditor(QDialog, Ui_TagEditor):
         if islinux:
             self.available_tags.itemDoubleClicked.connect(self.apply_tags)
         else:
-            self.connect(self.available_tags, SIGNAL('itemActivated(QListWidgetItem*)'), self.apply_tags)
-        self.connect(self.applied_tags,   SIGNAL('itemActivated(QListWidgetItem*)'), self.unapply_tags)
+            self.available_tags.itemActivated.connect(self.apply_tags)
+        self.applied_tags.itemActivated.connect(self.unapply_tags)
 
         geom = gprefs.get('tag_editor_geometry', None)
         if geom is not None:
@@ -178,7 +177,7 @@ class TagEditor(QDialog, Ui_TagEditor):
         q = icu_lower(unicode(filter_value))
         for i in xrange(collection.count()):  # on every available tag
             item = collection.item(i)
-            item.setHidden(bool(q and primary_find(q, unicode(item.text()))[0] == -1))
+            item.setHidden(bool(q and not primary_contains(q, unicode(item.text()))))
 
     def accept(self):
         self.save_state()

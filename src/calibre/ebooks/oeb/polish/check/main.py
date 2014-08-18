@@ -11,9 +11,10 @@ from future_builtins import map
 from calibre.ebooks.oeb.base import OEB_DOCS, OEB_STYLES
 from calibre.ebooks.oeb.polish.utils import guess_type
 from calibre.ebooks.oeb.polish.cover import is_raster_image
-from calibre.ebooks.oeb.polish.check.base import run_checkers
+from calibre.ebooks.oeb.polish.check.base import run_checkers, WARN
 from calibre.ebooks.oeb.polish.check.parsing import (
-    check_filenames, check_xml_parsing, check_css_parsing, fix_style_tag, check_html_size, check_ids)
+    check_filenames, check_xml_parsing, check_css_parsing, fix_style_tag,
+    check_html_size, check_ids, EmptyFile, check_encoding_declarations)
 from calibre.ebooks.oeb.polish.check.images import check_raster_images
 from calibre.ebooks.oeb.polish.check.links import check_links, check_mimetypes, check_link_destinations
 from calibre.ebooks.oeb.polish.check.fonts import check_fonts
@@ -44,13 +45,26 @@ def run_checks(container):
     errors.extend(run_checkers(check_xml_parsing, html_items))
     errors.extend(run_checkers(check_raster_images, raster_images))
 
+    for err in errors:
+        if err.level > WARN:
+            return errors
+
     # cssutils is not thread safe
     for name, mt, raw in stylesheets:
+        if not raw:
+            errors.append(EmptyFile(name))
+            continue
         errors.extend(check_css_parsing(name, raw))
+
+    for name, mt, raw in html_items + xml_items:
+        errors.extend(check_encoding_declarations(name, container))
+
     for name, mt, raw in html_items:
+        if not raw:
+            continue
         root = container.parsed(name)
         for style in root.xpath('//*[local-name()="style"]'):
-            if style.get('type', 'text/css') == 'text/css':
+            if style.get('type', 'text/css') == 'text/css' and style.text:
                 errors.extend(check_css_parsing(name, style.text, line_offset=style.sourceline - 1))
         for elem in root.xpath('//*[@style]'):
             raw = elem.get('style')
@@ -70,7 +84,10 @@ def fix_errors(container, errors):
     # Fix parsing
     changed = False
     for name in {e.name for e in errors if getattr(e, 'is_parsing_error', False)}:
-        root = container.parsed(name)
+        try:
+            root = container.parsed(name)
+        except TypeError:
+            continue
         container.dirty(name)
         if container.mime_map[name] in OEB_DOCS:
             for style in root.xpath('//*[local-name()="style"]'):

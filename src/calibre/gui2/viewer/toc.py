@@ -214,7 +214,6 @@ class TOC(QStandardItemModel):
         self.all_items = depth_first = []
         for t in toc:
             self.appendRow(TOCItem(spine, t, 0, depth_first))
-        self.setHorizontalHeaderItem(0, QStandardItem(_('Table of Contents')))
 
         for x in depth_first:
             possible_enders = [t for t in depth_first if t.depth <= x.depth

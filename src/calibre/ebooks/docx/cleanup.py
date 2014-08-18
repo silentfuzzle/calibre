@@ -171,7 +171,7 @@ def cleanup_markup(log, root, styles, dest_dir, detect_cover):
             if prefix:
                 prefix += '; '
             p.set('style', prefix + 'page-break-after:always')
-            p.text = NBSP
+            p.text = NBSP if not p.text else p.text
 
     if detect_cover:
         # Check if the first image in the document is possibly a cover
@@ -185,6 +185,7 @@ def cleanup_markup(log, root, styles, dest_dir, detect_cover):
                     width, height, fmt = identify(path)
                 except:
                     width, height, fmt = 0, 0, None
+                del fmt
                 try:
                     is_cover = 0.8 <= height/width <= 1.8 and height*width >= 160000
                 except ZeroDivisionError:

@@ -8,13 +8,14 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 
 import sys
 
-from PyQt4.Qt import (
-     QIcon, Qt, QSplitter, QListWidget, QTextBrowser, QPalette,
+from PyQt5.Qt import (
+     QIcon, Qt, QSplitter, QListWidget, QTextBrowser, QPalette, QUrl, QMenu,
      QListWidgetItem, pyqtSignal, QApplication, QStyledItemDelegate)
 
 from calibre.ebooks.oeb.polish.check.base import WARN, INFO, DEBUG, ERROR, CRITICAL
 from calibre.ebooks.oeb.polish.check.main import run_checks, fix_errors
 from calibre.gui2.tweak_book import tprefs
+from calibre.gui2.tweak_book.widgets import BusyCursor
 
 def icon_for_level(level):
     if level > WARN:
@@ -26,6 +27,19 @@ def icon_for_level(level):
     else:
         icon = None
     return QIcon(I(icon)) if icon else QIcon()
+
+def prefix_for_level(level):
+    if level > WARN:
+        text = _('ERROR')
+    elif level == WARN:
+        text = _('WARNING')
+    elif level == INFO:
+        text = _('INFO')
+    else:
+        text = ''
+    if text:
+        text += ': '
+    return text
 
 class Delegate(QStyledItemDelegate):
 
@@ -46,6 +60,8 @@ class Check(QSplitter):
         self.setChildrenCollapsible(False)
 
         self.items = i = QListWidget(self)
+        i.setContextMenuPolicy(Qt.CustomContextMenu)
+        i.customContextMenuRequested.connect(self.context_menu)
         self.items.setSpacing(3)
         self.items.itemDoubleClicked.connect(self.current_item_activated)
         self.items.currentItemChanged.connect(self.current_item_changed)
@@ -57,33 +73,55 @@ class Check(QSplitter):
         h.anchorClicked.connect(self.link_clicked)
         h.setOpenLinks(False)
         self.addWidget(h)
-        self.clear_help(_('Check has not been run'))
         self.setStretchFactor(0, 100)
         self.setStretchFactor(1, 50)
+        self.clear_at_startup()
 
         state = tprefs.get('check-book-splitter-state', None)
         if state is not None:
             self.restoreState(state)
 
+    def clear_at_startup(self):
+        self.clear_help(_('Check has not been run'))
+        self.items.clear()
+
+    def context_menu(self, pos):
+        m = QMenu()
+        if self.items.count() > 0:
+            m.addAction(QIcon(I('edit-copy.png')), _('Copy list of errors to clipboard'), self.copy_to_clipboard)
+        if list(m.actions()):
+            m.exec_(self.mapToGlobal(pos))
+
+    def copy_to_clipboard(self):
+        items = []
+        for item in (self.items.item(i) for i in xrange(self.items.count())):
+            msg = unicode(item.text())
+            msg = prefix_for_level(item.data(Qt.UserRole).level) + msg
+            items.append(msg)
+        if items:
+            QApplication.clipboard().setText('\n'.join(items))
+
     def save_state(self):
         tprefs.set('check-book-splitter-state', bytearray(self.saveState()))
 
-    def clear_help(self, msg):
+    def clear_help(self, msg=None):
+        if msg is None:
+            msg = _('No problems found')
         self.help.setText('<h2>%s</h2><p><a style="text-decoration:none" title="%s" href="run:check">%s</a></p>' % (
             msg, _('Click to run a check on the book'), _('Run check')))
 
     def link_clicked(self, url):
-        url = unicode(url.toString())
+        url = unicode(url.toString(QUrl.None))
         if url == 'activate:item':
             self.current_item_activated()
         elif url == 'run:check':
             self.check_requested.emit()
         elif url == 'fix:errors':
-            errors = [self.items.item(i).data(Qt.UserRole).toPyObject() for i in xrange(self.items.count())]
+            errors = [self.items.item(i).data(Qt.UserRole) for i in xrange(self.items.count())]
             self.fix_requested.emit(errors)
         elif url.startswith('fix:error,'):
             num = int(url.rpartition(',')[-1])
-            errors = [self.items.item(num).data(Qt.UserRole).toPyObject()]
+            errors = [self.items.item(num).data(Qt.UserRole)]
             self.fix_requested.emit(errors)
         elif url.startswith('activate:item:'):
             index = int(url.rpartition(':')[-1])
@@ -100,7 +138,7 @@ class Check(QSplitter):
     def current_item_activated(self, *args):
         i = self.items.currentItem()
         if i is not None:
-            err = i.data(Qt.UserRole).toPyObject()
+            err = i.data(Qt.UserRole)
             if err.has_multiple_locations:
                 self.location_activated(0)
             else:
@@ -109,7 +147,7 @@ class Check(QSplitter):
     def location_activated(self, index):
         i = self.items.currentItem()
         if i is not None:
-            err = i.data(Qt.UserRole).toPyObject()
+            err = i.data(Qt.UserRole)
             err.current_location_index = index
             self.item_activated.emit(err)
 
@@ -127,7 +165,7 @@ class Check(QSplitter):
             return loc
 
         if i is not None:
-            err = i.data(Qt.UserRole).toPyObject()
+            err = i.data(Qt.UserRole)
             header = {DEBUG:_('Debug'), INFO:_('Information'), WARN:_('Warning'), ERROR:_('Error'), CRITICAL:_('Error')}[err.level]
             ifix = ''
             loc = loc_to_string(err.line, err.col)
@@ -160,7 +198,6 @@ class Check(QSplitter):
                 template % (err.HELP, ifix, fix_tt, fix_msg, run_tt, run_msg))
 
     def run_checks(self, container):
-        from calibre.gui2.tweak_book.boss import BusyCursor
         with BusyCursor():
             self.show_busy()
             QApplication.processEvents()
@@ -176,10 +213,9 @@ class Check(QSplitter):
             self.current_item_changed()
             self.items.setFocus(Qt.OtherFocusReason)
         else:
-            self.clear_help(_('No problems found'))
+            self.clear_help()
 
     def fix_errors(self, container, errors):
-        from calibre.gui2.tweak_book.boss import BusyCursor
         with BusyCursor():
             self.show_busy(_('Running fixers, please wait...'))
             QApplication.processEvents()
@@ -199,6 +235,10 @@ class Check(QSplitter):
         if ev.key() in (Qt.Key_Enter, Qt.Key_Return):
             self.current_item_activated()
         return super(Check, self).keyPressEvent(ev)
+
+    def clear(self):
+        self.items.clear()
+        self.clear_help()
 
 def main():
     from calibre.gui2 import Application

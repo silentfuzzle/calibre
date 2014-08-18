@@ -12,6 +12,7 @@ from lxml.etree import XMLParser, fromstring, XMLSyntaxError
 import cssutils
 
 from calibre import force_unicode, human_readable, prepare_string_for_xml
+from calibre.ebooks.chardet import replace_encoding_declarations, find_declared_encoding
 from calibre.ebooks.html_entities import html5_entities
 from calibre.ebooks.oeb.polish.pretty import pretty_script_or_style as fix_style_tag
 from calibre.ebooks.oeb.polish.utils import PositionFinder, guess_type
@@ -25,6 +26,31 @@ ALL_ENTITIES = HTML_ENTITTIES | XML_ENTITIES
 replace_pat = re.compile('&(%s);' % '|'.join(re.escape(x) for x in sorted((HTML_ENTITTIES - XML_ENTITIES))))
 mismatch_pat = re.compile('tag mismatch:.+?line (\d+).+?line \d+')
 
+class EmptyFile(BaseError):
+
+    HELP = _('This file is empty, it contains nothing, you should probably remove it.')
+    INDIVIDUAL_FIX = _('Remove this file')
+
+    def __init__(self, name):
+        BaseError.__init__(self, _('The file %s is empty') % name, name)
+
+    def __call__(self, container):
+        container.remove_item(self.name)
+        return True
+
+class DecodeError(BaseError):
+
+    is_parsing_error = True
+
+    HELP = _('A decoding errors means that the contents of the file could not'
+             ' be interpreted as text. This usually happens if the file has'
+             ' an incorrect character encoding declaration or if the file is actually'
+             ' a binary file, like an image or font that is mislabelled with'
+             ' an incorrect media type in the OPF.')
+
+    def __init__(self, name):
+        BaseError.__init__(self, _('Parsing of %s failed, could not decode') % name, name)
+
 class XMLParseError(BaseError):
 
     is_parsing_error = True
@@ -35,6 +61,7 @@ class XMLParseError(BaseError):
              ' "do the wrong thing".')
 
     def __init__(self, msg, *args, **kwargs):
+        msg = msg or ''
         BaseError.__init__(self, 'Parsing failed: ' + msg, *args, **kwargs)
         m = mismatch_pat.search(msg)
         if m is not None:
@@ -140,6 +167,24 @@ class BadNamespace(BaseError):
         container.dirty(self.name)
         return True
 
+class NonUTF8(BaseError):
+
+    level = WARN
+    INDIVIDUAL_FIX = _("Change this file's encoding to UTF-8")
+
+    def __init__(self, name, enc):
+        BaseError.__init__(self, _('Non UTF-8 encoding declaration'), name)
+        self.HELP = _('This file has its encoding declared as %s. Some'
+                      ' reader software cannot handle non-UTF8 encoded files.'
+                      ' You should change the encoding to UTF-8.') % enc
+
+    def __call__(self, container):
+        raw = container.raw_data(self.name)
+        if isinstance(raw, type('')):
+            raw, changed = replace_encoding_declarations(raw)
+            if changed:
+                container.open(self.name, 'wb').write(raw.encode('utf-8'))
+                return True
 
 class EntitityProcessor(object):
 
@@ -182,7 +227,16 @@ def check_html_size(name, mt, raw):
 
 entity_pat = re.compile(br'&(#{0,1}[a-zA-Z0-9]{1,8});')
 
+def check_encoding_declarations(name, container):
+    errors = []
+    enc = find_declared_encoding(container.raw_data(name))
+    if enc is not None and enc.lower() != 'utf-8':
+        errors.append(NonUTF8(name, enc))
+    return errors
+
 def check_xml_parsing(name, mt, raw):
+    if not raw:
+        return [EmptyFile(name)]
     raw = raw.replace(b'\r\n', b'\n').replace(b'\r', b'\n')
     # Get rid of entities as named entities trip up the XML parser
     eproc = EntitityProcessor(mt)
@@ -200,6 +254,8 @@ def check_xml_parsing(name, mt, raw):
 
     try:
         root = fromstring(eraw, parser=parser)
+    except UnicodeDecodeError:
+        return errors + [DecodeError(name)]
     except XMLSyntaxError as err:
         try:
             line, col = err.position
@@ -312,7 +368,10 @@ def check_css_parsing(name, raw, line_offset=0, is_declaration=False):
     if is_declaration:
         parser.parseStyle(raw, validate=True)
     else:
-        parser.parseString(raw, validate=True)
+        try:
+            parser.parseString(raw, validate=True)
+        except UnicodeDecodeError:
+            return [DecodeError(name)]
     for err in log.errors:
         err.line += line_offset
     return log.errors

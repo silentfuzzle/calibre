@@ -11,10 +11,11 @@ import os, pprint, time, uuid, re
 from cookielib import Cookie
 from threading import current_thread
 
-from PyQt4.Qt import (QObject, QNetworkAccessManager, QNetworkDiskCache,
+from PyQt5.Qt import (QObject, QNetworkAccessManager, QNetworkDiskCache,
         QNetworkProxy, QNetworkProxyFactory, QEventLoop, QUrl, pyqtSignal,
         QDialog, QVBoxLayout, QSize, QNetworkCookieJar, Qt, pyqtSlot, QPixmap)
-from PyQt4.QtWebKit import QWebPage, QWebSettings, QWebView, QWebElement
+from PyQt5.QtWebKit import QWebSettings, QWebElement
+from PyQt5.QtWebKitWidgets import QWebPage, QWebView
 
 from calibre import USER_AGENT, prints, get_proxies, get_proxy_info, prepare_string_for_xml
 from calibre.constants import ispy3, cache_dir
@@ -124,7 +125,7 @@ class WebPage(QWebPage):  # {{{
 
     @property
     def ready_state(self):
-        return unicode(self.mainFrame().evaluateJavaScript('document.readyState').toString())
+        return unicode(self.mainFrame().evaluateJavaScript('document.readyState') or '')
 
     @pyqtSlot(QPixmap)
     def transfer_image(self, img):
@@ -209,7 +210,7 @@ class NetworkAccessManager(QNetworkAccessManager):  # {{{
         reply.ignoreSslErrors()
 
     def createRequest(self, operation, request, data):
-        url = unicode(request.url().toString())
+        url = unicode(request.url().toString(QUrl.None))
         operation_name = self.OPERATION_NAMES[operation]
         debug = []
         debug.append(('Request: %s %s' % (operation_name, url)))
@@ -244,7 +245,7 @@ class NetworkAccessManager(QNetworkAccessManager):  # {{{
             self.report_reply(reply)
 
     def report_reply(self, reply):
-        reply_url = unicode(reply.url().toString())
+        reply_url = unicode(reply.url().toString(QUrl.None))
         self.reply_count += 1
         err = reply.error()
 
@@ -402,7 +403,7 @@ class Browser(QObject, FormsMixin):
         return lw.loaded_ok
 
     def _wait_for_replies(self, reply_count, timeout):
-        final_time = time.time() + timeout
+        final_time = time.time() + (self.default_timeout if timeout is default_timeout else timeout)
         loop = QEventLoop(self)
         while (time.time() < final_time and self.nam.reply_count <
                 reply_count):
@@ -577,7 +578,7 @@ class Browser(QObject, FormsMixin):
                     ans[url] = raw
                     urls.discard(url)
 
-        while urls and time.time() - start_time < timeout and self.page.ready_state not in {'complete', 'completed'}:
+        while urls and time.time() - start_time < timeout and not self.load_completed:
             get_resources()
             if urls:
                 self.run_for_a_time(0.1)
@@ -585,6 +586,10 @@ class Browser(QObject, FormsMixin):
         if urls:
             get_resources()
         return ans
+
+    @property
+    def load_completed(self):
+        return self.page.ready_state in {'complete', 'completed'}
 
     def get_resource(self, url, rtype='img', use_cache=True, timeout=default_timeout):
         '''

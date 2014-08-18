@@ -1,5 +1,3 @@
-.. include:: global.rst
-
 .. _faq:
 
 Frequently Asked Questions
@@ -55,19 +53,27 @@ There are two aspects to this problem:
 What's the deal with Table of Contents in MOBI files?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The first thing to realize is that most ebooks have two tables of contents. One is the traditional Table of Contents, like the TOC you find in paper books. This Table of Contents is part of the main document flow and can be styled however you like. This TOC is called the *content TOC*.
+The first thing to realize is that most ebooks have two tables of contents. One is the traditional Table of Contents, like the ToC you find in paper books. This Table of Contents is part of the main document flow and can be styled however you like. This ToC is called the *content ToC*.
 
-Then there is the *metadata TOC*. A metadata TOC is a TOC that is not part of the book text and is typically accessed by some special button on a reader. For example, in the calibre viewer, you use the Show Table of Contents button to see this TOC. This TOC cannot be styled by the book creator. How it is represented is up to the viewer program.
+Then there is the *metadata ToC*. A metadata ToC is a ToC that is not part of the book text and is typically accessed by some special button on a reader. For example, in the calibre viewer, you use the Show Table of Contents button to see this ToC. This ToC cannot be styled by the book creator. How it is represented is up to the viewer program.
 
-In the MOBI format, the situation is a little confused. This is because the MOBI format, alone amongst mainstream ebook formats, *does not* have decent support for a metadata TOC. A MOBI book simulates the presence of a metadata TOC by putting an *extra* content TOC at the end of the book. When you click Goto Table of Contents on your Kindle, it is to this extra content TOC that the Kindle takes you. 
+In the MOBI format, the situation is a little confused. This is because the MOBI format, alone amongst mainstream ebook formats, *does not* have decent support for a metadata ToC. A MOBI book simulates the presence of a metadata ToC by putting an *extra* content ToC at the end of the book. When you click Goto Table of Contents on your Kindle, it is to this extra content ToC that the Kindle takes you. 
 
-Now it might well seem to you that the MOBI book has two identical TOCs. Remember that one is semantically a content TOC and the other is a metadata TOC, even though both might have exactly the same entries and look the same. One can be accessed directly from the Kindle's menus, the other cannot. 
+Now it might well seem to you that the MOBI book has two identical ToCs. Remember that one is semantically a content ToC and the other is a metadata ToC, even though both might have exactly the same entries and look the same. One can be accessed directly from the Kindle's menus, the other cannot. 
 
-When converting to MOBI, calibre detects the *metadata TOC* in the input document and generates an end-of-file TOC in the output MOBI file. You can turn this off by an option in the MOBI Output settings. You can also tell calibre whether to put it and the start or the end of the book via an option in the MOBI Output settings. Remember this TOC is semantically a *metadata TOC*, in any format other than MOBI it *cannot not be part of the text*. The fact that it is part of the text in MOBI is an accident caused by the limitations of MOBI. If you want a TOC at a particular location in your document text, create one by hand. So we strongly recommend that you leave the default as it is, i.e. with the metadata TOC at the end of the book.
+When converting to MOBI, calibre detects the *metadata ToC* in the input document and generates an end-of-file ToC in the output MOBI file. You can turn this off by an option in the MOBI Output settings. You can also tell calibre whether to put it and the start or the end of the book via an option in the MOBI Output settings. Remember this ToC is semantically a *metadata ToC*, in any format other than MOBI it *cannot not be part of the text*. The fact that it is part of the text in MOBI is an accident caused by the limitations of MOBI. If you want a ToC at a particular location in your document text, create one by hand. So we strongly recommend that you leave the default as it is, i.e. with the metadata ToC at the end of the book. Also note that if you disable the generation of the end-of-file ToC the resulting MOBI file may not function correctly on a Kindle, since the Kindle's use the metadata ToC for many things, including the Page Flip feature.
 
-If you have a hand edited TOC in the input document, you can use the TOC detection options in calibre to automatically generate the metadata TOC from it. See the conversion section of the User Manual for more details on how to use these options.
+If you have a hand edited ToC in the input document, you can use the ToC detection options in calibre to automatically generate the metadata ToC from it. See the conversion section of the User Manual for more details on how to use these options.
 
-Finally, I encourage you to ditch the content TOC and only have a metadata TOC in your ebooks. Metadata TOCs will give the people reading your ebooks a much superior navigation experience (except on the Kindle, where they are essentially the same as a content TOC).
+Finally, I encourage you to ditch the content ToC and only have a metadata ToC in your ebooks. Metadata ToCs will give the people reading your ebooks a much superior navigation experience (except on the Kindle, where they are essentially the same as a content ToC).
+
+.. note::
+    The newer AZW3 format has proper support for a metadata ToC. However, the
+    Kindle firmware tends to malfunction if you disable the generation of the
+    end-of-file inline ToC. So it is recommended that you leave the generated
+    ToC alone. If you create an AZW3 file with a metadata ToC and no
+    end-of-file generated ToC, some features ont he Kindle will not work, such
+    as the Page Flip feature.
 
 The covers for my MOBI files have stopped showing up in Kindle for PC/Kindle for Android/iPad etc.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -366,9 +372,9 @@ single android device out there, so if your device is not automatically
 detected, follow the instructions at :ref:`devsupport` to get your device
 supported in |app|.
 
-.. note:: With newer Android devices, the USB connection is only supported on
-          Windows Vista and newer and Linux. If you are on Windows XP or OS X,
-          you should use one of the wireless connection methods.
+.. note:: With newer Android devices, the USB connection is not supported on
+          Windows XP. If you are on Windows XP, you should use one of the
+          wireless connection methods.
 
 Over the air
 ^^^^^^^^^^^^^^
@@ -484,19 +490,23 @@ will always be under /dev by examining the output of::
 Why does |app| not support collections on the Kindle or shelves on the Nook?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Neither the Kindle nor the Nook provide any way to manipulate collections over a USB connection.
-If you really care about using collections, I would urge you to sell your Kindle/Nook and get a SONY.
-Only SONY seems to understand that life is too short to be entering collections one by one on an
-e-ink screen :)
+Neither the Kindle nor the Nook provide any way to manipulate collections over
+a USB connection.  If you really care about using collections, I would urge you
+to sell your Kindle/Nook and get a Kobo.  Only Kobo seems to understand that
+life is too short to be entering collections one by one on an e-ink screen :)
 
-Note that in the case of the Kindle, there is a way to manipulate collections via USB,
-but it requires that the Kindle be rebooted *every time* it is disconnected from the computer, for the
-changes to the collections to be recognized. As such, it is unlikely that
-any |app| developers will ever feel motivated enough to support it. There is however, a |app| plugin
-that allows you to create collections on your Kindle from the |app| metadata. It is available
-`from here <http://www.mobileread.com/forums/showthread.php?t=118635>`_. 
+Note that in the case of the Kindle, there is a way to manipulate collections
+via USB, but it requires that the Kindle be rebooted *every time* it is
+disconnected from the computer, for the changes to the collections to be
+recognized. As such, it is unlikely that any |app| developers will ever feel
+motivated enough to support it. There is however, a |app| plugin that allows
+you to create collections on your Kindle from the |app| metadata. It is
+available `from here <http://www.mobileread.com/forums/showthread.php?t=244202>`_. 
 
-.. note:: Amazon have removed the ability to manipulate collections completely in their newer models, like the Kindle Touch and Kindle Fire, making even the above plugin useless. If you really want the ability to manage collections on your Kindle via a USB connection, we encourage you to complain to Amazon about it, or get a reader where this is supported, like the SONY or Kobo Readers.
+.. note:: 
+    Amazon have removed the ability to manipulate collections completely
+    in their newer models, like the Kindle Touch and Kindle Fire, making even the
+    above plugin useless, unless you root your Kindle and install custom firmware.
 
 I am getting an error when I try to use |app| with my Kobo Touch/Glo/etc.?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -540,7 +550,7 @@ You can copy or move books between different libraries (once you have more than 
 How does |app| manage author names and sorting?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Author names are complex, especially across cultures. |app| has a very flexible strategy for managing author names. The first thing to understand is that books and authors are separate entities in |app|. A book can have more than one author, and an author can have more than one book. You can manage the authors of a book by the edit metadata dialog. You can manage individual authors by right clicking on the author in the Tag Browser on the left of the main |app| screen and selecting :guilabel:`Manage authors`. Using this dialog you can change the name of an author and also how that name is sorted. This will automatically change the name of the author in all the books of that author. When a book has multiple authors, separate their names using the & character.
+Author names are complex, especially across cultures, see `this note <http://www.w3.org/International/questions/qa-personal-names.en.php?changelang=en>`_ for some of complexities. |app| has a very flexible strategy for managing author names. The first thing to understand is that books and authors are separate entities in |app|. A book can have more than one author, and an author can have more than one book. You can manage the authors of a book by the edit metadata dialog. You can manage individual authors by right clicking on the author in the Tag Browser on the left of the main |app| screen and selecting :guilabel:`Manage authors`. Using this dialog you can change the name of an author and also how that name is sorted. This will automatically change the name of the author in all the books of that author. When a book has multiple authors, separate their names using the & character.
 
 Now coming to author name sorting:
 
@@ -684,16 +694,13 @@ if you are willing to live with that risk. In particular, be aware that
 Google Drive, **you will suffer data loss**. See `this thread
 <http://www.mobileread.com/forums/showthread.php?t=205581>`_ for details.
 
-Content From The Web
----------------------
+
+Miscellaneous
+--------------
+
 .. contents:: Contents
   :depth: 1
   :local:
-
-
-I obtained a recipe for a news site as a .py file from somewhere, how do I use it?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Start the :guilabel:`Add custom news sources` dialog (from the :guilabel:`Fetch news` menu) and click the :guilabel:`Switch to advanced mode` button. Delete everything in the box with the recipe source code and copy paste the contents of your .py file into the box. Click :guilabel:`Add/update recipe`.
 
 
 I want |app| to download news from my favorite news website.
@@ -702,16 +709,6 @@ If you are reasonably proficient with computers, you can teach |app| to download
 
 Otherwise, you can request a particular news site by posting in the `calibre Recipes forum <http://www.mobileread.com/forums/forumdisplay.php?f=228>`_.
 
-Can I use web2disk to download an arbitrary website?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-``web2disk http://mywebsite.com``
-
-Miscellaneous
---------------
-
-.. contents:: Contents
-  :depth: 1
-  :local:
 
 Why the name calibre?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -752,8 +749,6 @@ There can be several causes for this:
     * If you get an error in the welcome wizard on an initial run of calibre, try choosing a folder like :file:`C:\\library` as the calibre library (calibre sometimes
       has trouble with library locations if the path contains non-English characters, or only numbers, etc.)
     * Try running it as Administrator (Right click on the icon and select "Run as Administrator")
-    * **Windows Vista**: If the folder :file:`C:\\Users\\Your User Name\\AppData\\Local\\VirtualStore\\Program Files\\calibre` exists, delete it. Uninstall |app|. Reboot. Re-install.
-    * **Any windows version**: Try disabling any antivirus program you have running and see if that fixes it. Also try disabling any firewall software that prevents connections to the local computer.
 
 If it still wont launch, start a command prompt (press the windows key and R; then type :command:`cmd.exe` in the Run dialog that appears). At the command prompt type the following command and press Enter::
 

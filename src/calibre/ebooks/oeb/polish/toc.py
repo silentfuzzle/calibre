@@ -20,7 +20,9 @@ from calibre import __version__
 from calibre.ebooks.oeb.base import XPath, uuid_id, xml2text, NCX, NCX_NS, XML, XHTML, XHTML_NS, serialize
 from calibre.ebooks.oeb.polish.errors import MalformedMarkup
 from calibre.ebooks.oeb.polish.utils import guess_type
+from calibre.ebooks.oeb.polish.opf import set_guide_item, get_book_language
 from calibre.ebooks.oeb.polish.pretty import pretty_html_tree
+from calibre.translations.dynamic import translate
 from calibre.utils.localization import get_lang, canonicalize_lang, lang_as_iso639_1
 
 ns = etree.FunctionNamespace('calibre_xpath_extensions')
@@ -182,11 +184,12 @@ def find_existing_toc(container):
 
 def get_toc(container, verify_destinations=True):
     toc = find_existing_toc(container)
-    if toc is None:
+    if toc is None or not container.has_name(toc):
         ans = TOC()
-        ans.lang = ans.uid = None
+        ans.lang = ans.uid = ans.toc_file_name = None
         return ans
     ans = parse_ncx(container, toc)
+    ans.toc_file_name = toc
     if verify_destinations:
         verify_toc_destinations(container, ans)
     return ans
@@ -237,6 +240,12 @@ def item_at_top(elem):
     return True
 
 def from_xpaths(container, xpaths):
+    '''
+    Generate a Table of Contents from a list of XPath expressions. Each
+    expression in the list corresponds to a level of the generate ToC. For
+    example: :code:`['//h:h1', '//h:h2', '//h:h3']` will generate a three level
+    table of contents from the ``<h1>``, ``<h2>`` and ``<h3>`` tags.
+    '''
     tocroot = TOC()
     xpaths = [XPath(xp) for xp in xpaths]
     level_prev = {i+1:None for i in xrange(len(xpaths))}
@@ -292,6 +301,9 @@ def from_xpaths(container, xpaths):
     return tocroot
 
 def from_links(container):
+    '''
+    Generate a Table of Contents from links in the book.
+    '''
     toc = TOC()
     link_path = XPath('//h:a[@href]')
     seen_titles, seen_dests = set(), set()
@@ -335,6 +347,9 @@ def find_text(node):
                 return text
 
 def from_files(container):
+    '''
+    Generate a Table of Contents from files in the book.
+    '''
     toc = TOC()
     for i, spinepath in enumerate(container.spine_items):
         name = container.abspath_to_name(spinepath)
@@ -481,13 +496,23 @@ def find_inline_toc(container):
             return name
 
 def create_inline_toc(container, title=None):
-    title = title or _('Table of Contents')
+    '''
+    Create an inline (HTML) Table of Contents from an existing NCX table of contents.
+
+    :param title: The title for this table of contents.
+    '''
+    lang = get_book_language(container)
+    default_title = 'Table of Contents'
+    if lang:
+        lang = lang_as_iso639_1(lang) or lang
+        default_title = translate(lang, default_title)
+    title = title or default_title
     toc = get_toc(container)
     if len(toc) == 0:
         return None
     toc_name = find_inline_toc(container)
 
-    def process_node(html_parent, toc, level=1, indent='  '):
+    def process_node(html_parent, toc, level=1, indent='  ', style_level=2):
         li = html_parent.makeelement(XHTML('li'))
         li.tail = '\n'+ (indent*level)
         html_parent.append(li)
@@ -502,12 +527,13 @@ def create_inline_toc(container, title=None):
         li.append(a)
         if len(toc) > 0:
             parent = li.makeelement(XHTML('ul'))
+            parent.set('class', 'level%d' % (style_level))
             li.append(parent)
             a.tail = '\n\n' + (indent*(level+2))
             parent.text = '\n'+(indent*(level+3))
             parent.tail = '\n\n' + (indent*(level+1))
             for child in toc:
-                process_node(parent, child, level+3)
+                process_node(parent, child, level+3, style_level=style_level + 1)
             parent[-1].tail = '\n' + (indent*(level+2))
 
     E = ElementMaker(namespace=XHTML_NS, nsmap={None:XHTML_NS})
@@ -527,8 +553,12 @@ def create_inline_toc(container, title=None):
     )
 
     name = toc_name
+    ul = html[1][1]
+    ul.set('class', 'level1')
     for child in toc:
-        process_node(html[1][1], child)
+        process_node(ul, child)
+    if lang:
+        html.set('lang', lang)
     pretty_html_tree(container, html)
     raw = serialize(html, 'text/html')
     if name is None:
@@ -540,5 +570,6 @@ def create_inline_toc(container, title=None):
     else:
         with container.open(name, 'wb') as f:
             f.write(raw)
+    set_guide_item(container, 'toc', title, name, frag='calibre_generated_inline_toc')
     return name
 

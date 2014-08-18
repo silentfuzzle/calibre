@@ -107,7 +107,10 @@ def get_title_sort_pat(lang=None):
             q = get_lang()
     q = canonicalize_lang(q) if q else q
     data = tweaks['per_language_title_sort_articles']
-    ans = data.get(q, None)
+    try:
+        ans = data.get(q, None)
+    except AttributeError:
+        ans = None  # invalid tweak value
     try:
         ans = frozenset(ans) if ans else frozenset(data['eng'])
     except:
@@ -355,6 +358,20 @@ def check_isbn(isbn):
         return check_isbn10(isbn)
     if len(isbn) == 13:
         return check_isbn13(isbn)
+    return None
+
+def check_issn(issn):
+    if not issn:
+        return None
+    issn = re.sub(r'[^0-9X]', '', issn.upper())
+    try:
+        digits = map(int, issn[:7])
+        products = [(8 - i) * d for i, d in enumerate(digits)]
+        check = 11 - sum(products) % 11
+        if (check == 10 and issn[7] == 'X') or check == int(issn[7]):
+            return issn
+    except Exception:
+        pass
     return None
 
 def format_isbn(isbn):

@@ -1,5 +1,3 @@
-.. include:: global.rst
-
 .. _edit:
 
 Editing E-books 
@@ -78,7 +76,7 @@ sum of the individual file sizes.
 Many files have special meaning, in the book. These will typically have
 an icon next to their names, indicating the special meaning. For example, in
 the picture to the left, you can see that the files :guilabel:`cover_image.jpg`
-and :guilabel:`titlepage.xhtml` have the ocon of a cover next to them, this
+and :guilabel:`titlepage.xhtml` have the icon of a cover next to them, this
 indicates they are the book cover image and titlepage. Similarly, the
 :guilabel:`content.opf` file has a metadata icon next to it, indicating the
 book metadata is present in it and the the :guilabel:`toc.ncx` file has a T
@@ -123,7 +121,9 @@ Changing text file order
 
 You can re-arrange the order in which text (HTML) files are opened when reading
 the book by simply dragging and dropping them in the Files browser. For the
-technically inclined, this is called re-ordering the book spine.
+technically inclined, this is called re-ordering the book spine. Note that you
+have to drop the items *between* other items, not on top of them, this can be a
+little fiddly until you get used to it.
 
 Marking the cover
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -190,6 +190,11 @@ As a convenience, you can select multiple HTML files in the Files Browser,
 right click and choose Link stylesheets to have |app| automatically insert the
 <link> tags for those stylesheets into all the selected HTML files.
 
+.. raw:: html epub
+    
+    <div style="clear:both"></div>
+
+
 Search & Replace
 -------------------
 
@@ -225,6 +230,18 @@ You can also go to a specific line in the currently open editor via
 .. note:: 
     Remember, to harness the full power of search and replace, you will
     need to use regular expressions. See :ref:`regexptutorial`.
+
+Saved searches
+^^^^^^^^^^^^^^^
+
+You can save frequently used search/replace expressions and reuse them multiple times.
+To save a search simply right click in the Find box and select :guilabel:`Save current search`.
+
+You can bring up the dialog of saved searches via :guilabel:`Search->Saved
+Searches`. This will present you with a list of search and replace expressions
+that you can apply. You can even select multiple entries in the list by holding
+down the Ctrl Key while clicking so as to run multiple search and replace
+expressions in a single operation.
 
 Automated tools
 -------------------
@@ -308,6 +325,17 @@ Some of the checks performed are:
     * Various compatibility checks for known problems that can cause the book
       to malfunction on reader devices.
 
+Add a cover
+^^^^^^^^^^^^
+
+You can easily add a cover to the book via :guilabel:`Tools->Add cover`. This
+allows you to either choose an existing image in the book as the cover or
+import a new image into the book and make it the cover. When editing EPUB
+files, the HTML wrapper for the cover is automatically generated. If an
+existing cover in the book is found, it is replaced. The tool also
+automatically takes care of correctly marking the cover files as covers in the
+OPF.
+
 Embedding referenced fonts
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -367,6 +395,18 @@ broken HTML/CSS. Therefore, if you dont want any auto-fixing to be performed,
 first use the Check Book tool to correct all problems and only then run
 beautify.  Accessed via :guilabel:`Tools->Beautify all files`.
 
+.. note::
+    In HTML any text can have significant whitespace, via the CSS white-space
+    directive. Therefore, beautification could potentially change the rendering
+    of the HTML. To avoid this as far as possible, the beautify algorithm
+    only beautifies block level tags that contain other block level tags. So,
+    for example, text inside a <p> tag will not have its whitespace changed.
+    But a <body> tag that contains only other <p> and <div> tags will be
+    beautified.  This can sometimes mean that a particular file will not be
+    affected by beautify as it has no suitable block level tags. In such
+    cases you can try different beautification tools, that are less careful,
+    for example: `HTML Tidy <http://infohound.net/tidy/>`_.
+
 
 Insert inline Table of Contents
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -380,6 +420,27 @@ generated based on the currently defined Table of Contents.
 If you use this tool multiple times, each invocation will cause the previously
 created inline Table of Contents to be replaced. The tool can be accessed via
 :guilabel:`Tools->Table of Contents->Insert inline Table of Contents`.
+
+Set Semantics
+^^^^^^^^^^^^^^^^^
+
+This tool is used to set *semantics* in EPUB files. Semantics are simply,
+links in the OPF file that identify certain locations in the book as having
+special meaning. You can use them to identify the foreword, dedication, cover,
+table of contents, etc. Simply choose the type of semantic information you want
+to specify and then select the location in the book the link should point to.
+This tool can be accessed via :guilabel:`Tools->Set semantics`.
+
+Filter style information
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This tool can be used to easily remove specified CSS style properties from the
+entire book. You can tell it what properties you want removed, for example,
+``color, background-color, line-height`` and it will remove them from
+everywhere they occur --- stylesheets, ``<style>`` tags and inline ``style``
+attributes. After removing the style information, a summary of all the changes
+made is displayed so you can see exactly what was changed. The tool can be
+accessed via :guilabel:`Tools->Filter style information`.
 
 .. _checkpoints:
 
@@ -464,6 +525,37 @@ right clicking inside the file in the editor and choosing :guilabel:`Split at
 multiple locations`. This will allow you to easily split a large file at all
 heading tags or all tags having a certain class and so on.
 
+.. raw:: html epub
+    
+    <div style="clear:both"></div>
+
+The Live CSS panel
+---------------------
+
+.. image:: images/live_css.png
+    :alt: The Live Preview Panel
+    :class: float-left-img
+
+
+The :guilabel:`Live CSS` panel shows you all the style rules that apply to the
+tag you are currently editing. The name of tag, along with its line number in
+the editor are displayed, followed by a list of matching style rules.
+
+It is a great way to quickly see which style rules apply to any tag. The view
+also has clickable links (in blue), which take you directly to the location
+where the style was defined, in case you wish to make any changes to the style
+rules. Style rules that apply directly to the tag, as well as rules that are
+inherited from parent tags are shown.
+
+The panel also shows you what the finally calculated styles for the tag are.
+Properties in the list that are superseded by higher priority rules are shown
+with a line through them.
+
+You can enable the Live CSS panel via :guilabel:`View->Live CSS`.
+
+.. raw:: html epub
+    
+    <div style="clear:both"></div>
 
 Miscellaneous Tools
 ----------------------
@@ -479,16 +571,75 @@ You can right click to edit the Table of Contents, refresh the view or
 expand/collapse all items. Access this view via :guilabel:`Views->Table of
 Contents`.
 
+Checking the spelling of words in the book
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can run a spelling checker via :guilabel:`Tools->Check spelling`. 
+
+.. image:: images/edit-book-spell.png
+    :alt: The Check Spelling tool
+    :align: center
+    :class: fit-img
+
+Words are shown with the number of times they occur in the book and the
+language the word belongs to. Language information is taken from the books
+metadata and from ``lang`` attributes in the HTML files. This allows the spell
+checker to work well even with books that contain text in multiple languages.
+For example, in the following HTML extract, the word color will be checked
+using American English and the word colour using British English::
+
+    <div lang="en_US">color <span lang="en_GB">colour</span></div>
+
+.. note::
+    You can double click a word to highlight the next occurrence of that word
+    in the editor. This is useful if you wish to manually edit the word, or see
+    what context it is in.
+
+To change a word, simply double click one of the suggested alternative
+spellings on the right, or type in your own corrected spelling and click the
+:guilabel:`Change selected word to` button. This will replace all occurrences
+of the word in the book. You can also right click on a word in the main word
+list to change the word conveniently from the right click menu.
+
+You can have the spelling checker ignore a word for the current session by
+clicking the :guilabel:`Ignore` button. You can also add a word to the user
+dictionary by clicking the :guilabel:`Add to dictionary` button. The spelling
+checker supports multiple user dictionaries, so you can select the dictionary
+you want the word added to.
+
+You can also have the spelling checker display all the words in your book, not
+just the incorrectly spelled ones. This is useful to see what words are most
+common in your book and to run a simple search and replace on individual words.
+
+.. note::
+    If you make any changes to the book by editing files while the spell check
+    tool is open, you should click the :guilabel:`Refresh` button in the spell
+    check tool. If you do not do this and continue to use the spell check tool,
+    you could lose the changes you have made in the editor.
+
+Adding new dictionaries
+###########################
+
+The spelling checker comes with builtin dictionaries for the English and
+Spanish languages. You can install your own dictionaries via
+:guilabel:`Preferences->Editor->Manage spelling dictionaries`. The spell
+checker can use dictionaries from the OpenOffice program (in the .oxt
+format). You can download these dictionaries from
+`The OpenOffice Extensions repository <http://extensions.openoffice.org/>`_.
+
+
 Inserting special characters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can insert characters that are difficult to type by using the
 :guilabel:`Edit->Insert special character` tool. This shows you all unicode
-characters, simply click in the character you want to type. If you hold Ctrl
+characters, simply click on the character you want to type. If you hold Ctrl
 while clicking, the window will close itself after inserting the selected
-character.
+character. This tool can be used to insert special characters into the main
+text or into any other area of the user interface, such as the Search and
+replace tool.
 
-Because there are a lot of character, you can define your own "Favorites"
+Because there are a lot of characters, you can define your own :guilabel:`Favorite`
 characters, that will be shown first. Simply right click on a character to mark
 it as favorite. You can also right click on a character in favorites to remove
 it from favorites. Finally, you can re-arrange the order of characters in
@@ -502,6 +653,10 @@ into the corresponding character. For example, to type ÿ you would type ff and
 then Alt+X. To type a non-breaking space you would use a0 and then
 :guilabel:`Alt+X`, to type the horizontal ellipsis you would use 2026 and
 :guilabel:`Alt+X` and so on.
+
+Finally, you can type in special characters by using HTML named entities. For
+example, typing &nbsp; will be replaced by a non breaking space when you type the
+semi-colon. The replacement happens only when typing the semi-colon.
 
 The code inspector view
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -524,3 +679,13 @@ This tool allows you to automatically move all files into sub-folders based on
 their types. Access it via :guilabel:`Tools->Arrange into folders`. Note that
 this tool only changes how the files are arranged inside the EPUB, it does not
 change how they are displayed in the Files Browser.
+
+Importing files in other e-book formats as EPUB
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The editor includes the ability to import files in some other e-book formats
+directly as a new EPUB, without going through a full conversion. This is
+particularly useful to directly create EPUB files from your own hand-edited
+HTML files. You can do this via :guilabel:`File->Import an HTML or DOCX file as
+a new book`.
+

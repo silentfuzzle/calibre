@@ -216,6 +216,14 @@ def clean_word_doc(data, log):
         data = pat.sub('', data)
     return data
 
+class HTML5Doc(ValueError):
+    pass
+
+def check_for_html5(prefix, root):
+    if re.search(r'<!DOCTYPE\s+html\s*>', prefix, re.IGNORECASE) is not None:
+        if root.xpath('//svg'):
+            raise HTML5Doc('This document appears to be un-namespaced HTML 5, should be parsed by the HTML 5 parser')
+
 def parse_html(data, log=None, decoder=None, preprocessor=None,
         filename='<string>', non_html_file_tags=frozenset()):
     if log is None:
@@ -240,13 +248,19 @@ def parse_html(data, log=None, decoder=None, preprocessor=None,
     # Remove DOCTYPE declaration as it messes up parsing
     # In particular, it causes tostring to insert xmlns
     # declarations, which messes up the coercing logic
+    pre = ''
     idx = data.find('<html')
     if idx == -1:
         idx = data.find('<HTML')
+    has_html4_doctype = False
     if idx > -1:
         pre = data[:idx]
         data = data[idx:]
         if '<!DOCTYPE' in pre:  # Handle user defined entities
+            has_html4_doctype = re.search(r'<!DOCTYPE\s+[^>]+HTML\s+4.0[^.]+>', pre) is not None
+            # kindlegen produces invalid xhtml with uppercase attribute names
+            # if fed HTML 4 with uppercase attribute names, so try to detect
+            # and compensate for that.
             user_entities = {}
             for match in re.finditer(r'<!ENTITY\s+(\S+)\s+([^>]+)', pre):
                 val = match.group(2)
@@ -257,7 +271,7 @@ def parse_html(data, log=None, decoder=None, preprocessor=None,
                 pat = re.compile(r'&(%s);'%('|'.join(user_entities.keys())))
                 data = pat.sub(lambda m:user_entities[m.group(1)], data)
 
-    data = clean_word_doc(data, log)
+    data = raw = clean_word_doc(data, log)
 
     # Setting huge_tree=True causes crashes in windows with large files
     parser = etree.XMLParser(no_network=True)
@@ -265,14 +279,17 @@ def parse_html(data, log=None, decoder=None, preprocessor=None,
     # Try with more & more drastic measures to parse
     try:
         data = etree.fromstring(data, parser=parser)
-    except etree.XMLSyntaxError:
+        check_for_html5(pre, data)
+    except (HTML5Doc, etree.XMLSyntaxError):
         log.debug('Initial parse failed, using more'
                 ' forgiving parsers')
-        data = xml_replace_entities(data)
+        raw = data = xml_replace_entities(raw)
         try:
             data = etree.fromstring(data, parser=parser)
-        except etree.XMLSyntaxError:
+            check_for_html5(pre, data)
+        except (HTML5Doc, etree.XMLSyntaxError):
             log.debug('Parsing %s as HTML' % filename)
+            data = raw
             try:
                 data = html5_parse(data)
             except:
@@ -280,7 +297,7 @@ def parse_html(data, log=None, decoder=None, preprocessor=None,
                     'HTML 5 parsing failed, falling back to older parsers')
                 data = _html4_parse(data)
 
-    if data.tag == 'HTML':
+    if has_html4_doctype or data.tag == 'HTML':
         # Lower case all tag and attribute names
         data.tag = data.tag.lower()
         for x in data.iterdescendants():

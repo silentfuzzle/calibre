@@ -23,7 +23,7 @@ def available_translations():
     return _available_translations
 
 def get_system_locale():
-    from calibre.constants import iswindows
+    from calibre.constants import iswindows, isosx, plugins
     lang = None
     if iswindows:
         try:
@@ -34,6 +34,13 @@ def get_system_locale():
                 lang = None
         except:
             pass  # Windows XP does not have the GetUserDefaultLocaleName fn
+    elif isosx:
+        try:
+            lang = plugins['usbobserver'][0].user_locale() or None
+        except:
+            # Fallback to environment vars if something bad happened
+            import traceback
+            traceback.print_exc()
     if lang is None:
         try:
             lang = locale.getdefaultlocale(['LANGUAGE', 'LC_ALL', 'LC_CTYPE',
@@ -100,8 +107,23 @@ def get_all_translators():
                 buf = cStringIO.StringIO(zf.read(mpath + '/messages.mo'))
                 yield lang, GNUTranslations(buf)
 
+lcdata = {
+    u'abday': (u'Sun', u'Mon', u'Tue', u'Wed', u'Thu', u'Fri', u'Sat'),
+    u'abmon': (u'Jan', u'Feb', u'Mar', u'Apr', u'May', u'Jun', u'Jul', u'Aug', u'Sep', u'Oct', u'Nov', u'Dec'),
+    u'd_fmt': u'%m/%d/%Y',
+    u'd_t_fmt': u'%a %d %b %Y %r %Z',
+    u'day': (u'Sunday', u'Monday', u'Tuesday', u'Wednesday', u'Thursday', u'Friday', u'Saturday'),
+    u'mon': (u'January', u'February', u'March', u'April', u'May', u'June', u'July', u'August', u'September', u'October', u'November', u'December'),
+    u'noexpr': u'^[nN].*',
+    u'radixchar': u'.',
+    u't_fmt': u'%r',
+    u't_fmt_ampm': u'%I:%M:%S %p',
+    u'thousep': u',',
+    u'yesexpr': u'^[yY].*'
+}
+
 def set_translators():
-    global _lang_trans
+    global _lang_trans, lcdata
     # To test different translations invoke as
     # CALIBRE_OVERRIDE_LANG=de_DE.utf8 program
     lang = get_lang()
@@ -135,6 +157,11 @@ def set_translators():
                     iso639 = cStringIO.StringIO(zf.read(isof))
                 except:
                     pass  # No iso639 translations for this lang
+                if buf is not None:
+                    try:
+                        lcdata = cPickle.loads(zf.read(mpath + '/lcdata.pickle'))
+                    except:
+                        pass  # No lcdata
 
         if buf is not None:
             t = GNUTranslations(buf)
@@ -157,9 +184,9 @@ _extra_lang_codes = {
         'pt_BR' : _('Brazilian Portuguese'),
         'en_GB' : _('English (UK)'),
         'zh_CN' : _('Simplified Chinese'),
-        'zh_HK' : _('Chinese (HK)'),
         'zh_TW' : _('Traditional Chinese'),
         'en'    : _('English'),
+        'en_US' : _('English (United States)'),
         'en_AR' : _('English (Argentina)'),
         'en_AU' : _('English (Australia)'),
         'en_JP' : _('English (Japan)'),
@@ -179,7 +206,6 @@ _extra_lang_codes = {
         'en_PK' : _('English (Pakistan)'),
         'en_PL' : _('English (Poland)'),
         'en_HR' : _('English (Croatia)'),
-        'en_HK' : _('English (Hong Kong)'),
         'en_HU' : _('English (Hungary)'),
         'en_ID' : _('English (Indonesia)'),
         'en_IL' : _('English (Israel)'),
@@ -222,6 +248,7 @@ if False:
     _('pm')
     _('&Copy')
     _('Select All')
+    _('Copy Link')
     _('&Select All')
     _('Copy &Link location')
     _('&Undo')
@@ -235,15 +262,6 @@ if False:
     _('Fonts')
     _('&Step up')
     _('Step &down')
-    _('Basic colors')
-    _('Custom colors')
-    _('&Add to Custom Colors')
-    _('Hu&e')
-    _('&Sat')
-    _('&Val')
-    _('&Red')
-    _('&Green')
-    _('Bl&ue')
 
 _lcase_map = {}
 for k in _extra_lang_codes:

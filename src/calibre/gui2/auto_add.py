@@ -10,7 +10,7 @@ __docformat__ = 'restructuredtext en'
 import os, tempfile, shutil, time
 from threading import Thread, Event
 
-from PyQt4.Qt import (QFileSystemWatcher, QObject, Qt, pyqtSignal, QTimer)
+from PyQt5.Qt import (QFileSystemWatcher, QObject, Qt, pyqtSignal, QTimer)
 
 from calibre import prints
 from calibre.ptempfile import PersistentTemporaryDirectory
@@ -231,7 +231,7 @@ class AutoAdder(QObject):
                 paths.extend(p)
                 formats.extend(f)
                 metadata.extend(mis)
-            dups = [(mi, mi.cover, [p]) for mi, p in zip(metadata, paths)]
+            dups = [(mic, mic.cover, [p]) for mic, p in zip(metadata, paths)]
             d = DuplicatesQuestion(m.db, dups, parent=gui)
             dups = tuple(d.duplicates)
             if dups:
@@ -261,7 +261,7 @@ class AutoAdder(QObject):
                 'Added %(num)d book(s) automatically from %(src)s') %
                 dict(num=count, src=self.worker.path), 2000)
             if hasattr(gui, 'db_images'):
-                gui.db_images.reset()
+                gui.db_images.beginResetModel(), gui.db_images.endResetModel()
 
         if needs_rescan:
             QTimer.singleShot(2000, self.dir_changed)

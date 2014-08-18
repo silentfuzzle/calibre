@@ -125,8 +125,8 @@ def iterlinks(root, find_links_in_css=True):
 
         if tag == XHTML('object'):
             codebase = None
-            ## <object> tags have attributes that are relative to
-            ## codebase
+            # <object> tags have attributes that are relative to
+            # codebase
             if 'codebase' in attribs:
                 codebase = el.get('codebase')
                 yield (el, 'codebase', codebase, 0)
@@ -604,8 +604,8 @@ class Metadata(object):
                 allowed = self.allowed
                 if allowed is not None and term not in allowed:
                     raise AttributeError(
-                        'attribute %r not valid for metadata term %r'
-                            % (self.attr(term), barename(obj.term)))
+                        'attribute %r not valid for metadata term %r' % (
+                            self.attr(term), barename(obj.term)))
                 return self.attr(term)
 
             def __get__(self, obj, cls):
@@ -913,6 +913,7 @@ class Manifest(object):
 
         def _parse_css(self, data):
             from cssutils import CSSParser, log, resolveImports
+            from cssutils.css import CSSRule
             log.setLevel(logging.WARN)
             log.raiseExceptions = False
             self.oeb.log.debug('Parsing', self.href, '...')
@@ -924,6 +925,8 @@ class Manifest(object):
             data = parser.parseString(data, href=self.href, validate=False)
             data = resolveImports(data)
             data.namespaces['h'] = XHTML_NS
+            for rule in tuple(data.cssRules.rulesOfType(CSSRule.PAGE_RULE)):
+                data.cssRules.remove(rule)
             return data
 
         def _fetch_css(self, path):

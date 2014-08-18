@@ -9,7 +9,7 @@ __docformat__ = 'restructuredtext en'
 
 import os, cPickle, traceback, time, importlib
 from binascii import hexlify, unhexlify
-from multiprocessing.connection import Listener, arbitrary_address, Client
+from multiprocessing.connection import Client
 from threading import Thread
 from contextlib import closing
 
@@ -117,11 +117,9 @@ def communicate(ans, worker, listener, args, timeout=300, heartbeat=None,
     ans['result'] = cw.res['result']
 
 def create_worker(env, priority='normal', cwd=None, func='main'):
-    address = arbitrary_address('AF_PIPE' if iswindows else 'AF_UNIX')
-    if iswindows and address[1] == ':':
-        address = address[2:]
+    from calibre.utils.ipc.server import create_listener
     auth_key = os.urandom(32)
-    listener = Listener(address=address, authkey=auth_key)
+    address, listener = create_listener(auth_key)
 
     env = dict(env)
     env.update({
@@ -135,6 +133,32 @@ def create_worker(env, priority='normal', cwd=None, func='main'):
     w = Worker(env)
     w(cwd=cwd, priority=priority)
     return listener, w
+
+def start_pipe_worker(command, env=None, priority='normal'):
+    import subprocess, atexit
+    from functools import partial
+    w = Worker(env or {})
+    args = {'stdout':subprocess.PIPE, 'stdin':subprocess.PIPE, 'env':w.env}
+    if iswindows:
+        import win32process
+        priority = {
+                'high'   : win32process.HIGH_PRIORITY_CLASS,
+                'normal' : win32process.NORMAL_PRIORITY_CLASS,
+                'low'    : win32process.IDLE_PRIORITY_CLASS}[priority]
+        args['creationflags'] = win32process.CREATE_NO_WINDOW|priority
+    else:
+        def renice(niceness):
+            try:
+                os.nice(niceness)
+            except:
+                pass
+        niceness = {'normal' : 0, 'low'    : 10, 'high'   : 20}[priority]
+        args['preexec_fn'] = partial(renice, niceness)
+        args['close_fds'] = True
+
+    p = subprocess.Popen([w.executable, '--pipe-worker', command], **args)
+    atexit.register(w.kill)
+    return p
 
 def fork_job(mod_name, func_name, args=(), kwargs={}, timeout=300,  # seconds
         cwd=None, priority='normal', env={}, no_output=False, heartbeat=None,

@@ -10,6 +10,8 @@ import string
 from future_builtins import map
 
 from calibre.utils.config import JSONConfig
+from calibre.spell.dictionary import Dictionaries, parse_lang_code
+
 tprefs = JSONConfig('tweak_book_gui')
 d = tprefs.defaults
 
@@ -39,7 +41,29 @@ d['preview_minimum_font_size'] = 8
 d['remove_existing_links_when_linking_sheets'] = True
 d['charmap_favorites'] = list(map(ord, '\xa0\u2002\u2003\u2009\xad' '‘’“”‹›«»‚„' '—–§¶†‡©®™' '→⇒•·°±−×÷¼½½¾' '…µ¢£€¿¡¨´¸ˆ˜' 'ÀÁÂÃÄÅÆÇÈÉÊË' 'ÌÍÎÏÐÑÒÓÔÕÖØ' 'ŒŠÙÚÛÜÝŸÞßàá' 'âãäåæçèéêëìí' 'îïðñòóôõöøœš' 'ùúûüýÿþªºαΩ∞'))  # noqa
 d['folders_for_types'] = {'style':'styles', 'image':'images', 'font':'fonts', 'audio':'audio', 'video':'video'}
-
+d['pretty_print_on_open'] = False
+d['disable_completion_popup_for_search'] = False
+d['saved_searches'] = []
+d['insert_tag_mru'] = ['p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'em', 'strong', 'td', 'tr']
+d['spell_check_case_sensitive_sort'] = False
+d['inline_spell_check'] = True
+d['custom_themes'] = {}
+d['remove_unused_classes'] = False
+d['global_book_toolbar'] = [
+'new-file', 'open-book',  'save-book', None, 'global-undo', 'global-redo', 'create-checkpoint', None, 'donate', 'user-manual']
+d['global_tools_toolbar'] = ['check-book', 'spell-check-book', 'edit-toc', 'insert-character', 'manage-fonts', 'smarten-punctuation', 'remove-unused-css']
+d['global_plugins_toolbar'] = []
+d['editor_common_toolbar'] = [('editor-' + x) if x else None for x in ('undo', 'redo', None, 'cut', 'copy', 'paste')]
+d['editor_css_toolbar'] = ['pretty-current', 'insert-image']
+d['editor_xml_toolbar'] = ['pretty-current', 'insert-tag']
+d['editor_html_toolbar'] = ['fix-html-current', 'pretty-current', 'insert-image', 'insert-hyperlink', 'insert-tag', 'change-paragraph']
+d['editor_format_toolbar'] = [('format-text-' + x) if x else x for x in (
+'bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript',
+    None, 'color', 'background-color', None, 'justify-left', 'justify-center',
+    'justify-right', 'justify-fill')]
+d['spell_check_case_sensitive_search'] = False
+d['add_cover_preserve_aspect_ratio'] = False
+d['templates'] = {}
 del d
 
 ucase_map = {l:string.ascii_uppercase[i] for i, l in enumerate(string.ascii_lowercase)}
@@ -64,4 +88,37 @@ class NonReplaceDict(dict):
 
 actions = NonReplaceDict()
 editors = NonReplaceDict()
+toolbar_actions = NonReplaceDict()
+editor_toolbar_actions = {
+    'format':NonReplaceDict(), 'html':NonReplaceDict(), 'xml':NonReplaceDict(), 'css':NonReplaceDict()}
+
 TOP = object()
+dictionaries = Dictionaries()
+
+def editor_name(editor):
+    for n, ed in editors.iteritems():
+        if ed is editor:
+            return n
+
+def set_book_locale(lang):
+    dictionaries.initialize()
+    try:
+        dictionaries.default_locale = parse_lang_code(lang)
+        if dictionaries.default_locale.langcode == 'und':
+            raise ValueError('')
+    except ValueError:
+        dictionaries.default_locale = dictionaries.ui_locale
+    from calibre.gui2.tweak_book.editor.syntax.html import refresh_spell_check_status
+    refresh_spell_check_status()
+
+def verify_link(url, name=None):
+    if _current_container is None or name is None:
+        return None
+    target = _current_container.href_to_name(url, name)
+    if _current_container.has_name(target):
+        return True
+    if url.startswith('#'):
+        return True
+    if url.partition(':')[0] in {'http', 'https', 'mailto'}:
+        return True
+    return False

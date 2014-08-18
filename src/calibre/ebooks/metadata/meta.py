@@ -100,40 +100,30 @@ def _get_metadata(stream, stream_type, use_libprs_metadata,
     if use_libprs_metadata and getattr(opf, 'application_id', None) is not None:
         return opf
 
-    mi = MetaInformation(None, None)
     name = os.path.basename(getattr(stream, 'name', ''))
-    base = metadata_from_filename(name, pat=pattern)
-    if force_read_metadata or prefs['read_file_metadata']:
-        mi = get_file_type_metadata(stream, stream_type)
-    if base.title == os.path.splitext(name)[0] and \
-            base.is_null('authors') and base.is_null('isbn'):
-        # Assume that there was no metadata in the file and the user set pattern
-        # to match meta info from the file name did not match.
-        # The regex is meant to match the standard format filenames are written
-        # in the library title - author.extension
-        base.smart_update(metadata_from_filename(name, re.compile(
-            r'^(?P<title>.+)[ _]-[ _](?P<author>[^-]+)$')))
-        if base.title:
-            base.title = base.title.replace('_', ' ')
-        if base.authors:
-            base.authors = [a.replace('_', ' ').strip() for a in base.authors]
+    # The fallback pattern matches the default filename format produced by calibre
+    base = metadata_from_filename(name, pat=pattern, fallback_pat=re.compile(
+            r'^(?P<title>.+) - (?P<author>[^-]+)$'))
     if not base.authors:
         base.authors = [_('Unknown')]
     if not base.title:
         base.title = _('Unknown')
+    mi = MetaInformation(None, None)
+    if force_read_metadata or prefs['read_file_metadata']:
+        mi = get_file_type_metadata(stream, stream_type)
     base.smart_update(mi)
     if opf is not None:
         base.smart_update(opf)
 
     return base
 
-def set_metadata(stream, mi, stream_type='lrf'):
+def set_metadata(stream, mi, stream_type='lrf', report_error=None):
     if stream_type:
         stream_type = stream_type.lower()
-    set_file_type_metadata(stream, mi, stream_type)
+    set_file_type_metadata(stream, mi, stream_type, report_error=report_error)
 
 
-def metadata_from_filename(name, pat=None):
+def metadata_from_filename(name, pat=None, fallback_pat=None):
     if isbytestring(name):
         name = name.decode(filesystem_encoding, 'replace')
     name = name.rpartition('.')[0]
@@ -142,6 +132,8 @@ def metadata_from_filename(name, pat=None):
         pat = re.compile(prefs.get('filename_pattern'))
     name = name.replace('_', ' ')
     match = pat.search(name)
+    if match is None and fallback_pat is not None:
+        match = fallback_pat.search(name)
     if match is not None:
         try:
             mi.title = match.group('title')
@@ -191,6 +183,11 @@ def metadata_from_filename(name, pat=None):
                 from calibre.utils.date import parse_only_date
                 mi.pubdate = parse_only_date(pubdate)
         except:
+            pass
+        try:
+            comments = match.group('comments')
+            mi.comments = comments
+        except (IndexError, ValueError):
             pass
 
     if mi.is_null('title'):

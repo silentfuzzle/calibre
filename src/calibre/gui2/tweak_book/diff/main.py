@@ -9,7 +9,7 @@ __copyright__ = '2014, Kovid Goyal <kovid at kovidgoyal.net>'
 import sys, os, re
 from functools import partial
 
-from PyQt4.Qt import (
+from PyQt5.Qt import (
     QGridLayout, QToolButton, QIcon, QRadioButton, QMenu, QApplication, Qt,
     QSize, QWidget, QLabel, QStackedLayout, QPainter, QRect, QVBoxLayout,
     QCursor, QEventLoop, QKeySequence, pyqtSignal, QTimer, QHBoxLayout)
@@ -109,13 +109,13 @@ def get_decoded_raw(name):
             raw = xml_to_unicode(raw, verbose=True)[0]
         else:
             m = re.search(r"coding[:=]\s*([-\w.]+)", raw[:1024], flags=re.I)
-            if m is not None:
+            if m is not None and m.group(1) != '8bit':
                 enc = m.group(1)
             else:
                 enc = force_encoding(raw, verbose=True)
             try:
                 raw = raw.decode(enc)
-            except ValueError:
+            except (LookupError, ValueError):
                 pass
     return raw, syntax
 
@@ -126,7 +126,8 @@ def file_diff(left, right):
         raw1, raw2 = open(left, 'rb').read(), open(right, 'rb').read()
     cache = Cache()
     cache.set_left(left, raw1), cache.set_right(right, raw2)
-    return cache, {left:syntax1, right:syntax2}, {left:right}, {}, set(), set()
+    changed_names = {} if raw1 == raw2 else {left:right}
+    return cache, {left:syntax1, right:syntax2}, changed_names, {}, set(), set()
 
 def dir_diff(left, right):
     ldata, rdata, lsmap, rsmap = {}, {}, {}, {}
@@ -438,19 +439,25 @@ def compare_books(path1, path2, revert_msg=None, revert_callback=None, parent=No
     d.break_cycles()
 
 def main(args=sys.argv):
-    left, right = sys.argv[-2:]
+    from calibre.gui2 import Application
+    left, right = args[-2:]
     ext1, ext2 = left.rpartition('.')[-1].lower(), right.rpartition('.')[-1].lower()
+    if ext1.startswith('original_'):
+        ext1 = ext1.partition('_')[-1]
+    if ext2.startswith('original_'):
+        ext2 = ext2.partition('_')[-2]
     if os.path.isdir(left):
         attr = 'dir_diff'
     elif (ext1, ext2) in {('epub', 'epub'), ('azw3', 'azw3')}:
         attr = 'ebook_diff'
     else:
         attr = 'file_diff'
-    app = QApplication([])
+    app = Application([])  # noqa
     d = Diff(show_as_window=True)
-    d.show()
-    getattr(d, attr)(left, right)
-    return app.exec_()
+    func = getattr(d, attr)
+    QTimer.singleShot(0, lambda : func(left, right))
+    d.exec_()
+    return 0
 
 if __name__ == '__main__':
     main()

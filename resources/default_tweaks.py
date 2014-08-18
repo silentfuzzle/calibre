@@ -147,7 +147,7 @@ sort_columns_at_startup = None
 #  d     the day as number without a leading zero (1 to 31)
 #  dd    the day as number with a leading zero (01 to 31)
 #  ddd   the abbreviated localized day name (e.g. 'Mon' to 'Sun').
-#  dddd  the long localized day name (e.g. 'Monday' to 'Qt::Sunday').
+#  dddd  the long localized day name (e.g. 'Monday' to 'Sunday').
 #  M     the month as number without a leading zero (1-12)
 #  MM    the month as number with a leading zero (01-12)
 #  MMM   the abbreviated localized month name (e.g. 'Jan' to 'Dec').
@@ -219,6 +219,10 @@ save_template_title_series_sorting = 'library_order'
 per_language_title_sort_articles = {
         # English
         'eng'  : (r'A\s+', r'The\s+', r'An\s+'),
+
+        # Esperanto
+        'epo': (r'La\s+', r"L'", 'L\xb4'),
+
         # Spanish
         'spa'  : (r'El\s+', r'La\s+', r'Lo\s+', r'Los\s+', r'Las\s+', r'Un\s+',
                   r'Una\s+', r'Unos\s+', r'Unas\s+'),
@@ -226,8 +230,11 @@ per_language_title_sort_articles = {
         'fra'  : (r'Le\s+', r'La\s+', r"L'", u'L´', r'Les\s+', r'Un\s+', r'Une\s+',
                   r'Des\s+', r'De\s+La\s+', r'De\s+', r"D'", u'D´'),
         # Italian
-        'ita'  : (r'Lo\s+', r'Il\s+', r"L'", r'La\s+', r'Gli\s+', r'I\s+',
-                  r'Le\s+', ),
+        'ita': ('Lo\\s+', 'Il\\s+', "L'", 'L\xb4', 'La\\s+', 'Gli\\s+',
+                'I\\s+', 'Le\\s+', 'Uno\\s+', 'Un\\s+', 'Una\\s+', "Un'",
+                'Un\xb4', 'Dei\\s+', 'Degli\\s+', 'Delle\\s+', 'Del\\s+',
+                'Della\\s+', 'Dello\\s+', "Dell'", 'Dell\xb4'),
+
         # Portuguese
         'por'  : (r'A\s+', r'O\s+', r'Os\s+', r'As\s+', r'Um\s+', r'Uns\s+',
                   r'Uma\s+', r'Umas\s+', ),
@@ -444,7 +451,7 @@ public_smtp_relay_delay = 301
 # All covers in the calibre library will be resized, preserving aspect ratio,
 # to fit within this size. This is to prevent slowdowns caused by extremely
 # large covers
-maximum_cover_size = (1450, 2000)
+maximum_cover_size = (1650, 2200)
 
 #: Where to send downloaded news
 # When automatically sending downloaded news to a connected device, calibre

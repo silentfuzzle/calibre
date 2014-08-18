@@ -9,7 +9,7 @@ __docformat__ = 'restructuredtext en'
 
 import os, shutil
 
-from PyQt4.Qt import (QFontInfo, QFontMetrics, Qt, QFont, QFontDatabase, QPen,
+from PyQt5.Qt import (QFontInfo, QFontMetrics, Qt, QFont, QFontDatabase, QPen,
         QStyledItemDelegate, QSize, QStyle, QStringListModel, pyqtSignal,
         QDialog, QVBoxLayout, QApplication, QFontComboBox, QPushButton,
         QToolButton, QGridLayout, QListView, QWidget, QDialogButtonBox, QIcon,
@@ -66,7 +66,7 @@ class FontFamilyDelegate(QStyledItemDelegate):
             return QSize(300, 50)
 
     def do_size_hint(self, option, index):
-        text = index.data(Qt.DisplayRole).toString()
+        text = index.data(Qt.DisplayRole) or ''
         font = QFont(option.font)
         font.setPointSize(QFontInfo(font).pointSize() * 1.5)
         m = QFontMetrics(font)
@@ -82,7 +82,7 @@ class FontFamilyDelegate(QStyledItemDelegate):
         painter.restore()
 
     def do_paint(self, painter, option, index):
-        text = unicode(index.data(Qt.DisplayRole).toString())
+        text = unicode(index.data(Qt.DisplayRole) or '')
         font = QFont(option.font)
         font.setPointSize(QFontInfo(font).pointSize() * 1.5)
         font2 = QFont(font)
@@ -285,8 +285,9 @@ class FontFamilyDialog(QDialog):
         for f in files:
             shutil.copyfile(f, os.path.join(dest, os.path.basename(f)))
         self.font_scanner.do_scan()
+        self.m.beginResetModel()
         self.build_font_list()
-        self.m.reset()
+        self.m.endResetModel()
         self.view.setCurrentIndex(self.m.index(0))
         if families:
             for i, val in enumerate(self.families):
@@ -333,6 +334,7 @@ class FontFamilyChooser(QWidget):
         self.setToolTip = self.button.setToolTip
         self.toolTip = self.button.toolTip
         self.clear_button.setToolTip(_('Clear the font family'))
+        l.addStretch(1)
 
     def clear_family(self):
         self.font_family = None

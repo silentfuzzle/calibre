@@ -282,8 +282,8 @@ class BrowseServer(object):
         ans = ans.replace('{Search}', _('Search'))
         opts = ['<option %svalue="%s">%s</option>' % (
             'selected="selected" ' if k==sort else '',
-            xml(k), xml(n), ) for k, n in
-                sorted(sort_opts, key=lambda x: sort_key(operator.itemgetter(1)(x))) if k and n]
+            xml(k), xml(nl), ) for k, nl in
+                sorted(sort_opts, key=lambda x: sort_key(operator.itemgetter(1)(x))) if k and nl]
         ans = ans.replace('{sort_select_options}', ('\n'+' '*20).join(opts))
         lp = self.db.library_path
         if isbytestring(lp):
@@ -498,7 +498,9 @@ class BrowseServer(object):
                     datatype, self.opts.url_prefix)
             href = re.search(r'<a href="([^"]+)"', html)
             if href is not None:
-                raise cherrypy.InternalRedirect(href.group(1))
+                # cherrypy does not auto unquote params when using
+                # InternalRedirect
+                raise cherrypy.InternalRedirect(unquote(href.group(1)))
 
         if len(items) <= self.opts.max_opds_ungrouped_items:
             script = 'false'

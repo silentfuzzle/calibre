@@ -11,7 +11,7 @@ import re
 from contextlib import closing
 from lxml import html
 
-from PyQt4.Qt import QUrl
+from PyQt5.Qt import QUrl
 
 from calibre import browser
 from calibre.gui2 import open_url
@@ -97,7 +97,7 @@ class AmazonUKKindleStore(StorePlugin):
                         './/ul[contains(@class, "rsltL")]'
                         '//span[contains(@class, "lrg") and not(contains(@class, "bld"))]/text()')
                 asin_xpath = '@name'
-                cover_xpath = './/img[@class="productImage"]/@src'
+                cover_xpath = './/img[contains(@class, "productImage")]/@src'
                 title_xpath = './/h3[@class="newaps"]/a//text()'
                 author_xpath = './/h3[@class="newaps"]//span[contains(@class, "reg")]//text()'
                 price_xpath = (

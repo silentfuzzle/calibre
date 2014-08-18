@@ -9,11 +9,14 @@ __copyright__ = '2014, Kovid Goyal <kovid at kovidgoyal.net>'
 import re
 
 from lxml import etree
-from cssselect import HTMLTranslator
+from cssutils.css import CSSRule
+from cssselect import HTMLTranslator, parse
 from cssselect.xpath import XPathExpr, is_safe_name
+from cssselect.parser import SelectorSyntaxError
 
 from calibre import force_unicode
 from calibre.ebooks.oeb.base import OEB_STYLES, OEB_DOCS, XPNSMAP, XHTML_NS
+from calibre.ebooks.oeb.normalize_css import normalize_filter_css, normalizers
 from calibre.ebooks.oeb.stylizer import MIN_SPACE_RE, is_non_whitespace, xpath_lower_case, fix_namespace
 from calibre.ebooks.oeb.polish.pretty import pretty_script_or_style
 
@@ -117,16 +120,46 @@ def preserve_htmlns_prefix(sheet, prefix):
     else:
         sheet.namespaces[prefix] = XHTML_NS
 
-def remove_unused_css(container, report):
-    from cssutils.css import CSSRule
-    sheets = {name:container.parsed(name) for name, mt in container.mime_map.iteritems() if mt in OEB_STYLES}
+def get_imported_sheets(name, container, sheets, recursion_level=10, sheet=None):
+    ans = set()
+    sheet = sheet or sheets[name]
+    for rule in sheet.cssRules.rulesOfType(CSSRule.IMPORT_RULE):
+        if rule.href:
+            iname = container.href_to_name(rule.href, name)
+            if iname in sheets:
+                ans.add(iname)
+    if recursion_level > 0:
+        for imported_sheet in tuple(ans):
+            ans |= get_imported_sheets(imported_sheet, container, sheets, recursion_level=recursion_level-1)
+    ans.discard(name)
+    return ans
+
+def remove_unused_css(container, report=None, remove_unused_classes=False):
+    '''
+    Remove all unused CSS rules from the book. An unused CSS rule is one that does not match any actual content.
+
+    :param report: An optional callable that takes a single argument. It is called with information about the operations being performed.
+    :param remove_unused_classes: If True, class attributes in the HTML that do not match any CSS rules are also removed.
+    '''
+    report = report or (lambda x:x)
+
+    def safe_parse(name):
+        try:
+            return container.parsed(name)
+        except TypeError:
+            pass
+    sheets = {name:safe_parse(name) for name, mt in container.mime_map.iteritems() if mt in OEB_STYLES}
+    sheets = {k:v for k, v in sheets.iteritems() if v is not None}
+    import_map = {name:get_imported_sheets(name, container, sheets) for name in sheets}
+    if remove_unused_classes:
+        class_map = {name:{icu_lower(x) for x in classes_in_rule_list(sheet.cssRules)} for name, sheet in sheets.iteritems()}
     sheet_namespace = {}
     for sheet in sheets.itervalues():
         sheet_namespace[sheet] = process_namespaces(sheet)
         sheet.namespaces['h'] = XHTML_NS
     style_rules = {name:tuple(sheet.cssRules.rulesOfType(CSSRule.STYLE_RULE)) for name, sheet in sheets.iteritems()}
 
-    num_of_removed_rules = 0
+    num_of_removed_rules = num_of_removed_classes = 0
     pseudo_pat = re.compile(r':(first-letter|first-line|link|hover|visited|active|focus|before|after)', re.I)
     cache = {}
 
@@ -134,9 +167,17 @@ def remove_unused_css(container, report):
         if mt not in OEB_DOCS:
             continue
         root = container.parsed(name)
+        used_classes = set()
         for style in root.xpath('//*[local-name()="style"]'):
             if style.get('type', 'text/css') == 'text/css' and style.text:
                 sheet = container.parse_css(style.text)
+                if remove_unused_classes:
+                    used_classes |= {icu_lower(x) for x in classes_in_rule_list(sheet.cssRules)}
+                imports = get_imported_sheets(name, container, sheets, sheet=sheet)
+                for imported_sheet in imports:
+                    style_rules[imported_sheet] = tuple(filter_used_rules(root, style_rules[imported_sheet], container.log, pseudo_pat, cache))
+                    if remove_unused_classes:
+                        used_classes |= class_map[imported_sheet]
                 ns = process_namespaces(sheet)
                 sheet.namespaces['h'] = XHTML_NS
                 rules = tuple(sheet.cssRules.rulesOfType(CSSRule.STYLE_RULE))
@@ -151,8 +192,30 @@ def remove_unused_css(container, report):
 
         for link in root.xpath('//*[local-name()="link" and @href]'):
             sname = container.href_to_name(link.get('href'), name)
-            if sname in sheets:
-                style_rules[sname] = tuple(filter_used_rules(root, style_rules[sname], container.log, pseudo_pat, cache))
+            if sname not in sheets:
+                continue
+            style_rules[sname] = tuple(filter_used_rules(root, style_rules[sname], container.log, pseudo_pat, cache))
+            if remove_unused_classes:
+                used_classes |= class_map[sname]
+
+            for iname in import_map[sname]:
+                style_rules[iname] = tuple(filter_used_rules(root, style_rules[iname], container.log, pseudo_pat, cache))
+                if remove_unused_classes:
+                    used_classes |= class_map[iname]
+
+        if remove_unused_classes:
+            for elem in root.xpath('//*[@class]'):
+                original_classes, classes = elem.get('class', '').split(), []
+                for x in original_classes:
+                    if icu_lower(x) in used_classes:
+                        classes.append(x)
+                if len(classes) != len(original_classes):
+                    if classes:
+                        elem.set('class', ' '.join(classes))
+                    else:
+                        del elem.attrib['class']
+                    num_of_removed_classes += len(original_classes) - len(classes)
+                    container.dirty(name)
 
     for name, sheet in sheets.iteritems():
         preserve_htmlns_prefix(sheet, sheet_namespace[sheet])
@@ -163,7 +226,124 @@ def remove_unused_css(container, report):
             container.dirty(name)
 
     if num_of_removed_rules > 0:
-        report(_('Removed %d unused CSS style rules') % num_of_removed_rules)
+        report(ngettext('Removed %d unused CSS style rule', 'Removed %d unused CSS style rules',
+                        num_of_removed_rules) % num_of_removed_rules)
     else:
         report(_('No unused CSS style rules found'))
-    return num_of_removed_rules > 0
+    if remove_unused_classes:
+        if num_of_removed_classes > 0:
+            report(ngettext('Removed %d unused class from the HTML', 'Removed %d unused classes from the HTML',
+                   num_of_removed_classes) % num_of_removed_classes)
+        else:
+            report(_('No unused class attributes found'))
+    return num_of_removed_rules + num_of_removed_classes > 0
+
+def filter_declaration(style, properties):
+    changed = False
+    for prop in properties:
+        if style.removeProperty(prop) != '':
+            changed = True
+    all_props = set(style.keys())
+    for prop in style.getProperties():
+        n = normalizers.get(prop.name, None)
+        if n is not None:
+            normalized = n(prop.name, prop.propertyValue)
+            removed = properties.intersection(set(normalized))
+            if removed:
+                changed = True
+                style.removeProperty(prop.name)
+                for prop in set(normalized) - removed - all_props:
+                    style.setProperty(prop, normalized[prop])
+    return changed
+
+def filter_sheet(sheet, properties):
+    from cssutils.css import CSSRule
+    changed = False
+    remove = []
+    for rule in sheet.cssRules.rulesOfType(CSSRule.STYLE_RULE):
+        if filter_declaration(rule.style, properties):
+            changed = True
+            if rule.style.length == 0:
+                remove.append(rule)
+    for rule in remove:
+        sheet.cssRules.remove(rule)
+    return changed
+
+
+def filter_css(container, properties, names=()):
+    '''
+    Remove the specified CSS properties from all CSS rules in the book.
+
+    :param properties: Set of properties to remove. For example: :code:`{'font-family', 'color'}`.
+    :param names: The files from which to remove the properties. Defaults to all HTML and CSS files in the book.
+    '''
+    if not names:
+        types = OEB_STYLES | OEB_DOCS
+        names = []
+        for name, mt in container.mime_map.iteritems():
+            if mt in types:
+                names.append(name)
+    properties = normalize_filter_css(properties)
+    doc_changed = False
+
+    for name in names:
+        mt = container.mime_map[name]
+        if mt in OEB_STYLES:
+            sheet = container.parsed(name)
+            filtered = filter_sheet(sheet, properties)
+            if filtered:
+                container.dirty(name)
+                doc_changed = True
+        elif mt in OEB_DOCS:
+            root = container.parsed(name)
+            changed = False
+            for style in root.xpath('//*[local-name()="style"]'):
+                if style.text and style.get('type', 'text/css') in {None, '', 'text/css'}:
+                    sheet = container.parse_css(style.text)
+                    if filter_sheet(sheet, properties):
+                        changed = True
+                        style.text = force_unicode(sheet.cssText, 'utf-8')
+                        pretty_script_or_style(container, style)
+            for elem in root.xpath('//*[@style]'):
+                text = elem.get('style', None)
+                if text:
+                    style = container.parse_css(text, is_declaration=True)
+                    if filter_declaration(style, properties):
+                        changed = True
+                        if style.length == 0:
+                            del elem.attrib['style']
+                        else:
+                            elem.set('style', force_unicode(style.getCssText(separator=' '), 'utf-8'))
+            if changed:
+                container.dirty(name)
+                doc_changed = True
+
+    return doc_changed
+
+def _classes_in_selector(selector, classes):
+    for attr in ('selector', 'subselector', 'parsed_tree'):
+        s = getattr(selector, attr, None)
+        if s is not None:
+            _classes_in_selector(s, classes)
+    cn = getattr(selector, 'class_name', None)
+    if cn is not None:
+        classes.add(cn)
+
+def classes_in_selector(text):
+    classes = set()
+    try:
+        for selector in parse(text):
+            _classes_in_selector(selector, classes)
+    except SelectorSyntaxError:
+        pass
+    return classes
+
+def classes_in_rule_list(css_rules):
+    classes = set()
+    for rule in css_rules:
+        if rule.type == rule.STYLE_RULE:
+            classes |= classes_in_selector(rule.selectorText)
+        elif hasattr(rule, 'cssRules'):
+            classes |= classes_in_rule_list(rule.cssRules)
+    return classes
+

@@ -8,7 +8,7 @@ __docformat__ = 'restructuredtext en'
 import time
 from functools import partial
 
-from PyQt4.Qt import QTimer, QDialog, QDialogButtonBox, QCheckBox, QVBoxLayout, QLabel, Qt
+from PyQt5.Qt import QTimer, QDialog, QDialogButtonBox, QCheckBox, QVBoxLayout, QLabel, Qt
 
 from calibre.gui2 import error_dialog
 from calibre.gui2.actions import InterfaceAction
@@ -54,7 +54,7 @@ class Choose(QDialog):
 class TweakEpubAction(InterfaceAction):
 
     name = 'Tweak ePub'
-    action_spec = (_('Edit Book'), 'tweak.png', _('Edit eBooks'), _('T'))
+    action_spec = (_('Edit book'), 'tweak.png', _('Edit books in the EPUB or AZW formats'), _('T'))
     dont_add_to = frozenset(['context-menu-device'])
     action_type = 'current'
 
@@ -97,6 +97,9 @@ class TweakEpubAction(InterfaceAction):
         self.do_tweak(book_id)
 
     def do_tweak(self, book_id):
+        if self.gui.current_view() is not self.gui.library_view:
+            return error_dialog(self.gui, _('Cannot Edit Book'), _(
+                'Editing of books on the device is not supported'), show=True)
         from calibre.ebooks.oeb.polish.main import SUPPORTED
         db = self.gui.library_view.model().db
         fmts = db.formats(book_id, index_is_id=True) or ''
@@ -128,15 +131,11 @@ class TweakEpubAction(InterfaceAction):
                 'The %s format is missing from the calibre library. You should run'
                 ' library maintenance.') % fmt, show=True)
         tweak = 'ebook-edit'
-        self.gui.setCursor(Qt.BusyCursor)
-        if tprefs['update_metadata_from_calibre']:
-            from calibre.ebooks.metadata.opf2 import pretty_print
-            from calibre.ebooks.metadata.meta import set_metadata
-            mi = db.new_api.get_metadata(book_id, get_cover=True)
-            with pretty_print, open(path, 'r+b') as f:
-                set_metadata(f, mi, stream_type=fmt.lower())
-        notify = '%d:%s:%s:%s' % (book_id, fmt, db.library_id, db.library_path)
         try:
+            self.gui.setCursor(Qt.BusyCursor)
+            if tprefs['update_metadata_from_calibre']:
+                db.new_api.embed_metadata((book_id,), only_fmts={fmt})
+            notify = '%d:%s:%s:%s' % (book_id, fmt, db.library_id, db.library_path)
             self.gui.job_manager.launch_gui_app(tweak, kwargs=dict(path=path, notify=notify))
             time.sleep(2)
         finally:

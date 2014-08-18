@@ -9,12 +9,11 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 import sys, weakref
 from functools import wraps
 
-from PyQt4.Qt import (
-    QWidget, QPainter, QColor, QApplication, Qt, QPixmap, QRectF, QMatrix,
+from PyQt5.Qt import (
+    QWidget, QPainter, QColor, QApplication, Qt, QPixmap, QRectF, QTransform,
     QPointF, QPen, pyqtSignal, QUndoCommand, QUndoStack, QIcon, QImage, QByteArray)
 
 from calibre import fit_image
-from calibre.constants import isosx
 from calibre.gui2 import error_dialog, pixmap_to_data
 from calibre.gui2.dnd import (
     IMAGE_EXTENSIONS, dnd_has_extension, dnd_has_image, dnd_get_image, DownloadDialog)
@@ -94,13 +93,6 @@ def get_pixel_map():
 
 def qimage_to_magick(img):
     ans = Image()
-    if isosx:
-        # For some reson, on OSX MagickConstituteImage fails, and I can't be
-        # bothered figuring out why. Dumping to uncompressed PNG is reasonably
-        # fast.
-        raw = pixmap_to_data(img, 'PNG', quality=100)
-        ans.load(raw)
-        return ans
     fmt = get_pixel_map()
     if not img.hasAlphaChannel():
         if img.format() != img.Format_RGB32:
@@ -117,7 +109,7 @@ def qimage_to_magick(img):
 
 def magick_to_qimage(img):
     fmt = get_pixel_map()
-    # ImageMagick can output only output raw data in some formats that can be
+    # ImageMagick can only output raw data in some formats that can be
     # read into QImage directly, if the QImage format is not one of those, use
     # PNG
     if fmt in {'RGBA', 'BGRA'}:
@@ -160,7 +152,7 @@ class Rotate(Command):
 
     def __call__(self, canvas):
         img = canvas.current_image
-        m = QMatrix()
+        m = QTransform()
         m.rotate(90)
         return img.transformed(m, Qt.SmoothTransformation)
 

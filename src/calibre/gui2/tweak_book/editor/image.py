@@ -9,12 +9,12 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 import sys
 from functools import partial
 
-from PyQt4.Qt import (
+from PyQt5.Qt import (
     QMainWindow, Qt, QApplication, pyqtSignal, QLabel, QIcon, QFormLayout,
     QDialog, QSpinBox, QCheckBox, QDialogButtonBox, QToolButton, QMenu, QInputDialog)
 
 from calibre.gui2 import error_dialog
-from calibre.gui2.tweak_book import actions
+from calibre.gui2.tweak_book import actions, tprefs, editors
 from calibre.gui2.tweak_book.editor.canvas import Canvas
 
 class ResizeDialog(QDialog):  # {{{
@@ -136,6 +136,12 @@ class Editor(QMainWindow):
     def number_of_lines(self):
         return 0
 
+    def pretty_print(self, name):
+        return False
+
+    def change_document_name(self, newname):
+        pass
+
     def get_raw_data(self):
         return self.canvas.get_image_data(quality=self.quality)
 
@@ -152,11 +158,22 @@ class Editor(QMainWindow):
         # there is no easy way to check two images for equality
         self.data = raw
 
-    def apply_settings(self, prefs=None):
+    def apply_settings(self, prefs=None, dictionaries_changed=False):
         pass
 
     def go_to_line(self, *args, **kwargs):
         pass
+
+    def save_state(self):
+        for bar in self.bars:
+            if bar.isFloating():
+                return
+        tprefs['image-editor-state'] = bytearray(self.saveState())
+
+    def restore_state(self):
+        state = tprefs.get('image-editor-state', None)
+        if state is not None:
+            self.restoreState(state)
 
     def set_focus(self):
         self.canvas.setFocus(Qt.OtherFocusReason)
@@ -228,6 +245,7 @@ class Editor(QMainWindow):
         for x in ('undo', 'redo'):
             b.addAction(getattr(self.canvas, '%s_action' % x))
         self.edit_bar = b = self.addToolBar(_('Edit actions tool bar'))
+        b.setObjectName('edit-actions-bar')
         for x in ('copy', 'paste'):
             ac = actions['editor-%s' % x]
             setattr(self, 'action_' + x, b.addAction(ac.icon(), x, getattr(self, x)))
@@ -248,11 +266,24 @@ class Editor(QMainWindow):
         m.addAction(_('De-speckle image'), self.canvas.despeckle_image)
 
         self.info_bar = b = self.addToolBar(_('Image information bar'))
+        b.setObjectName('image_info_bar')
         self.fmt_label = QLabel('')
         b.addWidget(self.fmt_label)
         b.addSeparator()
         self.size_label = QLabel('')
         b.addWidget(self.size_label)
+        self.bars = [self.action_bar, self.edit_bar, self.info_bar]
+        for x in self.bars:
+            x.setFloatable(False)
+            x.topLevelChanged.connect(self.toolbar_floated)
+        self.restore_state()
+
+    def toolbar_floated(self, floating):
+        if not floating:
+            self.save_state()
+            for ed in editors.itervalues():
+                if ed is not self:
+                    ed.restore_state()
 
     def update_clipboard_actions(self, *args):
         if self.canvas.has_selection:

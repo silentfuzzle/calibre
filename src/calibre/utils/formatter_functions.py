@@ -178,6 +178,27 @@ class BuiltinCmp(BuiltinFormatterFunction):
             return eq
         return gt
 
+class BuiltinFirstMatchingCmp(BuiltinFormatterFunction):
+    name = 'first_matching_cmp'
+    category = 'Relational'
+    arg_count = -1
+    __doc__ = doc =   _('first_matching_cmp(val, cmp1, result1, cmp2, r2, ..., else_result) -- '
+            'compares "val < cmpN" in sequence, returning resultN for '
+            'the first comparison that succeeds. Returns else_result '
+            'if no comparison succeeds. Example: '
+            'first_matching_cmp(10,5,"small",10,"middle",15,"large","giant") '
+            'returns "large". The same example with a first value of 16 returns "giant".')
+
+    def evaluate(self, formatter, kwargs, mi, locals, *args):
+        if (len(args) % 2) != 0:
+            raise ValueError(_('first_matching_cmp requires an even number of arguments'))
+        val = float(args[0] if args[0] and args[0] != 'None' else 0)
+        for i in range(1, len(args) - 1, 2):
+            c = float(args[i] if args[i] and args[i] != 'None' else 0)
+            if val < c:
+                return args[i+1]
+        return args[len(args)-1]
+
 class BuiltinStrcat(BuiltinFormatterFunction):
     name = 'strcat'
     arg_count = -1
@@ -531,6 +552,40 @@ class BuiltinRe(BuiltinFormatterFunction):
 
     def evaluate(self, formatter, kwargs, mi, locals, val, pattern, replacement):
         return re.sub(pattern, replacement, val, flags=re.I)
+
+class BuiltinReGroup(BuiltinFormatterFunction):
+    name = 're_group'
+    arg_count = -1
+    category = 'String manipulation'
+    __doc__ = doc = _('re_group(val, pattern, template_for_group_1, for_group_2, ...) -- '
+            'return a string made by applying the reqular expression pattern '
+            'to the val and replacing each matched instance with the string '
+            'computed by replacing each matched group by the value returned '
+            'by the corresponding template. The original matched value for the '
+            'group is available as $. In template program mode, like for '
+            'the template and the eval functions, you use [[ for { and ]] for }.'
+            ' The following example in template program mode looks for series '
+            'with more than one word and uppercases the first word: '
+            "{series:'re_group($, \"(\S* )(.*)\", \"[[$:uppercase()]]\", \"[[$]]\")'}")
+
+    def evaluate(self, formatter, kwargs, mi, locals, val, pattern, *args):
+        from formatter import EvalFormatter
+
+        def repl(mo):
+            res = ''
+            if mo and mo.lastindex:
+                for dex in range(0, mo.lastindex):
+                    gv = mo.group(dex+1)
+                    if gv is None:
+                        continue
+                    if len(args) > dex:
+                        template = args[dex].replace('[[', '{').replace(']]', '}')
+                        res += EvalFormatter().safe_format(template, {'$': gv},
+                                           'EVAL', None, strip_results=False)
+                    else:
+                        res += gv
+            return res
+        return re.sub(pattern, repl, val, flags=re.I)
 
 class BuiltinSwapAroundComma(BuiltinFormatterFunction):
     name = 'swap_around_comma'
@@ -1139,21 +1194,60 @@ class BuiltinListRe(BuiltinFormatterFunction):
     name = 'list_re'
     arg_count = 4
     category = 'List manipulation'
-    __doc__ = doc = _('list_re(src_list, separator, search_re, opt_replace) -- '
+    __doc__ = doc = _('list_re(src_list, separator, include_re, opt_replace) -- '
             'Construct a list by first separating src_list into items using '
             'the separator character. For each item in the list, check if it '
-            'matches search_re. If it does, then add it to the list to be '
+            'matches include_re. If it does, then add it to the list to be '
             'returned. If opt_replace is not the empty string, then apply the '
             'replacement before adding the item to the returned list.')
 
-    def evaluate(self, formatter, kwargs, mi, locals, src_list, separator, search_re, opt_replace):
+    def evaluate(self, formatter, kwargs, mi, locals, src_list, separator, include_re, opt_replace):
         l = [l.strip() for l in src_list.split(separator) if l.strip()]
         res = []
         for item in l:
-            if re.search(search_re, item, flags=re.I) is not None:
+            if re.search(include_re, item, flags=re.I) is not None:
                 if opt_replace:
-                    item = re.sub(search_re, opt_replace, item)
-                for i in [t.strip() for t in item.split(',') if t.strip()]:
+                    item = re.sub(include_re, opt_replace, item)
+                for i in [t.strip() for t in item.split(separator) if t.strip()]:
+                    if i not in res:
+                        res.append(i)
+        if separator == ',':
+            return ', '.join(res)
+        return separator.join(res)
+
+class BuiltinListReGroup(BuiltinFormatterFunction):
+    name = 'list_re_group'
+    arg_count = -1
+    category = 'List manipulation'
+    __doc__ = doc = _('list_re_group(src_list, separator, include_re, search_re, group_1_template, ...) -- '
+                      'Like list_re except replacements are not optional. It '
+                      'uses re_group(list_item, search_re, group_1_template, ...) when '
+                      'doing the replacements on the resulting list.')
+
+    def evaluate(self, formatter, kwargs, mi, locals, src_list, separator, include_re,
+                 search_re, *args):
+        from formatter import EvalFormatter
+
+        l = [l.strip() for l in src_list.split(separator) if l.strip()]
+        res = []
+        for item in l:
+            def repl(mo):
+                newval = ''
+                if mo and mo.lastindex:
+                    for dex in range(0, mo.lastindex):
+                        gv = mo.group(dex+1)
+                        if gv is None:
+                            continue
+                        if len(args) > dex:
+                            template = args[dex].replace('[[', '{').replace(']]', '}')
+                            newval += EvalFormatter().safe_format(template, {'$': gv},
+                                              'EVAL', None, strip_results=False)
+                        else:
+                            newval += gv
+                return newval
+            if re.search(include_re, item, flags=re.I) is not None:
+                item = re.sub(search_re, repl, item, flags=re.I)
+                for i in [t.strip() for t in item.split(separator) if t.strip()]:
                     if i not in res:
                         res.append(i)
         if separator == ',':
@@ -1304,24 +1398,49 @@ class BuiltinTransliterate(BuiltinFormatterFunction):
         return ascii_text(source)
 
 
+class BuiltinAuthorLinks(BuiltinFormatterFunction):
+    name = 'author_links'
+    arg_count = 2
+    category = 'Get values from metadata'
+    __doc__ = doc = _('author_links(val_separator, pair_separator) -- returns '
+                      'a string containing a list of authors and that author\'s '
+                      'link values in the '
+                      'form author1 val_separator author1link pair_separator '
+                      'author2 val_separator author2link etc. An author is '
+                      'separated from its link value by the val_separator string '
+                      'with no added spaces. author:linkvalue pairs are separated '
+                      'by the pair_separator string argument with no added spaces. '
+                      'It is up to you to choose separator strings that do '
+                      'not occur in author names or links. An author is '
+                      'included even if the author link is empty.')
+
+    def evaluate(self, formatter, kwargs, mi, locals, val_sep, pair_sep):
+        if hasattr(mi, '_proxy_metadata'):
+            link_data = mi._proxy_metadata.author_link_map
+            if not link_data:
+                return ''
+            names = sorted(link_data.keys(), key=sort_key)
+            return pair_sep.join(n + val_sep + link_data[n] for n in names)
+        return _('This function can be used only in the GUI')
+
 _formatter_builtins = [
     BuiltinAdd(), BuiltinAnd(), BuiltinApproximateFormats(),
-    BuiltinAssign(), BuiltinBooksize(),
+    BuiltinAssign(), BuiltinAuthorLinks(), BuiltinBooksize(),
     BuiltinCapitalize(), BuiltinCmp(), BuiltinContains(), BuiltinCount(),
     BuiltinCurrentLibraryName(), BuiltinCurrentLibraryPath(),
     BuiltinDaysBetween(), BuiltinDivide(), BuiltinEval(), BuiltinFirstNonEmpty(),
-    BuiltinField(), BuiltinFinishFormatting(), BuiltinFormatDate(),
-    BuiltinFormatNumber(), BuiltinFormatsModtimes(), BuiltinFormatsPaths(),
-    BuiltinFormatsSizes(),
+    BuiltinField(), BuiltinFinishFormatting(), BuiltinFirstMatchingCmp(),
+    BuiltinFormatDate(), BuiltinFormatNumber(), BuiltinFormatsModtimes(),
+    BuiltinFormatsPaths(), BuiltinFormatsSizes(),
     BuiltinHasCover(), BuiltinHumanReadable(), BuiltinIdentifierInList(),
     BuiltinIfempty(), BuiltinLanguageCodes(), BuiltinLanguageStrings(),
     BuiltinInList(), BuiltinListDifference(), BuiltinListEquals(),
     BuiltinListIntersection(), BuiltinListitem(), BuiltinListRe(),
-    BuiltinListSort(), BuiltinListUnion(), BuiltinLookup(),
+    BuiltinListReGroup(), BuiltinListSort(), BuiltinListUnion(), BuiltinLookup(),
     BuiltinLowercase(), BuiltinMultiply(), BuiltinNot(),
     BuiltinOndevice(), BuiltinOr(), BuiltinPrint(), BuiltinRawField(),
-    BuiltinRe(), BuiltinSelect(), BuiltinSeriesSort(), BuiltinShorten(),
-    BuiltinStrcat(), BuiltinStrcatMax(),
+    BuiltinRe(), BuiltinReGroup(), BuiltinSelect(), BuiltinSeriesSort(),
+    BuiltinShorten(), BuiltinStrcat(), BuiltinStrcatMax(),
     BuiltinStrcmp(), BuiltinStrInList(), BuiltinStrlen(), BuiltinSubitems(),
     BuiltinSublist(),BuiltinSubstr(), BuiltinSubtract(), BuiltinSwapAroundComma(),
     BuiltinSwitch(), BuiltinTemplate(), BuiltinTest(), BuiltinTitlecase(),

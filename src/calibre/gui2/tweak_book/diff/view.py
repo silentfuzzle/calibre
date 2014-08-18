@@ -15,7 +15,7 @@ from difflib import SequenceMatcher
 from future_builtins import zip
 
 import regex
-from PyQt4.Qt import (
+from PyQt5.Qt import (
     QSplitter, QApplication, QTimer,
     QTextCursor, QTextCharFormat, Qt, QRect, QPainter, QPalette, QPen, QBrush,
     QColor, QTextLayout, QCursor, QFont, QSplitterHandle, QPainterPath,
@@ -26,9 +26,9 @@ from calibre import human_readable, fit_image
 from calibre.gui2 import info_dialog
 from calibre.gui2.tweak_book import tprefs
 from calibre.gui2.tweak_book.editor.text import PlainTextEdit, default_font_family, LineNumbers
-from calibre.gui2.tweak_book.editor.themes import theme_color
+from calibre.gui2.tweak_book.editor.themes import theme_color, get_theme
 from calibre.gui2.tweak_book.diff import get_sequence_matcher
-from calibre.gui2.tweak_book.diff.highlight import get_theme, get_highlighter
+from calibre.gui2.tweak_book.diff.highlight import get_highlighter
 
 Change = namedtuple('Change', 'ltop lbot rtop rbot kind')
 
@@ -119,7 +119,7 @@ class TextBrowser(PlainTextEdit):  # {{{
         font = self.heading_font = QFont(self.font())
         font.setPointSize(int(tprefs['editor_font_size'] * 1.5))
         font.setBold(True)
-        theme = get_theme()
+        theme = get_theme(tprefs['editor_theme'])
         pal = self.palette()
         pal.setColor(pal.Base, theme_color(theme, 'Normal', 'bg'))
         pal.setColor(pal.AlternateBase, theme_color(theme, 'CursorLine', 'bg'))
@@ -381,7 +381,7 @@ class TextBrowser(PlainTextEdit):  # {{{
             painter.drawLine(0, bottom - 1, w, bottom - 1)
 
     def wheelEvent(self, ev):
-        if ev.orientation() == Qt.Vertical:
+        if ev.angleDelta().x() == 0:
             self.wheel_event.emit(ev)
         else:
             return PlainTextEdit.wheelEvent(self, ev)
@@ -488,7 +488,7 @@ class DiffSplitHandle(QSplitterHandle):  # {{{
         return ans
 
     def wheelEvent(self, ev):
-        if ev.orientation() == Qt.Vertical:
+        if ev.angleDelta().x() == 0:
             self.wheel_event.emit(ev)
         else:
             return QSplitterHandle.wheelEvent(self, ev)
@@ -636,7 +636,7 @@ class DiffSplit(QSplitter):  # {{{
                 for x, val in v.line_number_map.iteritems():
                     dict.__setitem__(lnm, mapnum(x), val)
                 v.line_number_map = lnm
-                v.changes = [(mapnum(t), mapnum(b), kind) for t, b, kind in v.changes]
+                v.changes = [(mapnum(t), mapnum(b), k) for t, b, k in v.changes]
                 v.headers = [(mapnum(x), name) for x, name in v.headers]
                 v.images = OrderedDict((mapnum(x), v) for x, v in v.images.iteritems())
             v.viewport().update()
@@ -826,7 +826,6 @@ class DiffSplit(QSplitter):  # {{{
         self.replace_helper(alo, best_i, blo, best_j)
 
         # do intraline marking on the synch pair
-        aelt, belt = a[best_i], b[best_j]
         if eqi is None:
             self.do_replace(best_i, best_i+1, best_j, best_j+1)
         else:
@@ -895,7 +894,7 @@ class DiffView(QWidget):  # {{{
         self.l = l = QHBoxLayout(self)
         self.setLayout(l)
         self.syncpos = 0
-        l.setMargin(0), l.setSpacing(0)
+        l.setContentsMargins(0, 0, 0, 0), l.setSpacing(0)
         self.view = DiffSplit(self, show_open_in_editor=show_open_in_editor)
         l.addWidget(self.view)
         self.add_diff = self.view.add_diff

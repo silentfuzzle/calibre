@@ -98,7 +98,7 @@ class Base(object):  # {{{
         print('_'*50)
         sys.stdout.flush()
 
-#}}}
+# }}}
 
 class GoogleCode(Base):  # {{{
 
@@ -164,7 +164,7 @@ class GoogleCode(Base):  # {{{
                 fname.endswith('.zip') else 'Installer')
         ext = os.path.splitext(fname)[1][1:]
         op  = 'OpSys-'+{'msi':'Windows','exe':'Windows',
-                'dmg':'OSX','bz2':'Linux','xz':'All'}[ext]
+                'dmg':'OSX','txz':'Linux','xz':'All'}[ext]
         desc = self.files[fname]
         start = time.time()
         for i in range(retries):
@@ -445,7 +445,7 @@ def generate_index():  # {{{
                 if osx:
                     body.append('<dt>Apple Mac</dt><dd><a href="{0}" title="{1}">{1}</a></dd>'.format(
                         osx[0], 'OS X Disk Image (.dmg)'))
-                linux = [x for x in files if x.endswith('.bz2')]
+                linux = [x for x in files if x.endswith('.txz')]
                 if linux:
                     linux = ['<li><a href="{0}" title="{1}">{1}</a></li>'.format(
                         x, 'Linux 64-bit binary' if 'x86_64' in x else 'Linux 32-bit binary')
@@ -509,7 +509,7 @@ def upload_to_servers(files, version):  # {{{
 def upload_to_dbs(files, version):  # {{{
     print('Uploading to fosshub.com')
     sys.stdout.flush()
-    server = 'mirror1.fosshub.com'
+    server = 'mirror10.fosshub.com'
     rdir = 'release/'
     check_call(['ssh', 'kovid@%s' % server, 'rm -f release/*'])
     for x in files:
@@ -573,7 +573,7 @@ def cli_parser():
             epilog=epilog)
     cron = subparsers.add_parser('cron', help='Call script from cron')
     subparsers.add_parser('calibre', help='Upload to calibre file servers')
-    subparsers.add_parser('dbs', help='Upload to downloadbestsoftware.com')
+    subparsers.add_parser('dbs', help='Upload to fosshub.com')
 
     a = gc.add_argument
 
@@ -644,6 +644,3 @@ def main(args=None):
 if __name__ == '__main__':
     main()
 # }}}
-
-
-

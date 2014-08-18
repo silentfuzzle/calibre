@@ -60,7 +60,7 @@ def get_icons(zfp, name_or_list_of_names):
                 If a single path is passed in the return value will
                 be A QIcon.
     '''
-    from PyQt4.Qt import QIcon, QPixmap
+    from PyQt5.Qt import QIcon, QPixmap
     names = name_or_list_of_names
     ans = get_resources(zfp, names)
     if isinstance(names, basestring):
@@ -195,14 +195,18 @@ class PluginLoader(object):
                 reload(m)
             else:
                 m = importlib.import_module(plugin_module)
+            plugin_classes = []
             for obj in m.__dict__.itervalues():
                 if isinstance(obj, type) and issubclass(obj, Plugin) and \
                         obj.name != 'Trivial Plugin':
-                    ans = obj
-                    break
-            if ans is None:
+                    plugin_classes.append(obj)
+            if not plugin_classes:
                 raise InvalidPlugin('No plugin class found in %s:%s'%(
                     as_unicode(path_to_zip_file), plugin_name))
+            if len(plugin_classes) > 1:
+                plugin_classes.sort(key=lambda c:(getattr(c, '__module__', None) or '').count('.'))
+
+            ans = plugin_classes[0]
 
             if ans.minimum_calibre_version > numeric_version:
                 raise InvalidPlugin(

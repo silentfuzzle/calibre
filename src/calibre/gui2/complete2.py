@@ -10,32 +10,33 @@ __docformat__ = 'restructuredtext en'
 import weakref
 
 import sip
-from PyQt4.Qt import (QLineEdit, QAbstractListModel, Qt, pyqtSignal, QObject,
-        QApplication, QListView, QPoint, QModelIndex, QFont, QFontInfo)
+from PyQt5.Qt import (QLineEdit, QAbstractListModel, Qt, pyqtSignal, QObject,
+        QApplication, QListView, QPoint, QModelIndex, QFont, QFontInfo, QTimer)
 
 from calibre.constants import isosx, get_osx_version
-from calibre.utils.icu import sort_key, primary_startswith, primary_icu_find
-from calibre.gui2 import NONE
+from calibre.utils.icu import sort_key, primary_startswith, primary_contains
 from calibre.gui2.widgets import EnComboBox, LineEditECM
 from calibre.utils.config import tweaks
 
 def containsq(x, prefix):
-    return primary_icu_find(prefix, x)[0] != -1
+    return primary_contains(prefix, x)
 
 class CompleteModel(QAbstractListModel):  # {{{
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, sort_func=sort_key):
         QAbstractListModel.__init__(self, parent)
+        self.sort_func = sort_func
         self.all_items = self.current_items = ()
         self.current_prefix = ''
 
     def set_items(self, items):
         items = [unicode(x.strip()) for x in items]
         items = [x for x in items if x]
-        items = tuple(sorted(items, key=sort_key))
+        items = tuple(sorted(items, key=self.sort_func))
+        self.beginResetModel()
         self.all_items = self.current_items = items
         self.current_prefix = ''
-        self.reset()
+        self.endResetModel()
 
     def set_completion_prefix(self, prefix):
         old_prefix = self.current_prefix
@@ -43,14 +44,16 @@ class CompleteModel(QAbstractListModel):  # {{{
         if prefix == old_prefix:
             return
         if not prefix:
+            self.beginResetModel()
             self.current_items = self.all_items
-            self.reset()
+            self.endResetModel()
             return
         subset = prefix.startswith(old_prefix)
         universe = self.current_items if subset else self.all_items
         func = primary_startswith if tweaks['completion_mode'] == 'prefix' else containsq
+        self.beginResetModel()
         self.current_items = tuple(x for x in universe if func(x, prefix))
-        self.reset()
+        self.endResetModel()
 
     def rowCount(self, *args):
         return len(self.current_items)
@@ -61,7 +64,6 @@ class CompleteModel(QAbstractListModel):  # {{{
                 return self.current_items[index.row()]
             except IndexError:
                 pass
-        return NONE
 
     def index_for_prefix(self, prefix):
         for i, item in enumerate(self.current_items):
@@ -74,8 +76,9 @@ class Completer(QListView):  # {{{
     item_selected = pyqtSignal(object)
     relayout_needed = pyqtSignal()
 
-    def __init__(self, completer_widget, max_visible_items=7):
+    def __init__(self, completer_widget, max_visible_items=7, sort_func=sort_key):
         QListView.__init__(self)
+        self.disable_popup = False
         self.completer_widget = weakref.ref(completer_widget)
         self.setWindowFlags(Qt.Popup)
         self.max_visible_items = max_visible_items
@@ -84,7 +87,7 @@ class Completer(QListView):  # {{{
         self.setSelectionBehavior(self.SelectRows)
         self.setSelectionMode(self.SingleSelection)
         self.setAlternatingRowColors(True)
-        self.setModel(CompleteModel(self))
+        self.setModel(CompleteModel(self, sort_func=sort_func))
         self.setMouseTracking(True)
         self.entered.connect(self.item_entered)
         self.activated.connect(self.item_chosen)
@@ -113,7 +116,14 @@ class Completer(QListView):  # {{{
             self.relayout_needed.emit()
 
     def item_entered(self, idx):
-        self.setCurrentIndex(idx)
+        if self.visualRect(idx).top() < self.viewport().rect().bottom() - 5:
+            # Prevent any bottom item in the list that is only partially
+            # visible from triggering setCurrentIndex()
+            self.entered.disconnect()
+            try:
+                self.setCurrentIndex(idx)
+            finally:
+                self.entered.connect(self.item_entered)
 
     def next_match(self, previous=False):
         c = self.currentIndex()
@@ -132,6 +142,8 @@ class Completer(QListView):  # {{{
                 self.setCurrentIndex(index)
 
     def popup(self, select_first=True):
+        if self.disable_popup:
+            return
         p = self
         m = p.model()
         widget = self.completer_widget()
@@ -233,8 +245,8 @@ class Completer(QListView):  # {{{
             if e.isAccepted():
                 return True
         elif etype == e.MouseButtonPress:
-            if not self.underMouse():
-                self.hide()
+            if not self.rect().contains(self.mapFromGlobal(e.globalPos())):
+                QTimer.singleShot(0, self.hide)
                 e.accept()
                 return True
         elif etype in (e.InputMethod, e.ShortcutOverride):
@@ -253,7 +265,7 @@ class LineEdit(QLineEdit, LineEditECM):
     to complete non multiple fields as well.
     '''
 
-    def __init__(self, parent=None, completer_widget=None):
+    def __init__(self, parent=None, completer_widget=None, sort_func=sort_key):
         QLineEdit.__init__(self, parent)
 
         self.sep = ','
@@ -263,7 +275,7 @@ class LineEdit(QLineEdit, LineEditECM):
         completer_widget = (self if completer_widget is None else
                 completer_widget)
 
-        self.mcompleter = Completer(completer_widget)
+        self.mcompleter = Completer(completer_widget, sort_func=sort_func)
         self.mcompleter.item_selected.connect(self.completion_selected,
                 type=Qt.QueuedConnection)
         self.mcompleter.relayout_needed.connect(self.relayout)
@@ -292,6 +304,13 @@ class LineEdit(QLineEdit, LineEditECM):
             self.mcompleter.model().set_items(items)
         return property(fget=fget, fset=fset)
 
+    @dynamic_property
+    def disable_popup(self):
+        def fget(self):
+            return self.mcompleter.disable_popup
+        def fset(self, val):
+            self.mcompleter.disable_popup = bool(val)
+        return property(fget=fget, fset=fset)
     # }}}
 
     def complete(self, show_all=False, select_first=True):
@@ -303,10 +322,12 @@ class LineEdit(QLineEdit, LineEditECM):
             self.mcompleter.hide()
             return
         self.mcompleter.popup(select_first=select_first)
+        self.setFocus(Qt.OtherFocusReason)
         self.mcompleter.scroll_to(orig)
 
     def relayout(self):
         self.mcompleter.popup()
+        self.setFocus(Qt.OtherFocusReason)
 
     def text_edited(self, *args):
         if self.no_popup:
@@ -363,16 +384,21 @@ class LineEdit(QLineEdit, LineEditECM):
 
 class EditWithComplete(EnComboBox):
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         EnComboBox.__init__(self, *args)
-        self.setLineEdit(LineEdit(self, completer_widget=self))
+        self.setLineEdit(LineEdit(self, completer_widget=self, sort_func=kwargs.get('sort_func', sort_key)))
         self.setCompleter(None)
         self.eat_focus_out = True
         self.installEventFilter(self)
 
     # Interface {{{
     def showPopup(self):
-        self.lineEdit().complete(show_all=True)
+        orig = self.disable_popup
+        self.disable_popup = False
+        try:
+            self.lineEdit().complete(show_all=True)
+        finally:
+            self.disable_popup = orig
 
     def update_items_cache(self, complete_items):
         self.lineEdit().update_items_cache(complete_items)
@@ -399,7 +425,15 @@ class EditWithComplete(EnComboBox):
             self.lineEdit().all_items = val
         return property(fget=fget, fset=fset)
 
+    @dynamic_property
+    def disable_popup(self):
+        def fget(self):
+            return self.lineEdit().disable_popup
+        def fset(self, val):
+            self.lineEdit().disable_popup = bool(val)
+        return property(fget=fget, fset=fset)
     # }}}
+
     def text(self):
         return unicode(self.lineEdit().text())
 
@@ -435,7 +469,7 @@ class EditWithComplete(EnComboBox):
         return EnComboBox.eventFilter(self, obj, e)
 
 if __name__ == '__main__':
-    from PyQt4.Qt import QDialog, QVBoxLayout
+    from PyQt5.Qt import QDialog, QVBoxLayout
     app = QApplication([])
     d = QDialog()
     d.setLayout(QVBoxLayout())

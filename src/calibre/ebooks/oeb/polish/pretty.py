@@ -93,7 +93,7 @@ BLOCK_TAGS = frozenset(map(XHTML, (
     'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'li',
     'noscript', 'ol', 'output', 'p', 'pre', 'script', 'section', 'style', 'table', 'tbody', 'td',
-    'tfoot', 'thead', 'tr', 'ul', 'video'))) | {SVG_TAG}
+    'tfoot', 'thead', 'tr', 'ul', 'video', 'img'))) | {SVG_TAG}
 
 
 def isblock(x):
@@ -118,9 +118,9 @@ def indent_for_tag(x):
     prev = x.getprevious()
     x = x.getparent().text if prev is None else prev.tail
     if not x:
-        return None
+        return ''
     s = x.rpartition('\n')[-1]
-    return s if isspace(s) else None
+    return s if isspace(s) else ''
 
 def set_indent(elem, attr, indent):
     x = getattr(elem, attr)
@@ -172,6 +172,12 @@ def pretty_html_tree(container, root):
             pretty_xml_tree(child)
     for body in root.findall('h:body', namespaces=XPNSMAP):
         pretty_block(body)
+        # Special case the handling of a body that contains a single block tag
+        # with all content. In this case we prettify the containing block tag
+        # even if it has non block children.
+        if (len(body) == 1 and not callable(body[0].tag) and isblock(body[0]) and
+                not has_only_blocks(body[0]) and barename(body[0].tag) != 'pre' and len(body[0]) > 0):
+            pretty_block(body[0], level=2)
 
     if container is not None:
         # Handle <script> and <style> tags
@@ -179,19 +185,23 @@ def pretty_html_tree(container, root):
             pretty_script_or_style(container, child)
 
 def fix_html(container, raw):
+    ' Fix any parsing errors in the HTML represented as a string in raw. Fixing is done using the HTML 5 parsing algorithm. '
     root = container.parse_xhtml(raw)
     return serialize(root, 'text/html')
 
 def pretty_html(container, name, raw):
+    ' Pretty print the HTML represented as a string in raw '
     root = container.parse_xhtml(raw)
     pretty_html_tree(container, root)
     return serialize(root, 'text/html')
 
 def pretty_css(container, name, raw):
+    ' Pretty print the CSS represented as a string in raw '
     sheet = container.parse_css(raw)
     return serialize(sheet, 'text/css')
 
 def pretty_xml(container, name, raw):
+    ' Pretty print the XML represented as a string in raw. If ``name`` is the name of the OPF, extra OPF-specific prettying is performed. '
     root = container.parse_xml(raw)
     if name == container.opf_name:
         pretty_opf(root)
@@ -199,12 +209,14 @@ def pretty_xml(container, name, raw):
     return serialize(root, 'text/xml')
 
 def fix_all_html(container):
+    ' Fix any parsing errors in all HTML files in the container. Fixing is done using the HTML 5 parsing algorithm. '
     for name, mt in container.mime_map.iteritems():
         if mt in OEB_DOCS:
             container.parsed(name)
             container.dirty(name)
 
 def pretty_all(container):
+    ' Pretty print all HTML/CSS/XML files in the container '
     for name, mt in container.mime_map.iteritems():
         prettied = False
         if mt in OEB_DOCS:

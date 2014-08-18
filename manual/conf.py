@@ -25,6 +25,8 @@ custom
 
 needs_sphinx = '1.0'
 
+rst_prolog = '.. |app| replace:: %s' % __appname__
+
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.addons.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'custom', 'sphinx.ext.viewcode']
@@ -36,10 +38,14 @@ templates_path = ['templates']
 source_suffix = '.rst'
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = 'index' if tags.has('online') else 'simple_index'  # noqa
+# kill the warning about index/simple_index not being in a toctree
+exclude_patterns = ['simple_index.rst'] if master_doc == 'index' else ['index']
 
 # The language
-language = 'en'
+language = os.environ.get('CALIBRE_OVERRIDE_LANG', 'en')
+# ignore generated files in languages other than the language we are building for
+exclude_patterns += ['generated/' + x for x in os.listdir('generated') if x != language]
 
 # General substitutions.
 project = __appname__
@@ -55,24 +61,25 @@ release = __version__
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
-#today = ''
+# today = ''
 # Else, today_fmt is used as the format for a strftime call.
 today_fmt = '%B %d, %Y'
 
 # List of documents that shouldn't be included in the build.
 unused_docs = ['global', 'cli/global']
 
+locale_dirs = ['locale/']
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
-#add_function_parentheses = True
+# add_function_parentheses = True
 
 # If true, the current module name will be prepended to all description
 # unit titles (such as .. function::).
-#add_module_names = True
+# add_module_names = True
 
 # If true, sectionauthor and moduleauthor directives will be shown in the
 # output. They are ignored by default.
-#show_authors = False
+# show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -93,7 +100,7 @@ html_sidebars = {
 }
 
 # The favicon
-html_favicon = 'favicon.ico'
+html_favicon = '../icons/favicon.ico'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the built-in static files,
@@ -123,11 +130,11 @@ epub_tocdup      = True
 epub_cover       = ('epub_cover.jpg', 'epub_cover_template.html')
 
 # Custom sidebar templates, maps document names to template names.
-#html_sidebars = {}
+# html_sidebars = {}
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
-#html_additional_pages = {}
+# html_additional_pages = {}
 
 html_use_modindex = False
 html_use_index = False
@@ -157,13 +164,13 @@ latex_documents = [('index', 'calibre.tex', 'calibre User Manual',
     'Kovid Goyal', 'manual', False)]
 
 # Additional stuff for the LaTeX preamble.
-#latex_preamble = ''
+# latex_preamble = ''
 
 # Documents to append as an appendix to all manuals.
-#latex_appendices = []
+# latex_appendices = []
 
 # If false, no module index is generated.
-#latex_use_modindex = True
+# latex_use_modindex = True
 
 latex_logo = 'resources/logo.png'
 latex_show_pagerefs = True

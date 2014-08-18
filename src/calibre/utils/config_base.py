@@ -193,6 +193,7 @@ class OptionSet(object):
             try:
                 if not isinstance(src, unicode):
                     src = src.decode('utf-8')
+                src = src.replace(u'PyQt%d.QtCore' % 4, u'PyQt5.QtCore')
                 exec src in options
             except:
                 print 'Failed to parse options string:'
@@ -227,8 +228,6 @@ class OptionSet(object):
         if val is val is True or val is False or val is None or \
            isinstance(val, (int, float, long, basestring)):
             return repr(val)
-        if val.__class__.__name__ == 'QString':
-            return repr(unicode(val))
         pickle = cPickle.dumps(val, -1)
         return 'cPickle.loads(%s)'%repr(pickle)
 

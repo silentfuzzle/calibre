@@ -8,7 +8,7 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 
 from functools import partial
 
-from PyQt4.Qt import QTimer, QApplication, Qt
+from PyQt5.Qt import QTimer, QApplication, Qt
 
 from calibre.gui2 import error_dialog
 from calibre.gui2.actions import InterfaceAction
@@ -16,7 +16,7 @@ from calibre.gui2.actions import InterfaceAction
 class MarkBooksAction(InterfaceAction):
 
     name = 'Mark Books'
-    action_spec = (_('Mark Books'), 'marked.png', _('Temporarily mark books'), 'Ctrl+M')
+    action_spec = (_('Mark books'), 'marked.png', _('Temporarily mark books for easy access'), 'Ctrl+M')
     action_type = 'current'
     action_add_menu = True
     dont_add_to = frozenset([

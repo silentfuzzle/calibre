@@ -6,11 +6,11 @@ from __future__ import (unicode_literals, division, absolute_import,
 __license__ = 'GPL v3'
 __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 
-import shutil, os
+import shutil, os, errno
 from threading import Thread
 from Queue import LifoQueue, Empty
 
-from PyQt4.Qt import (QObject, pyqtSignal, QLabel, QWidget, QHBoxLayout, Qt)
+from PyQt5.Qt import (QObject, pyqtSignal, QLabel, QWidget, QHBoxLayout, Qt)
 
 from calibre.constants import iswindows
 from calibre.ptempfile import PersistentTemporaryFile
@@ -22,6 +22,27 @@ from calibre.utils.ipc import RC
 def save_container(container, path):
     temp = PersistentTemporaryFile(
         prefix=('_' if iswindows else '.'), suffix=os.path.splitext(path)[1], dir=os.path.dirname(path))
+    if hasattr(os, 'fchmod'):
+        # Ensure file permissions and owner information is preserved
+        fno = temp.fileno()
+        try:
+            st = os.stat(path)
+        except EnvironmentError as err:
+            if err.errno != errno.ENOENT:
+                raise
+            # path may not exist if we are saving a copy, in which case we use
+            # the metadata from the original book
+            st = os.stat(container.path_to_ebook)
+        os.fchmod(fno, st.st_mode)
+        try:
+            os.fchown(fno, st.st_uid, st.st_gid)
+        except EnvironmentError as err:
+            if err.errno != errno.EPERM:
+                # ignore chown failure as user could be editing file belonging
+                # to a different user, in which case we really cant do anything
+                # about it short of making the file update non-atomic
+                raise
+
     temp.close()
     temp = temp.name
     try:

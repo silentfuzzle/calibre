@@ -6,8 +6,8 @@ __copyright__ = '2008, Kovid Goyal <kovid at kovidgoyal.net>'
 import os, traceback, Queue, time, cStringIO, re, sys, weakref
 from threading import Thread, Event
 
-from PyQt4.Qt import (
-    QMenu, QAction, QActionGroup, QIcon, SIGNAL, Qt, pyqtSignal, QDialog,
+from PyQt5.Qt import (
+    QMenu, QAction, QActionGroup, QIcon, Qt, pyqtSignal, QDialog,
     QObject, QVBoxLayout, QDialogButtonBox, QCursor, QCoreApplication,
     QApplication, QEventLoop)
 
@@ -695,6 +695,7 @@ class DeviceMenu(QMenu):  # {{{
 
     fetch_annotations = pyqtSignal()
     disconnect_mounted_device = pyqtSignal()
+    sync = pyqtSignal(object, object, object)
 
     def __init__(self, parent=None):
         QMenu.__init__(self, parent)
@@ -805,8 +806,7 @@ class DeviceMenu(QMenu):  # {{{
         action.setChecked(True)
 
     def action_triggered(self, action):
-        self.emit(SIGNAL('sync(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)'),
-                action.dest, action.delete, action.specific)
+        self.sync.emit(action.dest, action.delete, action.specific)
 
     def trigger_default(self, *args):
         r = config['default_send_to_device_action']
@@ -861,7 +861,10 @@ device_signals = DeviceSignals()
 
 class DeviceMixin(object):  # {{{
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def init_device_mixin(self):
         self.device_error_dialog = error_dialog(self, _('Error'),
                 _('Error communicating with device'), ' ')
         self.device_error_dialog.setModal(Qt.NonModal)
@@ -973,9 +976,7 @@ class DeviceMixin(object):  # {{{
         self._sync_menu = DeviceMenu(self)
         self.iactions['Send To Device'].qaction.setMenu(self._sync_menu)
         self.iactions['Connect Share'].build_email_entries()
-        self.connect(self._sync_menu,
-                SIGNAL('sync(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)'),
-                self.dispatch_sync_event)
+        self._sync_menu.sync.connect(self.dispatch_sync_event)
         self._sync_menu.fetch_annotations.connect(
                 self.iactions['Fetch Annotations'].fetch_annotations)
         self._sync_menu.disconnect_mounted_device.connect(self.disconnect_mounted_device)
@@ -1751,12 +1752,7 @@ class DeviceMixin(object):  # {{{
             self.db_book_title_cache = db_book_title_cache
             self.db_book_uuid_cache = db_book_uuid_cache
 
-        # Now iterate through all the books on the device, setting the
-        # in_library field. If the UUID matches a book in the library, then
-        # do not consider that book for other matching. In all cases set
-        # the application_id to the db_id of the matching book. This value
-        # will be used by books_on_device to indicate matches. While we are
-        # going by, update the metadata for a book if automatic management is on
+        book_ids_to_refresh = set()
 
         def update_book(id_, book) :
             if not update_metadata:
@@ -1768,16 +1764,30 @@ class DeviceMixin(object):  # {{{
 
         def updateq(id_, book):
             try:
-                return (update_metadata and
-                        (db.metadata_last_modified(id_, index_is_id=True) !=
-                         getattr(book, 'last_modified', None) or
-                         (isinstance(getattr(book, 'thumbnail', None), (list, tuple))
-                          and max(book.thumbnail[0], book.thumbnail[1]) != desired_thumbnail_height
-                         )
+                if not update_metadata:
+                    return False
+
+                if self.device_manager.device is not None:
+                    set_of_ids = self.device_manager.device.synchronize_with_db(db, id_, book)
+                    if set_of_ids is not None:
+                        book_ids_to_refresh.update(set_of_ids)
+                        return True
+
+                return (db.metadata_last_modified(id_, index_is_id=True) !=
+                        getattr(book, 'last_modified', None) or
+                        (isinstance(getattr(book, 'thumbnail', None), (list, tuple))
+                         and max(book.thumbnail[0], book.thumbnail[1]) != desired_thumbnail_height
                         )
                        )
             except:
                 return True
+
+        # Now iterate through all the books on the device, setting the
+        # in_library field. If the UUID matches a book in the library, then
+        # do not consider that book for other matching. In all cases set
+        # the application_id to the db_id of the matching book. This value
+        # will be used by books_on_device to indicate matches. While we are
+        # going by, update the metadata for a book if automatic management is on
 
         total_book_count = 0
         for booklist in booklists:
@@ -1796,7 +1806,7 @@ class DeviceMixin(object):  # {{{
                     if current_book_count % 100 == 0:
                         self.status_bar.show_message(
                                 _('Analyzing books on the device: %d%% finished')%(
-                                    int((float(current_book_count)/total_book_count)*100.0)))
+                                    int((float(current_book_count)/total_book_count)*100.0)), show_notification=False)
 
                     # I am assuming that this sort-of multi-threading won't break
                     # anything. Reasons: excluding UI events prevents the user
@@ -1872,6 +1882,16 @@ class DeviceMixin(object):  # {{{
                     self.device_manager.sync_booklists(
                                 FunctionDispatcher(self.metadata_synced), booklists,
                                 plugboards, add_as_step_to_job)
+
+            if book_ids_to_refresh:
+                try:
+                    prints('DeviceJob: set_books_in_library refreshing GUI for ',
+                           len(book_ids_to_refresh), 'books')
+                    self.library_view.model().refresh_ids(book_ids_to_refresh,
+                                      current_row=self.library_view.currentIndex().row())
+                except:
+                    # This shouldn't ever happen, but just in case ...
+                    traceback.print_exc()
 
         if DEBUG:
             prints('DeviceJob: set_books_in_library finished: time=',

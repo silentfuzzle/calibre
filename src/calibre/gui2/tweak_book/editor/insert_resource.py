@@ -9,9 +9,9 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 import sys, os
 from functools import partial
 
-from PyQt4.Qt import (
+from PyQt5.Qt import (
     QGridLayout, QSize, QListView, QStyledItemDelegate, QLabel, QPixmap,
-    QApplication, QSizePolicy, QAbstractListModel, QVariant, Qt, QRect,
+    QApplication, QSizePolicy, QAbstractListModel, Qt, QRect,
     QPainter, QModelIndex, QSortFilterProxyModel, QLineEdit, QToolButton,
     QIcon, QFormLayout, pyqtSignal, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
     QMenu, QInputDialog)
@@ -20,7 +20,7 @@ from calibre import fit_image
 from calibre.constants import plugins
 from calibre.ebooks.metadata import string_to_authors
 from calibre.ebooks.metadata.book.base import Metadata
-from calibre.gui2 import NONE, choose_files, error_dialog
+from calibre.gui2 import choose_files, error_dialog
 from calibre.gui2.languages import LanguagesEdit
 from calibre.gui2.tweak_book import current_container, tprefs
 from calibre.gui2.tweak_book.widgets import Dialog
@@ -98,7 +98,7 @@ class ImageDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         QStyledItemDelegate.paint(self, painter, option, QModelIndex())  # draw the hover and selection highlights
-        name = unicode(index.data(Qt.DisplayRole).toString())
+        name = unicode(index.data(Qt.DisplayRole) or '')
         cover = self.cover_cache.get(name, None)
         if cover is None:
             cover = self.cover_cache[name] = QPixmap()
@@ -150,8 +150,9 @@ class Images(QAbstractListModel):
                     self.image_names.append(name)
 
     def refresh(self):
+        self.beginResetModel()
         self.build()
-        self.reset()
+        self.endResetModel()
 
     def rowCount(self, *args):
         return len(self.image_names)
@@ -160,10 +161,10 @@ class Images(QAbstractListModel):
         try:
             name = self.image_names[index.row()]
         except IndexError:
-            return NONE
+            return None
         if role in (Qt.DisplayRole, Qt.ToolTipRole):
-            return QVariant(name)
-        return NONE
+            return name
+        return None
 
 class InsertImage(Dialog):
 
@@ -258,12 +259,12 @@ class InsertImage(Dialog):
 
     def activated(self, index):
         if self.for_browsing:
-            return self.image_activated.emit(unicode(index.data().toString()))
+            return self.image_activated.emit(unicode(index.data() or ''))
         self.chosen_image_is_external = False
         self.accept()
 
     def accept(self):
-        self.chosen_image = unicode(self.view.currentIndex().data().toString())
+        self.chosen_image = unicode(self.view.currentIndex().data() or '')
         super(InsertImage, self).accept()
 
     def filter_changed(self, *args):

@@ -9,6 +9,7 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 from calibre import as_unicode
 from calibre.utils.magick import Image
 from calibre.ebooks.oeb.polish.check.base import BaseError, WARN
+from calibre.ebooks.oeb.polish.check.parsing import EmptyFile
 
 class InvalidImage(BaseError):
 
@@ -27,7 +28,7 @@ class CMYKImage(BaseError):
     level = WARN
 
     def __call__(self, container):
-        from PyQt4.Qt import QImage
+        from PyQt5.Qt import QImage
         from calibre.gui2 import pixmap_to_data
         ext = container.mime_map[self.name].split('/')[-1].upper()
         if ext == 'JPG':
@@ -47,6 +48,8 @@ class CMYKImage(BaseError):
         return True
 
 def check_raster_images(name, mt, raw):
+    if not raw:
+        return [EmptyFile(name)]
     errors = []
     i = Image()
     try:

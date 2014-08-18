@@ -8,11 +8,11 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 
 import shutil
 
-from PyQt4.Qt import (
-    QAbstractListModel, Qt, QModelIndex, QVariant, QApplication, QWidget,
+from PyQt5.Qt import (
+    QAbstractListModel, Qt, QModelIndex, QApplication, QWidget,
     QGridLayout, QListView, QStyledItemDelegate, pyqtSignal, QPushButton, QIcon)
 
-from calibre.gui2 import NONE, error_dialog
+from calibre.gui2 import error_dialog
 
 ROOT = QModelIndex()
 
@@ -44,14 +44,14 @@ class GlobalUndoHistory(QAbstractListModel):
 
     def data(self, index, role=Qt.DisplayRole):
         if role == Qt.DisplayRole:
-            return QVariant(self.label_for_row(index.row()))
+            return self.label_for_row(index.row())
         if role == Qt.FontRole and index.row() == self.pos:
             f = QApplication.instance().font()
             f.setBold(True)
-            return QVariant(f)
+            return f
         if role == Qt.UserRole:
-            return QVariant(self.states[index.row()])
-        return NONE
+            return self.states[index.row()]
+        return None
 
     def label_for_row(self, row):
         msg = self.states[row].message
@@ -77,9 +77,10 @@ class GlobalUndoHistory(QAbstractListModel):
         return self.states[self.pos - 1].container
 
     def open_book(self, container):
+        self.beginResetModel()
         self.states = [State(container)]
         self.pos = 0
-        self.reset()
+        self.endResetModel()
 
     def truncate(self):
         extra = self.states[self.pos+1:]
@@ -108,6 +109,7 @@ class GlobalUndoHistory(QAbstractListModel):
             self.beginRemoveRows(ROOT, 0, num - 1)
             cleanup(self.states[:num])
             self.states = self.states[num:]
+            self.pos -= num
             self.endRemoveRows()
 
     def rewind_savepoint(self):

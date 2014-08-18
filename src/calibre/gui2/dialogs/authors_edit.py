@@ -8,7 +8,7 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 
 from collections import OrderedDict
 
-from PyQt4.Qt import (
+from PyQt5.Qt import (
     QDialog, QGridLayout, QDialogButtonBox, QListWidget, QApplication, Qt,
     pyqtSignal, QSize, QPushButton, QIcon, QStyledItemDelegate, QLabel)
 
@@ -29,7 +29,7 @@ class ItemDelegate(QStyledItemDelegate):
         return QStyledItemDelegate.sizeHint(self, *args) + QSize(0, 15)
 
     def setEditorData(self, editor, index):
-        name = unicode(index.data(Qt.DisplayRole).toString())
+        name = unicode(index.data(Qt.DisplayRole) or '')
         editor.setText(name)
         editor.lineEdit().selectAll()
 

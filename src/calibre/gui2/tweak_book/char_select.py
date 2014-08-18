@@ -6,32 +6,22 @@ from __future__ import (unicode_literals, division, absolute_import,
 __license__ = 'GPL v3'
 __copyright__ = '2014, Kovid Goyal <kovid at kovidgoyal.net>'
 
-import unicodedata, re, os, cPickle, sys, textwrap
+import unicodedata, re, os, cPickle, textwrap
 from bisect import bisect
 from functools import partial
 from collections import defaultdict
 
-from PyQt4.Qt import (
-    QAbstractItemModel, QModelIndex, Qt, QVariant, pyqtSignal, QApplication,
+from PyQt5.Qt import (
+    QAbstractItemModel, QModelIndex, Qt, pyqtSignal, QApplication,
     QTreeView, QSize, QGridLayout, QAbstractListModel, QListView, QPen, QMenu,
     QStyledItemDelegate, QSplitter, QLabel, QSizePolicy, QIcon, QMimeData,
     QPushButton, QToolButton, QInputMethodEvent)
 
-from calibre.constants import ispy3, plugins, cache_dir
-from calibre.gui2 import NONE
+from calibre.constants import plugins, cache_dir
 from calibre.gui2.widgets2 import HistoryLineEdit2
 from calibre.gui2.tweak_book import tprefs
-from calibre.gui2.tweak_book.widgets import Dialog
-
-if not ispy3:
-    if sys.maxunicode >= 0x10FFFF:
-        chr = unichr
-    else:
-        def chr(i):
-            # Narrow builds of python cannot represent code point > 0xffff as a
-            # single character, so we need our own implementation of unichr
-            # that returns them as a surrogate pair
-            return (b"\U%s" % (hex(i)[2:].zfill(8))).decode('unicode-escape')
+from calibre.gui2.tweak_book.widgets import Dialog, BusyCursor
+from calibre.utils.icu import safe_chr as chr, icu_unicode_version, character_name_from_code
 
 ROOT = QModelIndex()
 
@@ -44,9 +34,10 @@ non_printing = {
 }
 
 # Searching {{{
+
 def load_search_index():
-    topchar = sys.maxunicode
-    ver = (1, topchar, unicodedata.unidata_version)  # Increment this when you make any changes to the index
+    topchar = 0x10ffff
+    ver = (1, topchar, icu_unicode_version or unicodedata.unidata_version)  # Increment this when you make any changes to the index
     name_map = {}
     path = os.path.join(cache_dir(), 'unicode-name-index.pickle')
     if os.path.exists(path):
@@ -57,7 +48,7 @@ def load_search_index():
     if not name_map:
         name_map = defaultdict(set)
         for x in xrange(1, topchar + 1):
-            for word in unicodedata.name(chr(x), '').split():
+            for word in character_name_from_code(x).split():
                 name_map[word.lower()].add(x)
         from calibre.ebooks.html_entities import html5_entities
         for name, char in html5_entities.iteritems():
@@ -443,20 +434,20 @@ class CategoryModel(QAbstractItemModel):
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
-            return NONE
+            return None
         pid = index.internalId()
         if pid == 0:
             if role == Qt.DisplayRole:
-                return QVariant(self.categories[index.row()][0])
+                return self.categories[index.row()][0]
             if role == Qt.FontRole:
-                return QVariant(self.bold_font)
+                return self.bold_font
             if role == Qt.DecorationRole and index.row() == 0:
-                return QVariant(self.fav_icon)
+                return self.fav_icon
         else:
             if role == Qt.DisplayRole:
                 item = self.categories[pid - 1][1][index.row()]
-                return QVariant(item[0])
-        return NONE
+                return item[0]
+        return None
 
     def get_range(self, index):
         if index.isValid():
@@ -474,7 +465,7 @@ class CategoryModel(QAbstractItemModel):
             category, subcategory = self.category_map[self.starts[ipos]]
         except IndexError:
             category = subcategory = _('Unknown')
-        return category, subcategory, unicodedata.name(chr(char_code), _('Unknown'))
+        return category, subcategory, (character_name_from_code(char_code) or _('Unknown'))
 
 class CategoryDelegate(QStyledItemDelegate):
 
@@ -540,8 +531,8 @@ class CharModel(QAbstractListModel):
 
     def data(self, index, role):
         if role == Qt.UserRole and -1 < index.row() < len(self.chars):
-            return QVariant(self.chars[index.row()])
-        return NONE
+            return self.chars[index.row()]
+        return None
 
     def flags(self, index):
         ans = Qt.ItemIsEnabled
@@ -571,8 +562,9 @@ class CharModel(QAbstractListModel):
             self.chars[x] = None
         for x in reversed(codes):
             self.chars.insert(row, x)
+        self.beginResetModel()
         self.chars = [x for x in self.chars if x is not None]
-        self.reset()
+        self.endResetModel()
         tprefs['charmap_favorites'] = list(self.chars)
         return True
 
@@ -588,8 +580,9 @@ class CharDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         QStyledItemDelegate.paint(self, painter, option, index)
-        charcode, ok = index.data(Qt.UserRole).toInt()
-        if not ok:
+        try:
+            charcode = int(index.data(Qt.UserRole))
+        except (TypeError, ValueError):
             return
         painter.save()
         try:
@@ -639,8 +632,11 @@ class CharView(QListView):
         self.clicked.connect(self.item_activated)
 
     def item_activated(self, index):
-        char_code, ok = self.model().data(index, Qt.UserRole).toInt()
-        if ok:
+        try:
+            char_code = int(self.model().data(index, Qt.UserRole))
+        except (TypeError, ValueError):
+            pass
+        else:
             self.char_selected.emit(chr(char_code))
 
     def set_allow_drag_and_drop(self, enabled):
@@ -659,8 +655,9 @@ class CharView(QListView):
 
     def show_chars(self, name, codes):
         self.showing_favorites = name == _('Favorites')
+        self._model.beginResetModel()
         self._model.chars = codes
-        self._model.reset()
+        self._model.endResetModel()
         self.scrollToTop()
 
     def mouseMoveEvent(self, ev):
@@ -669,8 +666,11 @@ class CharView(QListView):
             row = index.row()
             if row != self.last_mouse_idx:
                 self.last_mouse_idx = row
-                char_code, ok = self.model().data(index, Qt.UserRole).toInt()
-                if ok:
+                try:
+                    char_code = int(self.model().data(index, Qt.UserRole))
+                except (TypeError, ValueError):
+                    pass
+                else:
                     self.show_name.emit(char_code)
             self.setCursor(Qt.PointingHandCursor)
         else:
@@ -682,8 +682,11 @@ class CharView(QListView):
     def context_menu(self, pos):
         index = self.indexAt(pos)
         if index.isValid():
-            char_code, ok = self.model().data(index, Qt.UserRole).toInt()
-            if ok:
+            try:
+                char_code = int(self.model().data(index, Qt.UserRole))
+            except (TypeError, ValueError):
+                pass
+            else:
                 m = QMenu(self)
                 m.addAction(QIcon(I('edit-copy.png')), _('Copy %s to clipboard') % chr(char_code), partial(self.copy_to_clipboard, char_code))
                 m.addAction(QIcon(I('rating.png')),
@@ -695,8 +698,9 @@ class CharView(QListView):
 
     def restore_defaults(self):
         del tprefs['charmap_favorites']
+        self.model().beginResetModel()
         self.model().chars = list(tprefs['charmap_favorites'])
-        self.model().reset()
+        self.model().endResetModel()
 
     def copy_to_clipboard(self, char_code):
         c = QApplication.clipboard()
@@ -710,8 +714,9 @@ class CharView(QListView):
         elif char_code in existing:
             existing.remove(char_code)
             tprefs['charmap_favorites'] = existing
+            self.model().beginResetModel()
             self.model().chars.remove(char_code)
-            self.model().reset()
+            self.model().endResetModel()
 
 class CharSelect(Dialog):
 
@@ -773,7 +778,6 @@ class CharSelect(Dialog):
         self.char_view.setFocus(Qt.OtherFocusReason)
 
     def do_search(self):
-        from calibre.gui2.tweak_book.boss import BusyCursor
         text = unicode(self.search.text()).strip()
         if not text:
             return self.clear_search()

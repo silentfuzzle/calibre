@@ -8,7 +8,10 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 
 import re
 
-from calibre.gui2.tweak_book.editor import SyntaxTextCharFormat
+from PyQt5.Qt import QTextBlockUserData
+
+from calibre.gui2.tweak_book import verify_link
+from calibre.gui2.tweak_book.editor import syntax_text_char_format, LINK_PROPERTY, CSS_PROPERTY
 from calibre.gui2.tweak_book.editor.syntax.base import SyntaxHighlighter
 
 space_pat = re.compile(r'[ \n\t\r\f]+')
@@ -22,9 +25,13 @@ sheet_tokens = [(re.compile(k), v, n) for k, v, n in [
     (r'[~\^\*!%&\[\]\(\)<>\|+=@:;,./?-]', 'operator', 'operator'),
 ]]
 
+URL_TOKEN = 'url'
+
 content_tokens = [(re.compile(k), v, n) for k, v, n in [
-    (r'url\(.*?\)', 'string', 'url'),
+    (r'url\(.*?\)', 'string', URL_TOKEN),
+
     (r'@\S+', 'preproc', 'at-rule'),
+
     (r'(azimuth|background-attachment|background-color|'
     r'background-image|background-position|background-repeat|'
     r'background|border-bottom-color|border-bottom-style|'
@@ -73,7 +80,7 @@ content_tokens = [(re.compile(k), v, n) for k, v, n in [
     r'relative|repeat-x|repeat-y|repeat|rgb|ridge|right-side|'
     r'rightwards|s-resize|sans-serif|scroll|se-resize|'
     r'semi-condensed|semi-expanded|separate|serif|show|silent|'
-    r'slow|slower|small-caps|small-caption|smaller|soft|solid|'
+    r'slow|slower|small-caps|small-caption|smaller|small|soft|solid|'
     r'spell-out|square|static|status-bar|super|sub|sw-resize|'
     r'table-caption|table-cell|table-column|table-column-group|'
     r'table-footer-group|table-header-group|'
@@ -81,7 +88,8 @@ content_tokens = [(re.compile(k), v, n) for k, v, n in [
     r'transparent|ultra-condensed|ultra-expanded|underline|'
     r'upper-alpha|upper-latin|upper-roman|uppercase|url|'
     r'visible|w-resize|wait|wider|x-fast|x-high|x-large|x-loud|'
-    r'x-low|x-small|x-soft|xx-large|xx-small|yes)\b', 'keyword', 'keyword'),
+    r'x-low|x-small|x-soft|xx-large|xx-small|yes|src)\b', 'keyword', 'keyword'),
+
     (r'(indigo|gold|firebrick|indianred|yellow|darkolivegreen|'
     r'darkseagreen|mediumvioletred|mediumorchid|chartreuse|'
     r'mediumslateblue|black|springgreen|crimson|lightsalmon|brown|'
@@ -107,52 +115,84 @@ content_tokens = [(re.compile(k), v, n) for k, v, n in [
     r'lightslategray|lawngreen|lightgreen|tomato|hotpink|'
     r'lightyellow|lavenderblush|linen|mediumaquamarine|green|'
     r'blueviolet|peachpuff)\b', 'colorname', 'colorname'),
+
     (r'\!important', 'preproc', 'important'),
+
     (r'\#[a-zA-Z0-9]{1,6}', 'number', 'hexnumber'),
+
     (r'[\.-]?[0-9]*[\.]?[0-9]+(em|px|pt|pc|in|mm|cm|ex|s|rem)\b', 'number', 'dimension'),
+
     (r'[\.-]?[0-9]*[\.]?[0-9]+%(?=$|[ \n\t\f\r;}{()\[\]])', 'number', 'dimension'),
+
     (r'-?[0-9]+', 'number', 'number'),
+
     (r'[~\^\*!%&<>\|+=@:,./?-]+', 'operator', 'operator'),
+
     (r'[\[\]();]+', 'bracket', 'bracket'),
+
     (r'[a-zA-Z_][a-zA-Z0-9_]*', 'identifier', 'ident')
 
 ]]
 
-class State(object):
+NORMAL = 0
+IN_COMMENT_NORMAL = 1
+IN_SQS = 2
+IN_DQS = 3
+IN_CONTENT = 4
+IN_COMMENT_CONTENT = 5
 
-    NORMAL = 0
-    IN_COMMENT_NORMAL = 1
-    IN_SQS = 2
-    IN_DQS = 3
-    IN_CONTENT = 4
-    IN_COMMENT_CONTENT = 5
+class CSSState(object):
 
-    def __init__(self, num):
-        self.parse  = num & 0b1111
-        self.blocks = num >> 4
+    __slots__ = ('parse', 'blocks')
 
-    @property
-    def value(self):
-        return ((self.parse & 0b1111) | (max(0, self.blocks) << 4))
+    def __init__(self):
+        self.parse  = NORMAL
+        self.blocks = 0
 
+    def copy(self):
+        s = CSSState()
+        s.parse, s.blocks = self.parse, self.blocks
+        return s
 
-def normal(state, text, i, formats):
+    def __eq__(self, other):
+        return self.parse == getattr(other, 'parse', -1) and \
+            self.blocks == getattr(other, 'blocks', -1)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __repr__(self):
+        return "CSSState(parse=%s, blocks=%s)" % (self.parse, self.blocks)
+    __str__ = __repr__
+
+class CSSUserData(QTextBlockUserData):
+
+    def __init__(self):
+        QTextBlockUserData.__init__(self)
+        self.state = CSSState()
+        self.doc_name = None
+
+    def clear(self, state=None, doc_name=None):
+        self.state = CSSState() if state is None else state
+        self.doc_name = doc_name
+
+def normal(state, text, i, formats, user_data):
     ' The normal state (outside content blocks {})'
     m = space_pat.match(text, i)
     if m is not None:
         return [(len(m.group()), None)]
     cdo = cdo_pat.match(text, i)
     if cdo is not None:
-        state.parse = State.IN_COMMENT_NORMAL
+        state.parse = IN_COMMENT_NORMAL
         return [(len(cdo.group()), formats['comment'])]
     if text[i] == '"':
-        state.parse = State.IN_DQS
+        state.parse = IN_DQS
         return [(1, formats['string'])]
     if text[i] == "'":
-        state.parse = State.IN_SQS
+        state.parse = IN_SQS
         return [(1, formats['string'])]
     if text[i] == '{':
-        state.parse = State.IN_CONTENT
+        state.parse = IN_CONTENT
         state.blocks += 1
         return [(1, formats['bracket'])]
     for token, fmt, name in sheet_tokens:
@@ -162,24 +202,24 @@ def normal(state, text, i, formats):
 
     return [(len(text) - i, formats['unknown-normal'])]
 
-def content(state, text, i, formats):
+def content(state, text, i, formats, user_data):
     ' Inside content blocks '
     m = space_pat.match(text, i)
     if m is not None:
         return [(len(m.group()), None)]
     cdo = cdo_pat.match(text, i)
     if cdo is not None:
-        state.parse = State.IN_COMMENT_CONTENT
+        state.parse = IN_COMMENT_CONTENT
         return [(len(cdo.group()), formats['comment'])]
     if text[i] == '"':
-        state.parse = State.IN_DQS
+        state.parse = IN_DQS
         return [(1, formats['string'])]
     if text[i] == "'":
-        state.parse = State.IN_SQS
+        state.parse = IN_SQS
         return [(1, formats['string'])]
     if text[i] == '}':
         state.blocks -= 1
-        state.parse = State.NORMAL if state.blocks < 1 else State.IN_CONTENT
+        state.parse = NORMAL if state.blocks < 1 else IN_CONTENT
         return [(1, formats['bracket'])]
     if text[i] == '{':
         state.blocks += 1
@@ -187,38 +227,48 @@ def content(state, text, i, formats):
     for token, fmt, name in content_tokens:
         m = token.match(text, i)
         if m is not None:
+            if name is URL_TOKEN:
+                h = 'link'
+                url = m.group()
+                prefix, main, suffix = url[:4], url[4:-1], url[-1]
+                if len(main) > 1 and main[0] in ('"', "'") and main[0] == main[-1]:
+                    prefix += main[0]
+                    suffix = main[-1] + suffix
+                    main = main[1:-1]
+                    h = 'bad_link' if verify_link(main, user_data.doc_name) is False else 'link'
+                return [(len(prefix), formats[fmt]), (len(main), formats[h]), (len(suffix), formats[fmt])]
             return [(len(m.group()), formats[fmt])]
 
     return [(len(text) - i, formats['unknown-normal'])]
 
-def comment(state, text, i, formats):
+def comment(state, text, i, formats, user_data):
     ' Inside a comment '
     pos = text.find('*/', i)
     if pos == -1:
         return [(len(text), formats['comment'])]
-    state.parse = State.NORMAL if state.parse == State.IN_COMMENT_NORMAL else State.IN_CONTENT
+    state.parse = NORMAL if state.parse == IN_COMMENT_NORMAL else IN_CONTENT
     return [(pos - i + 2, formats['comment'])]
 
-def in_string(state, text, i, formats):
+def in_string(state, text, i, formats, user_data):
     'Inside a string'
-    q = '"' if state.parse == State.IN_DQS else "'"
+    q = '"' if state.parse == IN_DQS else "'"
     pos = text.find(q, i)
     if pos == -1:
         if text[-1] == '\\':
             # Multi-line string
             return [(len(text) - i, formats['string'])]
-        state.parse = (State.NORMAL if state.blocks < 1 else State.IN_CONTENT)
+        state.parse = (NORMAL if state.blocks < 1 else IN_CONTENT)
         return [(len(text) - i, formats['unterminated-string'])]
-    state.parse = (State.NORMAL if state.blocks < 1 else State.IN_CONTENT)
+    state.parse = (NORMAL if state.blocks < 1 else IN_CONTENT)
     return [(pos - i + len(q), formats['string'])]
 
 state_map = {
-    State.NORMAL:normal,
-    State.IN_COMMENT_NORMAL: comment,
-    State.IN_COMMENT_CONTENT: comment,
-    State.IN_SQS: in_string,
-    State.IN_DQS: in_string,
-    State.IN_CONTENT: content,
+    NORMAL:normal,
+    IN_COMMENT_NORMAL: comment,
+    IN_COMMENT_CONTENT: comment,
+    IN_SQS: in_string,
+    IN_DQS: in_string,
+    IN_CONTENT: content,
 }
 
 def create_formats(highlighter):
@@ -227,8 +277,6 @@ def create_formats(highlighter):
         'comment': theme['Comment'],
         'error': theme['Error'],
         'string': theme['String'],
-        'preproc': theme['PreProc'],
-        'keyword': theme['Keyword'],
         'colorname': theme['Constant'],
         'number': theme['Number'],
         'operator': theme['Function'],
@@ -243,16 +291,27 @@ def create_formats(highlighter):
         'unknown-normal': _('Invalid text'),
         'unterminated-string': _('Unterminated string'),
     }.iteritems():
-        f = formats[name] = SyntaxTextCharFormat(formats['error'])
+        f = formats[name] = syntax_text_char_format(formats['error'])
         f.setToolTip(msg)
+    formats['link'] = syntax_text_char_format(theme['Link'])
+    formats['link'].setToolTip(_('Hold down the Ctrl key and click to open this link'))
+    formats['link'].setProperty(LINK_PROPERTY, True)
+    formats['bad_link'] = syntax_text_char_format(theme['BadLink'])
+    formats['bad_link'].setProperty(LINK_PROPERTY, True)
+    formats['bad_link'].setToolTip(_('This link points to a file that is not present in the book'))
+    formats['preproc'] = f = syntax_text_char_format(theme['PreProc'])
+    f.setProperty(CSS_PROPERTY, True)
+    formats['keyword'] = f = syntax_text_char_format(theme['Keyword'])
+    f.setProperty(CSS_PROPERTY, True)
     return formats
 
 
 class CSSHighlighter(SyntaxHighlighter):
 
     state_map = state_map
-    state_class = State
     create_formats_func = create_formats
+    user_data_factory = CSSUserData
+
 
 if __name__ == '__main__':
     from calibre.gui2.tweak_book.editor.widget import launch_editor
