@@ -17,9 +17,19 @@ class EBookNetwork (object):
             self.data = json.dumps(self.data)
         else:
             self.bookGraph = digraph.DiGraph()
-            for s, t in zip(spine, toc):
-                self.bookGraph.add_node(str(s.start_page),label=str(s.start_page),title=t.text)
+            self.testCount = 0
+            for t in toc:
+                self.process_toc(spine,t)
+            print (self.testCount)
+            
             self.save_graph()
+            
+    def process_toc(self, spine, toc):
+        self.testCount = self.testCount + 1
+        spine_index = spine.index(toc.abspath)
+        self.bookGraph.add_node(str(spine[spine_index].start_page),label=str(spine[spine_index].start_page),title=toc.text)
+        for t in toc:
+            self.process_toc(spine, t)
             
     def add_edge(self, start_page, end_page):
         if (str(end_page) in self.bookGraph[str(start_page)]):

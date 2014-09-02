@@ -14,6 +14,7 @@ from calibre.gui2.viewer.ui import Main as MainWindow
 from calibre.gui2.viewer.printing import Printing
 from calibre.gui2.viewer.toc import TOC
 from calibre.gui2.viewer.book_network import EBookNetwork
+from calibre.gui2.viewer.adventurous_helper import AdventurousHelper
 from calibre.gui2.widgets import ProgressIndicator
 from calibre.gui2 import (
     Application, ORG_NAME, APP_UID, choose_files, info_dialog, error_dialog,
@@ -63,7 +64,6 @@ class EbookViewer(MainWindow):
         MainWindow.__init__(self, debug_javascript)
         self.adventurousReader = True
         self.absPos = 1.
-        self.setupUi(self)
         self.view.initialize_view(debug_javascript)
         self.view.magnification_changed.connect(self.magnification_changed)
         self.show_toc_on_open = False
@@ -454,7 +454,8 @@ class EbookViewer(MainWindow):
             num = self.pos.value()
             self.goto_page(num)
         else:
-            num = self.pos.value() + self.current_page.start_page
+            num = self.adventurous_helper.update_page_label(self.pos.value(), self.current_page)
+            print ("Num: " + str(num))
             self.goto_page(num, allow_page_turn=False)
 
     def forward(self, x):
@@ -473,27 +474,40 @@ class EbookViewer(MainWindow):
         
     def scrollbar_goto_page(self, new_page):
         if self.current_page is not None:
-            self.goto_page(new_page+self.current_page.start_page-1, allow_page_turn=False)
+            next_page = self.adventurous_helper.get_scrollbar_frac(new_page, self.current_page)
+            self.goto_page(next_page, allow_page_turn=False)
             
     def goto_page(self, new_page, loaded_check=True, allow_page_turn=True):
+        print ("Goto: " + str(new_page) + "," + str(allow_page_turn))
         if self.current_page is not None or not loaded_check:
             for page in self.iterator.spine:
-                checkPages = (new_page >= page.start_page and new_page <= page.max_page)
+                if (self.adventurousReader == False):
+                    checkPages = (new_page >= page.start_page and new_page <= page.max_page)
+                else:
+                    checkPages = (new_page >= page.start_page and new_page < page.max_page + 1)
+                    
                 if checkPages:
                     try:
                         if (self.adventurousReader == False):
                             frac = float(new_page-page.start_page)/(page.pages-1)
                         else:
-                            frac = float(new_page-page.start_page)/(page.pages)
+                            frac = float(new_page-page.start_page)/(self.adventurous_helper.get_section_pages(page))
                     except ZeroDivisionError:
                         frac = 0
                     if page == self.current_page:
+                        print ("current page " + str(frac))
                         self.view.scroll_to(frac)
                     else:
+                        if (allow_page_turn == False):
+                            allow_page_turn = self.adventurous_helper.get_allow_page_turn(self.current_index, page, self.toc, False)
+                            
                         if (allow_page_turn == True):
+                            print ("load page " + str(frac))
                             self.load_path(page, pos=frac)
                         else:
-                            self.view.scroll_to(float(self.current_page.max_page-self.current_page.start_page)/(self.current_page.pages))
+                            frac = float(self.current_page.max_page-self.current_page.start_page)/(self.current_page.pages)
+                            print ("scrolled to " + str(frac))
+                            self.view.scroll_to(frac)
 
     def open_ebook(self, checked):
         files = choose_files(self, 'ebook viewer open dialog',
@@ -579,9 +593,9 @@ class EbookViewer(MainWindow):
             if url.hasFragment():
                 frag = unicode(url.fragment())
             if path != self.current_page:
-                edgeAdded = self.ebook_network.add_edge(self.current_page.start_page, path.start_page)
-                if (edgeAdded):
-                    self.toc.load_network(self.ebook_network.data)
+                if (self.adventurousReader == True):
+                    self.adventurous_helper.add_network_edge(self.current_page, path, self.toc)
+                        
                 self.pending_anchor = frag
                 self.load_path(path)
             else:
@@ -601,7 +615,7 @@ class EbookViewer(MainWindow):
 
     def load_started(self):
         self.open_progress_indicator(_('Loading flow...'))
-
+            
     def load_finished(self, ok):
         self.close_progress_indicator()
         path = self.view.path()
@@ -612,9 +626,9 @@ class EbookViewer(MainWindow):
         self.current_page = self.iterator.spine[index]
         self.current_index = index
         if (self.adventurousReader == True):
-            numPages = self.current_page.pages + 1
-            if (self.current_page.pages == 1):
-                numPages = 1
+            self.adventurous_helper.set_curr_sec(self.current_index, self.current_page, self.toc)
+            numPages = self.adventurous_helper.get_num_pages(self.current_page)
+            print ("Num pages: " + str(numPages))
             self.pos.setMaximum(numPages)
             self.pos.setSuffix(' / %d'%numPages)
             self.set_vscrollbar_min(self.current_page.start_page)
@@ -687,9 +701,10 @@ class EbookViewer(MainWindow):
 
     def load_path(self, path, pos=0.0):
         self.open_progress_indicator(_('Laying out %s')%self.current_title)
+        print ("Pos: " + str(pos))
         self.view.load_path(path, pos=pos)
-        if (self.adventurousReader == True and self.current_page is not None):
-            self.set_vscrollbar_min(self.current_page.start_page)
+        #if (self.adventurousReader == True and self.current_page is not None):
+        #    self.set_vscrollbar_min(self.current_page.start_page)
 
     def viewport_resize_started(self, event):
         old, curr = event.size(), event.oldSize()
@@ -731,6 +746,7 @@ class EbookViewer(MainWindow):
         QTimer.singleShot(1000, self.update_page_number)
 
     def update_page_number(self):
+        print ("update_page_number")
         self.set_page_number(self.view.document.scroll_fraction)
 
     def close_progress_indicator(self):
@@ -855,9 +871,10 @@ class EbookViewer(MainWindow):
                 #if (adventurousReader == False):
                 #    self.toc.setModel(self.toc_model)
                 #else:
-                self.ebook_network = EBookNetwork(self.iterator.spine, self.iterator.toc, title, pathtoebook)
+                ebook_network = EBookNetwork(self.iterator.spine, self.iterator.toc, title, pathtoebook)
+                self.adventurous_helper = AdventurousHelper(True, self.iterator.toc, self.iterator.spine, ebook_network)
                 self.toc.set_manager(self)
-                self.toc.load_network(self.ebook_network.data)
+                self.toc.load_network(ebook_network.data)
                 if self.show_toc_on_open:
                     self.action_table_of_contents.setChecked(True)
             else:
@@ -865,6 +882,7 @@ class EbookViewer(MainWindow):
                 #TODO
                 #if (adventurousReader == False):
                 #    self.toc.setModel(self.toc_model)
+                print ("no toc")
                 self.action_table_of_contents.setChecked(False)
             if isbytestring(pathtoebook):
                 pathtoebook = force_unicode(pathtoebook, filesystem_encoding)
@@ -889,9 +907,9 @@ class EbookViewer(MainWindow):
                 self.vertical_scrollbar.setSingleStep(10)
                 self.vertical_scrollbar.setPageStep(100)
                 self.set_vscrollbar_value(1)
+                self.set_vscrollbar_min(100)
             else:
                 self.pos.setMaximum(1)
-            self.set_vscrollbar_min(100)
             self.current_index = -1
             QApplication.instance().alert(self, 5000)
             previous = self.set_bookmarks(self.iterator.bookmarks)
@@ -915,6 +933,7 @@ class EbookViewer(MainWindow):
             self.set_vscrollbar_value(1)
             self.vertical_scrollbar.setMinimum(min)
         else:
+            print ("Min: " + str(min))
             self.vertical_scrollbar.setMaximum(pageStep*self.pos.maximum())
             self.vertical_scrollbar.setMinimum(pageStep)
         self.vertical_scrollbar.setSingleStep(10)
@@ -932,13 +951,16 @@ class EbookViewer(MainWindow):
                 page = self.current_page.start_page + frac*float(self.current_page.pages-1)
                 self.set_vscrollbar_value(page)
             else:
-                page = frac*float(self.current_page.pages) + 1
-                self.absPos = self.current_page.start_page + frac*float(self.current_page.pages)
+                page = self.adventurous_helper.get_page_label(frac, self.current_page)
+                self.absPos = self.current_page.start_page + frac*float(self.adventurous_helper.get_section_pages(self.current_page))
+                print ("Absolute pos: " + str(self.absPos))
                 self.set_vscrollbar_value(page)
-                
+            
+            print ("set page num: " + str(page))
             self.pos.set_value(page)
 
     def scrolled(self, frac, onload=False):
+        print ("scrolled")
         self.set_page_number(frac)
         if not onload:
             ap = self.view.document.read_anchor_positions()
@@ -950,12 +972,13 @@ class EbookViewer(MainWindow):
             self.load_path(self.iterator.spine[self.current_index+1])
     
     def next_document(self):
-        if (self.adventurousReader == False):
-            self.curr_document()
+        if (self.adventurousReader == False or self.current_index < len(self.iterator.spine) - 1):
+            if (self.adventurous_helper.get_allow_page_turn(self.current_index, self.iterator.spine[self.current_index+1], self.toc, True)):
+                self.curr_document()
 
     def previous_document(self):
-        if (self.adventurousReader == False):
-            if hasattr(self, 'current_index') and self.current_index > 0:
+        if hasattr(self, 'current_index') and self.current_index > 0:
+            if (self.adventurousReader == False or self.adventurous_helper.get_allow_page_turn(self.current_index, self.iterator.spine[self.current_index-1], self.toc, True)):
                 self.load_path(self.iterator.spine[self.current_index-1], pos=1.0)
 
     def keyPressEvent(self, event):

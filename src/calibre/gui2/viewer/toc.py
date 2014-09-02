@@ -9,8 +9,8 @@ __docformat__ = 'restructuredtext en'
 # Adventurous Reader modifications added by Emily Palmieri <silentfuzzle@gmail.com>
 
 import re
-from PyQt4.Qt import (QStandardItem, QStandardItemModel, Qt, QFont,
-        QWebView, pyqtSlot, QObject, QString)
+from PyQt5.Qt import (QStandardItem, QStandardItemModel, Qt, QFont,
+        QWebView, pyqtSlot, QObject)
 from calibre.ebooks.oeb.display.webview import load_html
 
 from calibre.ebooks.metadata.toc import TOC as MTOC

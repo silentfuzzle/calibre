@@ -260,6 +260,7 @@ class Document(QWebPage):  # {{{
 
     def read_anchor_positions(self, use_cache=True):
         self.bridge_value = tuple(self.index_anchors)
+        print ("Bridge value: " + str(self.bridge_value))
         self.javascript(u'''
             py_bridge.value = book_indexing.anchor_positions(py_bridge.value, %s);
             '''%('true' if use_cache else 'false'))
