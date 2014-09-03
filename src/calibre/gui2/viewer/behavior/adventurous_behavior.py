@@ -1,6 +1,6 @@
 from sets import Set
 
-class AdventurousHelper (object):
+class AdventurousBehavior (object):
     def __init__(self, allow_sub_sections, toc, spine, ebook_network):
         self.allow_sub_sections = allow_sub_sections
         self.toc = toc
@@ -10,9 +10,13 @@ class AdventurousHelper (object):
         
     def set_curr_sec(self, curr_index, curr_sec, toc_view):
         self.curr_sec = curr_sec
+        self.curr_index = curr_index
+        curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)
+        self.toc_view = toc_view
+        
+        print ("set curr_sec ") 
         
         if (curr_sec not in self.include_sections):
-            curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)
             parent_set = self.get_parent_set(curr_index, curr_toc)
             self.include_sections, in_toc = self.find_include_sections(parent_set)
             
@@ -23,20 +27,16 @@ class AdventurousHelper (object):
                     self.start_spine = i
                 if (self.end_spine == -1 or self.end_spine < i):
                     self.end_spine = i
-            print ("Start index: " + str(self.start_spine))
-            print ("End index: " + str(self.end_spine))
         
         self.num_pages = self.calculate_num_pages(self.curr_sec)
         
-    def get_allow_page_turn(self, curr_index, next_sec, toc_view, add_edge):
-        return self.allow_page_turn(next_sec, toc_view, add_edge)
-        
-    def allow_page_turn(self, next_sec, toc_view, add_edge):
-        print ("allow_page_turn " + next_sec)
+    def allow_page_turn(self, next_sec):
+        print ("allow_page_turn")
         if (self.allow_sub_sections and self.curr_sec != next_sec):
             if (next_sec in self.include_sections):
-                if (add_edge):
-                    self.add_network_edge(self.corrected_curr_sec, next_sec, toc_view, True)
+                next_index = self.spine.index(next_sec)
+                if (next_index == self.curr_index + 1 or next_index == self.curr_index - 1):
+                    self.add_network_edge(self.corrected_curr_sec, next_sec, True)
                 return True
             else:
                 print ("False")
@@ -44,14 +44,13 @@ class AdventurousHelper (object):
         else:
             return False
                 
-    def get_num_pages(self, curr_sec):
-        if (curr_sec in self.include_sections):
+    def get_num_pages(self):
+        if (self.curr_sec in self.include_sections):
             return self.num_pages
         else:
-            return calculate_num_pages(curr_sec)
+            return calculate_num_pages(self.curr_sec)
             
     def calculate_num_pages(self, curr_sec):
-        print ("get_num_pages")
         if (self.allow_sub_sections):            
             num_pages = 0
             num_found = 0
@@ -105,7 +104,6 @@ class AdventurousHelper (object):
         
         # Include adjacent sections that aren't in the toc
         include_sections, in_toc = self.search_in_toc(0, 0, in_toc, include_sections)
-        print (str(len(include_sections)) + "," + str(len(in_toc)))
         return include_sections, in_toc
             
     def find_include_sub_sections(self, toc, include_sections):
@@ -169,26 +167,26 @@ class AdventurousHelper (object):
         
         return parent_set
         
-    def add_network_edge(self, start_sec, end_sec, toc_view, start_sec_checked=False):
-        end_toc, end_sec = self.check_and_get_toc(end_sec)
+    def add_network_edge(self, start_sec, end_sec, start_sec_checked=False):
+        end_toc, corrected_end_sec = self.check_and_get_toc(end_sec)
         
         if (start_sec_checked == False):
             start_toc, start_sec = self.check_and_get_toc(start_sec)
         
-        if (end_sec != start_sec):
-            edge_added = self.ebook_network.add_edge(start_sec.start_page, end_sec.start_page)
+        if (corrected_end_sec != start_sec):
+            edge_added = self.ebook_network.add_edge(start_sec.start_page, corrected_end_sec.start_page)
         
             if (edge_added):
-                toc_view.load_network(self.ebook_network.data)
+                self.toc_view.load_network(self.ebook_network.data)
             
     def check_and_get_toc(self, path_sec):
         path_toc = self.get_in_toc(path_sec, self.toc)
+        corrected_path_sec = path_sec
         if (path_toc is None):
-            print ("path_toc is None")
             path_toc = self.get_non_toced_parent(self.spine.index(path_sec))
-            path_sec = self.spine[self.spine.index(path_toc.abspath)]
-            
-        return (path_toc, path_sec)
+            corrected_path_sec = self.spine[self.spine.index(path_toc.abspath)]
+        
+        return (path_toc, corrected_path_sec)
             
     def get_non_toced_parent(self, current_index, back=True):
         check_in_toc_index = current_index - 1
@@ -212,17 +210,17 @@ class AdventurousHelper (object):
          
 
          
-    def get_page_label(self, frac, current_page):
+    def get_page_label(self, frac):
         if (self.allow_sub_sections):
-            return (current_page.start_page + frac*float(self.get_section_pages(current_page))+1) - self.spine[self.start_spine].start_page
+            return (self.curr_sec.start_page + frac*float(self.get_section_pages(self.curr_sec))+1) - self.spine[self.start_spine].start_page
         else:
-            return frac*float(self.get_section_pages(current_page)) + 1
+            return frac*float(self.get_section_pages(self.curr_sec)) + 1
             
-    def update_page_label(self, userInput, current_page):
+    def update_page_label(self, userInput):
         if (self.allow_sub_sections):
             return userInput + self.spine[self.start_spine].start_page - 1
         else:
-            return userInput + current_page.start_page
+            return userInput + self.curr_sec.start_page
             
     def get_section_pages(self, curr_sec):
         if (self.allow_sub_sections):
@@ -233,10 +231,10 @@ class AdventurousHelper (object):
         else:
             return curr_sec.pages
             
-    def get_scrollbar_frac(self, new_page, current_page):
+    def get_scrollbar_frac(self, new_page):
         print (new_page)
         if (self.allow_sub_sections):
             return new_page+self.spine[self.start_spine].start_page-1
         else:
-            return new_page+current_page.start_page-1
+            return new_page+self.curr_sec.start_page-1
         

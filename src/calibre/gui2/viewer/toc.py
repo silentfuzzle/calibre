@@ -6,44 +6,39 @@ from __future__ import (unicode_literals, division, absolute_import,
 __license__   = 'GPL v3'
 __copyright__ = '2012, Kovid Goyal <kovid@kovidgoyal.net>'
 __docformat__ = 'restructuredtext en'
-# Adventurous Reader modifications added by Emily Palmieri <silentfuzzle@gmail.com>
 
 import re
 from PyQt5.Qt import (QStandardItem, QStandardItemModel, Qt, QFont,
-        QWebView, pyqtSlot, QObject)
-from calibre.ebooks.oeb.display.webview import load_html
+        QTreeView)
 
 from calibre.ebooks.metadata.toc import TOC as MTOC
-       
-class TOCView (QWebView):
+
+class TOCView(QTreeView):
 
     def __init__(self, *args):
-        QWebView.__init__(self, *args)
-        
-        self.manager = None
-        self.loadFinished.connect(self.load_finished)
-        
-    def load_network(self, jsonCode):
-        self.jsonCode = jsonCode
-        path = 'C:/Users/Emily/Documents/GitHub/calibre/resources/adventurous_map_viewer/book_renderer.html'
-        load_html(path, self, codec=getattr(path, 'encoding', 'utf-8'), mime_type=getattr(path,
-        'mime_type', 'text/html'))
-        
-    def load_finished(self):
-        self.page().mainFrame().addToJavaScriptWindowObject("container", self)
-        
-        jScript = """dataLoaded({jsonCode}); """
-        jScriptFormat = jScript.format(jsonCode=str(self.jsonCode))
-        self.page().mainFrame().evaluateJavaScript(jScriptFormat)
-        
-    def set_manager(self, manager):
-        self.manager = manager
-        
-    @pyqtSlot(float)
-    def change_page(self, page):
-        print ("changed page: " + str(page))
-        if self.manager is not None:
-            self.manager.goto_page(page)
+        QTreeView.__init__(self, *args)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setMinimumWidth(80)
+        self.header().close()
+        self.setStyleSheet('''
+                QTreeView {
+                    background-color: palette(window);
+                    color: palette(window-text);
+                    border: none;
+                }
+
+                QTreeView::item {
+                    border: 1px solid transparent;
+                    padding-top:0.5ex;
+                    padding-bottom:0.5ex;
+                }
+
+                QTreeView::item:hover {
+                    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #e7effd, stop: 1 #cbdaf1);
+                    border: 1px solid #bfcde4;
+                    border-radius: 6px;
+                }
+        ''')
 
 class TOCItem(QStandardItem):
 

@@ -13,8 +13,9 @@ from PyQt5.Qt import (
 from calibre.gui2.viewer.ui import Main as MainWindow
 from calibre.gui2.viewer.printing import Printing
 from calibre.gui2.viewer.toc import TOC
+from calibre.gui2.viewer.tocNetwork import TOCNetworkView
 from calibre.gui2.viewer.book_network import EBookNetwork
-from calibre.gui2.viewer.adventurous_helper import AdventurousHelper
+from calibre.gui2.viewer.behavior.adventurous_behavior import AdventurousBehavior
 from calibre.gui2.widgets import ProgressIndicator
 from calibre.gui2 import (
     Application, ORG_NAME, APP_UID, choose_files, info_dialog, error_dialog,
@@ -454,7 +455,7 @@ class EbookViewer(MainWindow):
             num = self.pos.value()
             self.goto_page(num)
         else:
-            num = self.adventurous_helper.update_page_label(self.pos.value(), self.current_page)
+            num = self.adventurous_helper.update_page_label(self.pos.value())
             print ("Num: " + str(num))
             self.goto_page(num, allow_page_turn=False)
 
@@ -474,7 +475,8 @@ class EbookViewer(MainWindow):
         
     def scrollbar_goto_page(self, new_page):
         if self.current_page is not None:
-            next_page = self.adventurous_helper.get_scrollbar_frac(new_page, self.current_page)
+            next_page = self.adventurous_helper.get_scrollbar_frac(new_page)
+            print ("Scrollbar goto")
             self.goto_page(next_page, allow_page_turn=False)
             
     def goto_page(self, new_page, loaded_check=True, allow_page_turn=True):
@@ -499,7 +501,7 @@ class EbookViewer(MainWindow):
                         self.view.scroll_to(frac)
                     else:
                         if (allow_page_turn == False):
-                            allow_page_turn = self.adventurous_helper.get_allow_page_turn(self.current_index, page, self.toc, False)
+                            allow_page_turn = self.adventurous_helper.allow_page_turn(page)
                             
                         if (allow_page_turn == True):
                             print ("load page " + str(frac))
@@ -594,8 +596,8 @@ class EbookViewer(MainWindow):
                 frag = unicode(url.fragment())
             if path != self.current_page:
                 if (self.adventurousReader == True):
-                    self.adventurous_helper.add_network_edge(self.current_page, path, self.toc)
-                        
+                    self.adventurous_helper.add_network_edge(self.current_page, path)
+                
                 self.pending_anchor = frag
                 self.load_path(path)
             else:
@@ -619,6 +621,7 @@ class EbookViewer(MainWindow):
     def load_finished(self, ok):
         self.close_progress_indicator()
         path = self.view.path()
+        print ("Loaded path: " + path)
         try:
             index = self.iterator.spine.index(path)
         except (ValueError, AttributeError):
@@ -627,7 +630,7 @@ class EbookViewer(MainWindow):
         self.current_index = index
         if (self.adventurousReader == True):
             self.adventurous_helper.set_curr_sec(self.current_index, self.current_page, self.toc)
-            numPages = self.adventurous_helper.get_num_pages(self.current_page)
+            numPages = self.adventurous_helper.get_num_pages()
             print ("Num pages: " + str(numPages))
             self.pos.setMaximum(numPages)
             self.pos.setSuffix(' / %d'%numPages)
@@ -746,7 +749,6 @@ class EbookViewer(MainWindow):
         QTimer.singleShot(1000, self.update_page_number)
 
     def update_page_number(self):
-        print ("update_page_number")
         self.set_page_number(self.view.document.scroll_fraction)
 
     def close_progress_indicator(self):
@@ -868,13 +870,15 @@ class EbookViewer(MainWindow):
             if self.iterator.toc:
                 self.toc_model = TOC(self.iterator.spine, self.iterator.toc)
                 #TODO
-                #if (adventurousReader == False):
-                #    self.toc.setModel(self.toc_model)
-                #else:
-                ebook_network = EBookNetwork(self.iterator.spine, self.iterator.toc, title, pathtoebook)
-                self.adventurous_helper = AdventurousHelper(True, self.iterator.toc, self.iterator.spine, ebook_network)
-                self.toc.set_manager(self)
-                self.toc.load_network(ebook_network.data)
+                if (self.adventurousReader == False):
+                    self.toc.setModel(self.toc_model)
+                else:
+                    self.toc = TOCNetworkView(self)
+                    self.toc_dock.setWidget(self.toc)
+                    ebook_network = EBookNetwork(self.iterator.spine, self.iterator.toc, title, pathtoebook)
+                    self.adventurous_helper = AdventurousBehavior(True, self.iterator.toc, self.iterator.spine, ebook_network)
+                    self.toc.set_manager(self)
+                    self.toc.load_network(ebook_network.data)
                 if self.show_toc_on_open:
                     self.action_table_of_contents.setChecked(True)
             else:
@@ -934,6 +938,7 @@ class EbookViewer(MainWindow):
             self.vertical_scrollbar.setMinimum(min)
         else:
             print ("Min: " + str(min))
+            self.set_vscrollbar_value(1)
             self.vertical_scrollbar.setMaximum(pageStep*self.pos.maximum())
             self.vertical_scrollbar.setMinimum(pageStep)
         self.vertical_scrollbar.setSingleStep(10)
@@ -951,7 +956,7 @@ class EbookViewer(MainWindow):
                 page = self.current_page.start_page + frac*float(self.current_page.pages-1)
                 self.set_vscrollbar_value(page)
             else:
-                page = self.adventurous_helper.get_page_label(frac, self.current_page)
+                page = self.adventurous_helper.get_page_label(frac)
                 self.absPos = self.current_page.start_page + frac*float(self.adventurous_helper.get_section_pages(self.current_page))
                 print ("Absolute pos: " + str(self.absPos))
                 self.set_vscrollbar_value(page)
@@ -973,12 +978,12 @@ class EbookViewer(MainWindow):
     
     def next_document(self):
         if (self.adventurousReader == False or self.current_index < len(self.iterator.spine) - 1):
-            if (self.adventurous_helper.get_allow_page_turn(self.current_index, self.iterator.spine[self.current_index+1], self.toc, True)):
+            if (self.adventurous_helper.allow_page_turn(self.iterator.spine[self.current_index+1])):
                 self.curr_document()
 
     def previous_document(self):
         if hasattr(self, 'current_index') and self.current_index > 0:
-            if (self.adventurousReader == False or self.adventurous_helper.get_allow_page_turn(self.current_index, self.iterator.spine[self.current_index-1], self.toc, True)):
+            if (self.adventurousReader == False or self.adventurous_helper.allow_page_turn(self.iterator.spine[self.current_index-1])):
                 self.load_path(self.iterator.spine[self.current_index-1], pos=1.0)
 
     def keyPressEvent(self, event):
