@@ -876,7 +876,7 @@ class EbookViewer(MainWindow):
                     self.toc = TOCNetworkView(self)
                     self.toc_dock.setWidget(self.toc)
                     ebook_network = EBookNetwork(self.iterator.spine, self.iterator.toc, title, pathtoebook)
-                    self.adventurous_helper = AdventurousBehavior(True, self.iterator.toc, self.iterator.spine, ebook_network)
+                    self.adventurous_helper = AdventurousBehavior(self.iterator.toc, self.iterator.spine, ebook_network)
                     self.toc.set_manager(self)
                     self.toc.load_network(ebook_network.data)
                 if self.show_toc_on_open:
