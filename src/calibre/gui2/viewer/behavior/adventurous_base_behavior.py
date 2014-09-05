@@ -3,27 +3,34 @@ __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 __docformat__ = 'restructuredtext en'
 
-class BaseAdventurousBehavior (object):
-    def __init__(self, toc, spine, ebook_network):
+from calibre.gui2.viewer.behavior.base_behavior import BaseBehavior
+from calibre.gui2.viewer.book_network import EBookNetwork
+
+class BaseAdventurousBehavior (BaseBehavior):
+    def __init__(self, toc, spine, default_number_of_pages, title, pathtoebook, toc_view, setup_vscrollbar_method):
+        BaseBehavior.__init__(self, default_number_of_pages)
         self.toc = toc
         self.spine = spine
-        self.ebook_network = ebook_network
+        self.setup_vscrollbar_method = setup_vscrollbar_method
         
-    def set_curr_sec(self, curr_index, curr_sec, toc_view):
-        self.curr_sec = curr_sec
-        self.curr_index = curr_index
         self.toc_view = toc_view
+        self.ebook_network = EBookNetwork(spine, toc, title, pathtoebook)
+        self.toc_view.load_network(self.ebook_network.data)
         
     def allow_page_turn(self, next_sec):
         print ("allow_page_turn")
         return False
-                
-    def get_num_pages(self):
-        return self.calculate_num_pages(self.curr_sec)
-            
-    def calculate_num_pages(self, curr_sec):
-        num_pages = curr_sec.pages
-        return num_pages
+        
+    def set_curr_sec(self, curr_index, curr_sec):
+        print ("AdventurousBase curr_sec set")
+        super(BaseAdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
+        self.num_pages = curr_sec.pages
+        
+        if (type(self) is BaseAdventurousBehavior):
+            print ("BaseAdventurous set scrollbar")
+            self.setup_vscrollbar_method()
+        
+        
         
     def add_network_edge(self, start_sec, end_sec, start_sec_checked=False):
         end_toc, corrected_end_sec = self.check_and_get_toc(end_sec)
@@ -69,18 +76,28 @@ class BaseAdventurousBehavior (object):
 
          
     def get_page_label(self, frac):
-        return frac*float(self.get_section_pages(self.curr_sec)) + 1
+        section_position = frac*float(self.get_section_pages(self.curr_sec))
+        self.absolute_position = self.curr_sec.start_page + section_position
+        print (self.absolute_position)
+        return section_position + 1
             
-    def update_page_label(self, userInput):
-        return userInput + self.curr_sec.start_page
+    def update_page_label(self, user_input):
+        return user_input + self.curr_sec.start_page - 1
             
-    def get_section_pages(self, curr_sec):
-        if (curr_sec.pages == 1):
+    def get_section_pages(self, sec):
+        if (sec.pages == 1):
             return 0.8
         else:
-            return curr_sec.pages-1
+            return sec.pages-1
             
-    def get_scrollbar_frac(self, new_page):
-        print (new_page)
-        return new_page+self.curr_sec.start_page-1
+    def goto_page(self, new_page, goto_page_method):
+        abs_pos = self.update_page_label(new_page)
+        goto_page_method(abs_pos, allow_page_turn=False)
+        
+    def check_pages(self, new_page, page):
+        return (new_page >= page.start_page and new_page < page.max_page + 1)
+        
+    def link_clicked(self, path):
+        self.add_network_edge(self.curr_sec, path)
+        return
             

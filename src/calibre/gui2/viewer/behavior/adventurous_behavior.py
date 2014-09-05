@@ -7,12 +7,12 @@ from sets import Set
 from calibre.gui2.viewer.behavior.adventurous_base_behavior import BaseAdventurousBehavior
 
 class AdventurousBehavior (BaseAdventurousBehavior):
-    def __init__(self, toc, spine, ebook_network):
-        BaseAdventurousBehavior.__init__(self, toc, spine, ebook_network)
+    def __init__(self, toc, spine, default_number_of_pages, title, pathtoebook, toc_view, setup_scrollbar_method):
+        BaseAdventurousBehavior.__init__(self, toc, spine, default_number_of_pages, title, pathtoebook, toc_view, setup_scrollbar_method)
         self.include_sections = Set()
         
-    def set_curr_sec(self, curr_index, curr_sec, toc_view):
-        super(AdventurousBehavior, self).set_curr_sec(curr_index, curr_sec, toc_view)
+    def set_curr_sec(self, curr_index, curr_sec):
+        super(AdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
         
         print ("set curr_sec ")
         curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)
@@ -28,7 +28,10 @@ class AdventurousBehavior (BaseAdventurousBehavior):
                 if (self.end_spine == -1 or self.end_spine < i):
                     self.end_spine = i
         
-        self.num_pages = self.calculate_num_pages(self.curr_sec)
+            self.num_pages = self.calculate_num_pages(self.curr_sec)
+            
+            print ("set up scrollbar")
+            self.setup_vscrollbar_method()
         
     def allow_page_turn(self, next_sec):
         print ("allow_page_turn")
@@ -41,12 +44,6 @@ class AdventurousBehavior (BaseAdventurousBehavior):
             else:
                 print ("False")
                 return False
-                
-    def get_num_pages(self):
-        if (self.curr_sec in self.include_sections):
-            return self.num_pages
-        else:
-            return calculate_num_pages(self.curr_sec)
             
     def calculate_num_pages(self, curr_sec):      
         num_pages = 0
@@ -157,12 +154,10 @@ class AdventurousBehavior (BaseAdventurousBehavior):
 
          
     def get_page_label(self, frac):
-        return (self.curr_sec.start_page + frac*float(self.get_section_pages(self.curr_sec))+1) - self.spine[self.start_spine].start_page
+        section_position = super(AdventurousBehavior, self).get_page_label(frac)
+        return (self.curr_sec.start_page + section_position) - self.spine[self.start_spine].start_page
             
-    def update_page_label(self, userInput):
-        return userInput + self.spine[self.start_spine].start_page - 1
-            
-    def get_scrollbar_frac(self, new_page):
-        print (new_page)
-        return new_page+self.spine[self.start_spine].start_page-1
+    def update_page_label(self, user_input):
+        print ("Adventurous update_page_label")
+        return user_input + self.spine[self.start_spine].start_page - 1
         
