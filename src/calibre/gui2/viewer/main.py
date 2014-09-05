@@ -69,7 +69,7 @@ class EbookViewer(MainWindow):
     def __init__(self, pathtoebook=None, debug_javascript=False, open_at=None,
                  start_in_fullscreen=False):
         MainWindow.__init__(self, debug_javascript)
-        self.viewer_mode = self.ADVENTUROUS_MODE
+        self.viewer_mode = self.CALIBRE_MODE
         self.view.initialize_view(debug_javascript)
         self.view.magnification_changed.connect(self.magnification_changed)
         self.show_toc_on_open = False

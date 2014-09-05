@@ -84,18 +84,9 @@ class BaseAdventurousBehavior (BaseBehavior):
     def update_page_label(self, user_input):
         return user_input + self.curr_sec.start_page - 1
             
-    def get_section_pages(self, sec):
-        if (sec.pages == 1):
-            return 0.8
-        else:
-            return sec.pages-1
-            
     def goto_page(self, new_page, goto_page_method):
         abs_pos = self.update_page_label(new_page)
         goto_page_method(abs_pos, allow_page_turn=False)
-        
-    def check_pages(self, new_page, page):
-        return (new_page >= page.start_page and new_page < page.max_page + 1)
         
     def link_clicked(self, path):
         self.add_network_edge(self.curr_sec, path)

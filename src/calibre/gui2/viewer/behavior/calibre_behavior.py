@@ -14,11 +14,11 @@ class CalibreBehavior (BaseBehavior):
     def allow_page_turn(self, next_sec):
         return True
         
-    def get_section_pages(self, sec):
-        return sec.pages-1
+    #def get_section_pages(self, sec):
+        #return sec.pages-1
         
-    def check_pages(self, new_page, page):
-        return (new_page >= page.start_page and new_page <= page.max_page)
+    #def check_pages(self, new_page, page):
+        #return (new_page >= page.start_page and new_page <= page.max_page)
         
     def goto_page(self, user_input, goto_page_method):
         goto_page_method(user_input)

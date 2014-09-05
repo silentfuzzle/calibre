@@ -19,14 +19,6 @@ class BaseBehavior (object):
     @abc.abstractmethod
     def allow_page_turn(self, next_sec):
         return
-        
-    @abc.abstractmethod
-    def get_section_pages(self, sec):
-        return
-        
-    @abc.abstractmethod
-    def check_pages(self, new_page, page):
-        return
     
     @abc.abstractmethod
     def get_num_pages(self):
@@ -40,6 +32,15 @@ class BaseBehavior (object):
         print ("Base curr_sec set")
         self.curr_sec = curr_sec
         self.curr_index = curr_index
+        
+    def check_pages(self, new_page, page):
+        return (new_page >= page.start_page and new_page < page.max_page + 1)
+        
+    def get_section_pages(self, sec):
+        if (sec.pages == 1):
+            return 0.8
+        else:
+            return sec.pages-1
         
     def link_clicked(self, path):
         return
