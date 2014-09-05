@@ -40,5 +40,6 @@ class TOCNetworkView (QWebView):
     def change_page(self, page):
         print ("changed page: " + str(page))
         if self.manager is not None:
+            self.manager.internal_link_clicked(0)
             self.manager.goto_page(page)
             

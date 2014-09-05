@@ -69,7 +69,7 @@ class EbookViewer(MainWindow):
     def __init__(self, pathtoebook=None, debug_javascript=False, open_at=None,
                  start_in_fullscreen=False):
         MainWindow.__init__(self, debug_javascript)
-        self.viewer_mode = self.CALIBRE_MODE
+        self.viewer_mode = self.ADVENTUROUS_MODE
         self.view.initialize_view(debug_javascript)
         self.view.magnification_changed.connect(self.magnification_changed)
         self.show_toc_on_open = False
@@ -444,16 +444,17 @@ class EbookViewer(MainWindow):
 
     def back(self, x):
         pos = self.history.back(self.page_behavior.absolute_position)
+        print ("history back")
         
         if pos is not None:
             self.goto_page(pos)
 
     def goto_page_num(self):
-        print ("Goto page")
         self.page_behavior.goto_page(self.pos.value(), self.goto_page)
 
     def forward(self, x):
         pos = self.history.forward(self.page_behavior.absolute_position)
+        print ("history forward")
         
         if pos is not None:
             self.goto_page(pos)
@@ -469,7 +470,6 @@ class EbookViewer(MainWindow):
             self.page_behavior.goto_page(new_page, self.goto_page)
             
     def goto_page(self, new_page, loaded_check=True, allow_page_turn=True):
-        print ("Goto: " + str(new_page) + "," + str(allow_page_turn))
         if self.current_page is not None or not loaded_check:
             for page in self.iterator.spine:
                 checkPages = self.page_behavior.check_pages(new_page, page)
@@ -480,18 +480,15 @@ class EbookViewer(MainWindow):
                     except ZeroDivisionError:
                         frac = 0
                     if page == self.current_page:
-                        print ("current page " + str(frac))
                         self.view.scroll_to(frac)
                     else:
                         if (allow_page_turn == False):
                             allow_page_turn = self.page_behavior.allow_page_turn(page)
                             
                         if (allow_page_turn == True):
-                            print ("load page " + str(frac))
                             self.load_path(page, pos=frac)
                         else:
                             frac = float(self.current_page.max_page-self.current_page.start_page)/(self.current_page.pages)
-                            print ("scrolled to " + str(frac))
                             self.view.scroll_to(frac)
 
     def open_ebook(self, checked):
@@ -561,13 +558,13 @@ class EbookViewer(MainWindow):
     def internal_link_clicked(self, frac):
         self.update_page_number()  # Ensure page number is accurate as it is used for history
         self.history.add(self.page_behavior.absolute_position)
+        print ("added to history")
 
     def link_clicked(self, url):
         path = os.path.abspath(unicode(url.toLocalFile()))
         frag = None
         if path in self.iterator.spine:
-            self.update_page_number()  # Ensure page number is accurate as it is used for history
-            self.history.add(self.page_behavior.absolute_position)
+            self.internal_link_clicked(0)
             path = self.iterator.spine[self.iterator.spine.index(path)]
             if url.hasFragment():
                 frag = unicode(url.fragment())
@@ -596,7 +593,6 @@ class EbookViewer(MainWindow):
     def load_finished(self, ok):
         self.close_progress_indicator()
         path = self.view.path()
-        print ("Loaded path: " + path)
         try:
             index = self.iterator.spine.index(path)
         except (ValueError, AttributeError):
@@ -604,9 +600,7 @@ class EbookViewer(MainWindow):
         self.current_page = self.iterator.spine[index]
         self.current_index = index
         self.page_behavior.set_curr_sec(self.current_index, self.current_page)
-        print ("load_finished 1")
         self.set_page_number(self.view.scroll_fraction)
-        print ("load_finished 2")
         QTimer.singleShot(100, self.update_indexing_state)
         if self.pending_search is not None:
             self.do_search(self.pending_search,
@@ -675,7 +669,6 @@ class EbookViewer(MainWindow):
 
     def load_path(self, path, pos=0.0):
         self.open_progress_indicator(_('Laying out %s')%self.current_title)
-        print ("Pos: " + str(pos))
         self.view.load_path(path, pos=pos)
 
     def viewport_resize_started(self, event):
@@ -718,9 +711,7 @@ class EbookViewer(MainWindow):
         QTimer.singleShot(1000, self.update_page_number)
 
     def update_page_number(self):
-        print ("update_page_number 1")
         self.set_page_number(self.view.document.scroll_fraction)
-        print ("update_page_number 2")
 
     def close_progress_indicator(self):
         self.pi.stop()
@@ -893,7 +884,6 @@ class EbookViewer(MainWindow):
                     self.goto_page(open_at, loaded_check=False)
 
     def setup_vscrollbar(self):
-        print ("setting up scrollbar")
         pageStep = BaseBehavior.PAGE_STEP
         num_pages = self.page_behavior.num_pages
         self.pos.setMaximum(num_pages)
@@ -915,12 +905,9 @@ class EbookViewer(MainWindow):
         if getattr(self, 'current_page', None) is not None:
             page = self.page_behavior.get_page_label(frac)
             self.set_vscrollbar_value(page)
-            
-            print ("set page num: " + str(page))
             self.pos.set_value(page)
 
     def scrolled(self, frac, onload=False):
-        print ("scrolled")
         self.set_page_number(frac)
         if not onload:
             ap = self.view.document.read_anchor_positions()
