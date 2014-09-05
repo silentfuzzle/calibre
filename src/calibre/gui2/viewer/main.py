@@ -61,12 +61,15 @@ class EbookViewer(MainWindow):
             'into pages like a paper book')
     PAGED_MODE_TT = _('Switch to flow mode - where the text is not broken up '
             'into pages')
+    
+    ADVENTUROUS_MODE = "AR"
+    BASE_ADVENTUROUS_MODE = "BAR"
+    CALIBRE_MODE = "CD"
 
     def __init__(self, pathtoebook=None, debug_javascript=False, open_at=None,
                  start_in_fullscreen=False):
         MainWindow.__init__(self, debug_javascript)
-        self.adventurousReader = False
-        print (BaseBehavior.PAGE_STEP)
+        self.viewer_mode = self.ADVENTUROUS_MODE
         self.view.initialize_view(debug_javascript)
         self.view.magnification_changed.connect(self.magnification_changed)
         self.show_toc_on_open = False
@@ -115,7 +118,7 @@ class EbookViewer(MainWindow):
         self.pos.editingFinished.connect(self.goto_page_num)
         self.vertical_scrollbar.valueChanged[int].connect(lambda
                 x:self.scrollbar_goto_page(x/BaseBehavior.PAGE_STEP))
-        if (self.adventurousReader == False):
+        if (self.viewer_mode == self.CALIBRE_MODE):
             self.toc.pressed[QModelIndex].connect(self.toc_clicked)
         self.search.search.connect(self.find)
         self.search.focus_to_library.connect(lambda: self.view.setFocus(Qt.OtherFocusReason))
@@ -845,14 +848,18 @@ class EbookViewer(MainWindow):
                 self.action_table_of_contents.setChecked(False)
             
             total_num_pages = sum(self.iterator.pages)
-            if (self.adventurousReader == False):
+            if (self.viewer_mode == self.CALIBRE_MODE):
                 self.toc.setModel(self.toc_model)
                 self.page_behavior = CalibreBehavior(total_num_pages)
             else:
                 self.toc = TOCNetworkView(self)
                 self.toc.set_manager(self)
                 self.toc_dock.setWidget(self.toc)
-                self.page_behavior = AdventurousBehavior(self.iterator.toc, self.iterator.spine, total_num_pages, title, pathtoebook, self.toc, self.setup_vscrollbar)
+                if (self.viewer_mode == self.ADVENTUROUS_MODE):
+                    self.page_behavior = AdventurousBehavior(self.iterator.toc, self.iterator.spine, total_num_pages, title, pathtoebook, self.toc, self.setup_vscrollbar)
+                else:
+                    if (self.viewer_mode == self.BASE_ADVENTUROUS_MODE):
+                        self.page_behavior = BaseAdventurousBehavior(self.iterator.toc, self.iterator.spine, total_num_pages, title, pathtoebook, self.toc, self.setup_vscrollbar)
                 
             if isbytestring(pathtoebook):
                 pathtoebook = force_unicode(pathtoebook, filesystem_encoding)
