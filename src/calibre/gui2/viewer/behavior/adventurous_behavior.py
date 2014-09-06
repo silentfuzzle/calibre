@@ -1,25 +1,44 @@
 
 __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
-__docformat__ = 'restructuredtext en'
 
 from sets import Set
 from calibre.gui2.viewer.behavior.adventurous_base_behavior import BaseAdventurousBehavior
 
+# This class defines an Adventurous Reader behavior where users can view a group of sections at a time. This group includes sub-sections
+# and adjacent sections not included in the TOC.
 class AdventurousBehavior (BaseAdventurousBehavior):
+
+    ###########################################################################
+    #PAGE BEHAVIOR DEFINITION
+    ###########################################################################
+
+    # Constructor
+    # toc - (calibre.ebooks.metadata.toc.TOC) the current ebook's TOC
+    # spine - (List(SpineItem)) the current ebook's order of sections
+    # default_number_of_pages (number) - the total number of pages in the ebook
+    # title (string) - the title of the ebook
+    # pathtoebook (string) - the full path to the ebook on the user's file system
+    # toc_view (TOCNetworkView) - the interface displaying the ebook's network of sections
+    # setup_vscrollbar_method (method) - the method setting up the scrollbar and the position displayed in the upper left
     def __init__(self, toc, spine, default_number_of_pages, title, pathtoebook, toc_view, setup_scrollbar_method):
         BaseAdventurousBehavior.__init__(self, toc, spine, default_number_of_pages, title, pathtoebook, toc_view, setup_scrollbar_method)
         self.include_sections = Set()
         
+    # Sets the current section of the book the user is viewing, the sections the user can view from that section,
+    # and the total pages in those sections
+    # curr_index (integer) - the index of the current section in the spine
+    # curr_sec (SpineItem) - the current section being displayed
     def set_curr_sec(self, curr_index, curr_sec):
         super(AdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
         
-        print ("set curr_sec ")
+        # Make sure the current section exists in the TOC
         curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)
         if (curr_sec not in self.include_sections):
-            parent_set = self.get_parent_set(curr_index, curr_toc)
-            self.include_sections, in_toc = self.find_include_sections(parent_set)
+            # Determine the sections to include in the group if the user moved outside the previous group
+            self.include_sections, in_toc = self.find_include_sections(curr_toc)
             
+            # Determine the part of the spine included in the sections
             self.start_spine = -1
             self.end_spine = -1
             for i in in_toc:
@@ -28,24 +47,44 @@ class AdventurousBehavior (BaseAdventurousBehavior):
                 if (self.end_spine == -1 or self.end_spine < i):
                     self.end_spine = i
         
-            self.num_pages = self.calculate_num_pages(self.curr_sec)
-            
-            print ("set up scrollbar")
+            # Determine the number of pages in the group of sections
+            self.num_pages = self.calculate_num_pages()
             self.setup_vscrollbar_method()
         
+    # Returns whether the user can move from the current section to the passed section
+    # True if the passed section is in the group of sections the user can view
+    # next_sec (string) - the section to check
     def allow_page_turn(self, next_sec):
-        print ("allow_page_turn")
         if (self.curr_sec != next_sec):
             if (next_sec in self.include_sections):
                 next_index = self.spine.index(next_sec)
+                
+                # Don't add an edge if the user skipped sections in the book using the scrollbar or position label
                 if (next_index == self.curr_index + 1 or next_index == self.curr_index - 1):
                     self.add_network_edge(self.corrected_curr_sec, next_sec, True)
+                    
                 return True
-            else:
-                print ("False")
-                return False
+                
+        return False
+         
+    # Returns the user's position relative to the number of pages in the section group
+    # Sets the new absolute position in the book
+    # frac (number) - the scrollbar's position in relation to the current displayed section of the book
+    def get_page_label(self, frac):
+        section_position = super(AdventurousBehavior, self).get_page_label(frac)
+        return (self.curr_sec.start_page + section_position) - self.spine[self.start_spine].start_page
             
-    def calculate_num_pages(self, curr_sec):      
+    # Returns the user's absolute position in the ebook given a position set by the scrollbar or position label
+    # new_page (number) - the page to move the user to as set by the scrollbar or position label
+    def update_page_label(self, user_input):
+        return user_input + self.spine[self.start_spine].start_page - 1
+
+    ###########################################################################
+    #SECTION GROUP UPKEEP
+    ###########################################################################
+            
+    # Calculates the number of pages in the current group of sections
+    def calculate_num_pages(self):      
         num_pages = 0
         num_found = 0
         spine_index = 0
@@ -68,16 +107,18 @@ class AdventurousBehavior (BaseAdventurousBehavior):
             
         return num_pages
      
-    def find_include_sections(self, parent_set):
+    # Returns the sections to include in this group of sections
+    # curr_toc (calibre.ebooks.metadata.toc.TOC) - the TOC entry of the current section
+    def find_include_sections(self, curr_toc):
         include_sections = Set()
         
-        # Include the parent sections and all their children
-        for p in parent_set:
-            include_sections = self.find_include_sub_sections(p, include_sections)
-        
-        # Include the parent section if it has no children
-        if (len(include_sections) == 0 and len(parent_set) > 0):
-            include_sections.add(parent_set[0].abspath)
+        # Include the root of the TOC tree with this section and all TOC entries in it
+        curr_parent = curr_toc
+        while (curr_parent.parent.parent is not None):
+            curr_parent = curr_parent.parent
+            
+        for t in curr_parent.flat():
+            include_sections.add(t.abspath)
         
         # Determine where to check for sections that aren't in the toc
         in_toc = Set()
@@ -89,16 +130,13 @@ class AdventurousBehavior (BaseAdventurousBehavior):
         # Include adjacent sections that aren't in the toc
         include_sections, in_toc = self.search_in_toc(0, 0, in_toc, include_sections)
         return include_sections, in_toc
-            
-    def find_include_sub_sections(self, toc, include_sections):
-        if (len(toc) > 0):
-            include_sections.add(toc.abspath)
-            
-        for t in toc:
-            include_sections.add(t.abspath)
-            include_sections = self.find_include_sub_sections(t, include_sections)
-        return include_sections
         
+    # Find adjacent sections in the spine that aren't in the TOC that should be included in the section group
+    # index (integer) - the index to search from
+    # num_found (integer) - the number of entries in the section group that were found in this recursive search
+    # in_toc (List(integer)) - the indicies of the sections included in the section group
+    # include_sections (List(string)) - the list of sections to include in the section group
+    # found_first_toc_entry (boolean) - whether the first section in the TOC has been found yet
     def search_in_toc(self, index, num_found, in_toc, include_sections, found_first_toc_entry=False):
         next_index = index + 1
         
@@ -139,25 +177,4 @@ class AdventurousBehavior (BaseAdventurousBehavior):
             if (next_index < len(self.spine)):
                 include_sections, in_toc = self.search_in_toc(next_index, num_found, in_toc, include_sections, found_first_toc_entry)
             
-        return include_sections, in_toc
-        
-    def get_parent_set(self, current_index, curr_toc):            
-        parent_set = []
-        curr_parent = curr_toc
-        while (curr_parent is not None):
-            if (curr_parent.parent is not None):
-                parent_set.append(curr_parent)
-            curr_parent = curr_parent.parent
-        
-        return parent_set
-         
-
-         
-    def get_page_label(self, frac):
-        section_position = super(AdventurousBehavior, self).get_page_label(frac)
-        return (self.curr_sec.start_page + section_position) - self.spine[self.start_spine].start_page
-            
-    def update_page_label(self, user_input):
-        print ("Adventurous update_page_label")
-        return user_input + self.spine[self.start_spine].start_page - 1
-        
+        return include_sections, in_toc         
