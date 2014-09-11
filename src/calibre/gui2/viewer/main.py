@@ -835,11 +835,11 @@ class EbookViewer(MainWindow):
                     self.action_table_of_contents.setChecked(True)
             else:
                 self.toc_model = TOC(self.iterator.spine)
-                print ("no toc")
                 self.action_table_of_contents.setChecked(False)
             
             total_num_pages = sum(self.iterator.pages)
-            if (self.viewer_mode == self.CALIBRE_MODE):
+            if (self.viewer_mode == self.CALIBRE_MODE or not self.iterator.toc):
+                # Always use default Calibre behavior if the book doesn't have a toc
                 self.toc.setModel(self.toc_model)
                 self.page_behavior = CalibreBehavior(total_num_pages)
             else:

@@ -9,7 +9,6 @@ __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 import os
 from PyQt5.Qt import (Qt, QWebView, pyqtSlot)
 from calibre.ebooks.oeb.display.webview import load_html
-from calibre.constants import iswindows
        
 # This class displays an ebook network using an embedded Javascript application.
 class TOCNetworkView (QWebView):
