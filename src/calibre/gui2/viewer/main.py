@@ -669,9 +669,8 @@ class EbookViewer(MainWindow):
             items = self.toc_model.update_indexing_state(self.current_index,
                         self.view.viewport_rect, anchor_positions,
                         self.view.document.in_paged_mode)
-            #TODO
-            #if (items and adventurousReader == False):
-            #    self.toc.scrollTo(items[-1].index())
+            if (items and self.viewer_mode == self.CALIBRE_MODE):
+                self.toc.scrollTo(items[-1].index())
             if pgns is not None:
                 self.pending_goto_next_section = None
                 # Check that we actually progressed
