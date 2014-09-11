@@ -7,7 +7,7 @@ __copyright__ = '2009, Kovid Goyal <kovid@kovidgoyal.net>'
 __docformat__ = 'restructuredtext en'
 
 import sys, os, shutil, plistlib, subprocess, glob, zipfile, tempfile, \
-    py_compile, stat, operator
+    py_compile, stat, operator, time
 abspath, join, basename = os.path.abspath, os.path.join, os.path.basename
 
 from setup import (
@@ -321,8 +321,6 @@ class Py2App(object):
         c = join(self.build_dir, 'Contents')
         for x in ('Frameworks', 'MacOS', 'Resources'):
             os.makedirs(join(c, x))
-        for x in ('book.icns',):
-            shutil.copyfile(join('icons', x), join(self.resources_dir, x))
         for x in glob.glob(join('icons', 'icns', '*.iconset')):
             subprocess.check_call([
                 'iconutil', '-c', 'icns', x, '-o', join(
@@ -343,6 +341,7 @@ class Py2App(object):
         env['CALIBRE_LAUNCHED_FROM_BUNDLE']='1'
         docs = [{'CFBundleTypeName':'E-book',
             'CFBundleTypeExtensions':list(BOOK_EXTENSIONS),
+            'CFBundleTypeIconFile':'book.icns',
             'CFBundleTypeRole':'Viewer',
             }]
 
@@ -360,7 +359,7 @@ class Py2App(object):
                 LSMinimumSystemVersion='10.7.2',
                 LSRequiresNativeExecution=True,
                 NSAppleScriptEnabled=False,
-                NSHumanReadableCopyright='Copyright 2014, Kovid Goyal',
+                NSHumanReadableCopyright=time.strftime('Copyright %Y, Kovid Goyal'),
                 CFBundleGetInfoString=('calibre, an E-book management '
                 'application. Visit http://calibre-ebook.com for details.'),
                 CFBundleIconFile='calibre.icns',
@@ -598,7 +597,7 @@ class Py2App(object):
                 continue
             if x == 'Info.plist':
                 plist = plistlib.readPlist(join(self.contents_dir, x))
-                plist['LSUIElement'] = '1'
+                plist['LSBackgroundOnly'] = '1'
                 plist['CFBundleIdentifier'] = 'com.calibre-ebook.console'
                 plist.pop('CFBundleDocumentTypes')
                 plistlib.writePlist(plist, join(cc_dir, x))
@@ -613,7 +612,7 @@ class Py2App(object):
     @flush
     def create_gui_apps(self):
         info('\nCreating launcher apps for viewer and editor')
-        for launcher in ('ebook-viewer', 'ebook-edit'):
+        for launcher in ('ebook-viewer', 'ebook-edit', 'calibre-debug'):
             cc_dir = os.path.join(self.contents_dir, launcher + '.app', 'Contents')
             os.makedirs(cc_dir)
             for x in os.listdir(self.contents_dir):
@@ -621,9 +620,12 @@ class Py2App(object):
                     continue
                 if x == 'Info.plist':
                     plist = plistlib.readPlist(join(self.contents_dir, x))
-                    plist['CFBundleDisplayName'] = plist['CFBundleName'] = {'ebook-viewer':'E-book Viewer', 'ebook-edit':'Edit Book'}[launcher]
-                    plist['CFBundleExecutable'] = launcher
-                    plist['CFBundleIconFile'] = launcher + '.icns'
+                    plist['CFBundleDisplayName'] = plist['CFBundleName'] = {
+                        'ebook-viewer':'E-book Viewer', 'ebook-edit':'Edit Book', 'calibre-debug': 'calibre (debug)',
+                    }[launcher]
+                    if launcher != 'calibre-debug':
+                        plist['CFBundleExecutable'] = launcher
+                        plist['CFBundleIconFile'] = launcher + '.icns'
                     plist['CFBundleIdentifier'] = 'com.calibre-ebook.' + launcher
                     plist.pop('CFBundleDocumentTypes')
                     plistlib.writePlist(plist, join(cc_dir, x))
@@ -654,8 +656,14 @@ class Py2App(object):
         shutil.copytree(d, appdir, symlinks=True)
         subprocess.check_call(['/Users/kovid/sign.sh', appdir])
         os.symlink('/Applications', os.path.join(tdir, 'Applications'))
-        subprocess.check_call(['/usr/bin/hdiutil', 'create', '-srcfolder', tdir,
-                               '-volname', volname, '-format', format, dmg])
+        size_in_mb = int(subprocess.check_output(['du', '-s', '-k', tdir]).decode('utf-8').split()[0]) / 1024.
+        cmd = ['/usr/bin/hdiutil', 'create', '-srcfolder', tdir, '-volname', volname, '-format', format]
+        if 190 < size_in_mb < 250:
+            # We need -size 255m because of a bug in hdiutil. When the size of
+            # srcfolder is close to 200MB hdiutil fails with
+            # diskimages-helper: resize request is above maximum size allowed.
+            cmd += ['-size', '255m']
+        subprocess.check_call(cmd + [dmg])
         shutil.rmtree(tdir)
         if internet_enable:
             subprocess.check_call(['/usr/bin/hdiutil', 'internet-enable', '-yes', dmg])

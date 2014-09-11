@@ -14,7 +14,7 @@ ORG_NAME = 'KovidsBrain'
 APP_UID  = 'libprs500'
 from calibre import prints
 from calibre.constants import (islinux, iswindows, isbsd, isfrozen, isosx,
-        plugins, config_dir, filesystem_encoding, DEBUG)
+        plugins, config_dir, filesystem_encoding, isxp)
 from calibre.utils.config import Config, ConfigProxy, dynamic, JSONConfig
 from calibre.ebooks.metadata import MetaInformation
 from calibre.utils.date import UNDEFINED_DATE
@@ -117,7 +117,7 @@ defs['cover_grid_width'] = 0
 defs['cover_grid_height'] = 0
 defs['cover_grid_spacing'] = 0
 defs['cover_grid_color'] = (80, 80, 80)
-defs['cover_grid_cache_size'] = 100
+defs['cover_grid_cache_size_multiple'] = 5
 defs['cover_grid_disk_cache_size'] = 2500
 defs['cover_grid_show_title'] = False
 defs['cover_grid_texture'] = None
@@ -242,8 +242,7 @@ config = _config()
 # }}}
 
 QSettings.setPath(QSettings.IniFormat, QSettings.UserScope, config_dir)
-QSettings.setPath(QSettings.IniFormat, QSettings.SystemScope,
-        config_dir)
+QSettings.setPath(QSettings.IniFormat, QSettings.SystemScope, config_dir)
 QSettings.setDefaultFormat(QSettings.IniFormat)
 
 # Turn off DeprecationWarnings in windows GUI
@@ -323,7 +322,7 @@ def question_dialog(parent, title, msg, det_msg='', show_copy_button=False,
         # Set skip_dialog_msg to a message displayed to the user
         skip_dialog_name=None, skip_dialog_msg=_('Show this confirmation again'),
         skip_dialog_skipped_value=True, skip_dialog_skip_precheck=True,
-        # Override icon (QIcon to be used as the icon for this dialog)
+        # Override icon (QIcon to be used as the icon for this dialog or string for I())
         override_icon=None,
         # Change the text/icons of the yes and no buttons.
         # The icons must be QIcon objects or strings for I()
@@ -345,6 +344,7 @@ def question_dialog(parent, title, msg, det_msg='', show_copy_button=False,
         tc.setVisible(True)
         tc.setText(skip_dialog_msg)
         tc.setChecked(bool(skip_dialog_skip_precheck))
+        d.resize_needed.emit()
 
     ret = d.exec_() == d.Accepted
 
@@ -851,10 +851,15 @@ gui_thread = None
 
 qt_app = None
 
+builtin_fonts_loaded = False
+
 def load_builtin_fonts():
-    global _rating_font
+    global _rating_font, builtin_fonts_loaded
     # Load the builtin fonts and any fonts added to calibre by the user to
     # Qt
+    if builtin_fonts_loaded:
+        return
+    builtin_fonts_loaded = True
     for ff in glob.glob(P('fonts/liberation/*.?tf')) + \
             [P('fonts/calibreSymbols.otf')] + \
             glob.glob(os.path.join(config_dir, 'fonts', '*.?tf')):
@@ -874,19 +879,9 @@ def setup_gui_option_parser(parser):
         parser.add_option('--detach', default=False, action='store_true',
                           help=_('Detach from the controlling terminal, if any (linux only)'))
 
-def detach_gui():
-    if islinux and not DEBUG:
-        # Detach from the controlling process.
-        if os.fork() != 0:
-            raise SystemExit(0)
-        os.setsid()
-        so, se = file(os.devnull, 'a+'), file(os.devnull, 'a+', 0)
-        os.dup2(so.fileno(), sys.__stdout__.fileno())
-        os.dup2(se.fileno(), sys.__stderr__.fileno())
-
 class Application(QApplication):
 
-    def __init__(self, args, force_calibre_style=False, override_program_name=None, headless=False):
+    def __init__(self, args, force_calibre_style=False, override_program_name=None, headless=False, color_prefs=gprefs):
         self.file_event_hook = None
         if override_program_name:
             args = [override_program_name] + args[1:]
@@ -896,8 +891,8 @@ class Application(QApplication):
             args.extend(['-platformpluginpath', sys.extensions_location, '-platform', 'headless'])
         qargs = [i.encode('utf-8') if isinstance(i, unicode) else i for i in args]
         self.pi = plugins['progress_indicator'][0]
-        self.setup_styles(force_calibre_style)
         QApplication.__init__(self, qargs)
+        self.setup_styles(force_calibre_style)
         f = QFont(QApplication.font())
         if (f.family(), f.pointSize()) == ('Sans Serif', 9):  # Hard coded Qt settings, no user preference detected
             f.setPointSize(10)
@@ -925,6 +920,44 @@ class Application(QApplication):
         qt_app = self
         self._file_open_paths = []
         self._file_open_lock = RLock()
+
+        if not isosx:
+            # OS X uses a native color dialog that does not support custom
+            # colors
+            self.color_prefs = color_prefs
+            self.read_custom_colors()
+            self.lastWindowClosed.connect(self.save_custom_colors)
+
+        if isxp:
+            error_dialog(None, _('Windows XP not supported'), '<p>' + _(
+                'calibre versions newer than 2.0 do not run on Windows XP. This is'
+                ' because the graphics toolkit calibre uses (Qt 5) crashes a lot'
+                ' on Windows XP. We suggest you stay with <a href="%s">calibre 1.48</a>'
+                ' which works well on Windows XP.') % 'http://download.calibre-ebook.com/1.48.0/', show=True)
+            raise SystemExit(1)
+
+        if iswindows:
+            # On windows the highlighted colors for inactive widgets are the
+            # same as non highlighted colors. This is a regression from Qt 4.
+            # https://bugreports.qt-project.org/browse/QTBUG-41060
+            p = self.palette()
+            for role in (p.Highlight, p.HighlightedText, p.Base, p.AlternateBase):
+                p.setColor(p.Inactive, role, p.color(p.Active, role))
+            self.setPalette(p)
+
+        if iswindows:
+            # Prevent text copied to the clipboard from being lost on quit due to
+            # Qt 5 bug: https://bugreports.qt-project.org/browse/QTBUG-41125
+            self.aboutToQuit.connect(self.flush_clipboard)
+
+    def flush_clipboard(self):
+        try:
+            if self.clipboard().ownsClipboard():
+                import ctypes
+                ctypes.WinDLL('ole32.dll').OleFlushClipboard()
+        except Exception:
+            import traceback
+            traceback.print_exc()
 
     def load_builtin_fonts(self, scan_for_fonts=False):
         if scan_for_fonts:
@@ -1004,6 +1037,35 @@ class Application(QApplication):
         else:
             return QApplication.event(self, e)
 
+    @dynamic_property
+    def current_custom_colors(self):
+        from PyQt5.Qt import QColorDialog, QColor
+        def fget(self):
+            return [col.getRgb() for col in
+                    (QColorDialog.customColor(i) for i in xrange(QColorDialog.customCount()))]
+        def fset(self, colors):
+            num = min(len(colors), QColorDialog.customCount())
+            for i in xrange(num):
+                QColorDialog.setCustomColor(i, QColor(*colors[i]))
+        return property(fget=fget, fset=fset)
+
+    def read_custom_colors(self):
+        colors = self.color_prefs.get('custom_colors_for_color_dialog', None)
+        if colors is not None:
+            self.current_custom_colors = colors
+
+    def save_custom_colors(self):
+        # Qt 5 regression, it no longer saves custom colors
+        colors = self.current_custom_colors
+        if colors != self.color_prefs.get('custom_colors_for_color_dialog', None):
+            self.color_prefs.set('custom_colors_for_color_dialog', colors)
+
+    def __enter__(self):
+        self.setQuitOnLastWindowClosed(False)
+
+    def __exit__(self, *args):
+        self.setQuitOnLastWindowClosed(True)
+
 _store_app = None
 
 class SanitizeLibraryPath(object):
@@ -1032,6 +1094,9 @@ class SanitizeLibraryPath(object):
                 os.environ[var] = orig
 
 def open_url(qurl):
+    # Qt 5 requires QApplication to be constructed before trying to use
+    # QDesktopServices::openUrl()
+    ensure_app()
     if isinstance(qurl, basestring):
         qurl = QUrl(qurl)
     with SanitizeLibraryPath():
@@ -1057,6 +1122,14 @@ def open_local_file(path):
         url = QUrl.fromLocalFile(path)
         open_url(url)
 
+def ensure_app():
+    global _store_app
+    if _store_app is None and QApplication.instance() is None:
+        args = sys.argv[:1]
+        if islinux or isbsd:
+            args += ['-platformpluginpath', sys.extensions_location, '-platform', 'headless']
+        _store_app = QApplication(args)
+
 def must_use_qt():
     ''' This function should be called if you want to use Qt for some non-GUI
     task like rendering HTML/SVG or using a headless browser. It will raise a
@@ -1064,11 +1137,7 @@ def must_use_qt():
     thread is not the main GUI thread. On linux, it uses a special QPA headless
     plugin, so that the X server does not need to be running. '''
     global gui_thread, _store_app
-    if _store_app is None and QApplication.instance() is None:
-        args = sys.argv[:1]
-        if islinux or isbsd:
-            args += ['-platformpluginpath', sys.extensions_location, '-platform', 'headless']
-        _store_app = QApplication(args)
+    ensure_app()
     if gui_thread is None:
         gui_thread = QThread.currentThread()
     if gui_thread is not QThread.currentThread():

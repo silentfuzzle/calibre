@@ -28,7 +28,7 @@ def source_read_handler(app, docname, source):
 CLI_INDEX='''
 .. _cli:
 
-Command Line Interface
+%s
 ==========================
 
 .. image:: ../../images/cli.png
@@ -36,7 +36,7 @@ Command Line Interface
 .. note::
     %s
 
-Documented Commands
+%s
 --------------------
 
 .. toctree::
@@ -44,7 +44,7 @@ Documented Commands
 
 {documented}
 
-Undocumented Commands
+%s
 -------------------------
 
 {undocumented}
@@ -204,7 +204,10 @@ def cli_docs(app):
             continue
         module = __import__(module, fromlist=[module.split('.')[-1]])
         if hasattr(module, 'option_parser'):
-            documented_cmds.append((cmd, getattr(module, 'option_parser')()))
+            try:
+                documented_cmds.append((cmd, getattr(module, 'option_parser')()))
+            except TypeError:
+                documented_cmds.append((cmd, getattr(module, 'option_parser')(cmd)))
         else:
             undocumented_cmds.append(cmd)
 

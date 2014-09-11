@@ -11,7 +11,7 @@ import sys, os, importlib, time
 from PyQt5.Qt import QIcon
 
 from calibre.constants import islinux, iswindows
-from calibre.gui2 import Application, ORG_NAME, APP_UID, setup_gui_option_parser, detach_gui, decouple
+from calibre.gui2 import Application, ORG_NAME, APP_UID, setup_gui_option_parser, decouple
 from calibre.ptempfile import reset_base_dir
 from calibre.utils.config import OptionParser
 
@@ -47,15 +47,14 @@ def _run(args, notify=None):
     # errors during initialization of plugins that use the polish container
     # infrastructure.
     importlib.import_module('calibre.customize.ui')
+    from calibre.gui2.tweak_book import tprefs
     from calibre.gui2.tweak_book.ui import Main
 
     parser = option_parser()
     opts, args = parser.parse_args(args)
-    if getattr(opts, 'detach', False):
-        detach_gui()
     decouple('edit-book-')
     override = 'calibre-edit-book' if islinux else None
-    app = Application(args, override_program_name=override)
+    app = Application(args, override_program_name=override, color_prefs=tprefs)
     app.load_builtin_fonts()
     app.setWindowIcon(QIcon(I('tweak.png')))
     Application.setOrganizationName(ORG_NAME)

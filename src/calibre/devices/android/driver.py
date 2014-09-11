@@ -46,6 +46,7 @@ class ANDROID(USBMS):
                        0xcd6  : HTC_BCDS,
                        0xce5  : HTC_BCDS,
                        0xcec  : HTC_BCDS,
+                       0x0cf5 : HTC_BCDS,
                        0x2910 : HTC_BCDS,
                        0xe77  : HTC_BCDS,
                        0xff9  : HTC_BCDS,
@@ -101,7 +102,7 @@ class ANDROID(USBMS):
 
             # Google
             0x18d1 : {
-                0x0001 : [0x0222, 0x0223, 0x230, 0x9999],
+                0x0001 : [0x0222, 0x0223, 0x230, 0x255, 0x9999],
                 0x0002 : [0x9999],
                 0x0003 : [0x0230, 0x9999],
                 0x4e11 : [0x0100, 0x226, 0x227],
@@ -112,6 +113,7 @@ class ANDROID(USBMS):
                 0x0ff9 : [0x0226],
                 0xc91  : HTC_BCDS,
                 0xdddd : [0x216],
+                0x0d01 : [0x9999],
                 0x0d02 : [0x9999],
                 0xdeed : [0x231, 0x226],
             },
@@ -231,7 +233,7 @@ class ANDROID(USBMS):
             'PMP5097C', 'MASS', 'NOVO7', 'ZEKI', 'COBY', 'SXZ', 'USB_2.0',
             'COBY_MID', 'VS', 'AINOL', 'TOPWISE', 'PAD703', 'NEXT8D12',
             'MEDIATEK', 'KEENHI', 'TECLAST', 'SURFTAB', 'XENTA', 'OBREEY_S',
-            'SURFTAB_', 'ONYX-INT', 'IMCOSYS',
+            'SURFTAB_', 'ONYX-INT', 'IMCOSYS', 'SURFPAD3',
     ]
     WINDOWS_MAIN_MEM = ['ANDROID_PHONE', 'A855', 'A853', 'A953', 'INC.NEXUS_ONE',
             '__UMS_COMPOSITE', '_MB200', 'MASS_STORAGE', '_-_CARD', 'SGH-I897',
@@ -255,7 +257,7 @@ class ANDROID(USBMS):
             'NOVO7', 'MB526', '_USB#WYK7MSF8KE', 'TABLET_PC', 'F', 'MT65XX_MS',
             'ICS', 'E400', '__FILE-STOR_GADG', 'ST80208-1', 'GT-S5660M_CARD', 'XT894', '_USB',
             'PROD_TAB13-201', 'URFPAD2', 'MID1126', 'ST10216-1', 'S5360L_CARD', 'IDEATAB_A1000-F',
-            'LBOOX', 'LTAGUS', 'IMCOV6L',
+            'LBOOX', 'LTAGUS', 'IMCOV6L', '_101',
     ]
     WINDOWS_CARD_A_MEM = ['ANDROID_PHONE', 'GT-I9000_CARD', 'SGH-I897',
             'FILE-STOR_GADGET', 'SGH-T959_CARD', 'SGH-T959', 'SAMSUNG_ANDROID', 'GT-P1000_CARD',

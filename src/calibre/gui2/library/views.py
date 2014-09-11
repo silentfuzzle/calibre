@@ -13,7 +13,7 @@ from collections import OrderedDict
 from PyQt5.Qt import (
     QTableView, Qt, QAbstractItemView, QMenu, pyqtSignal, QFont, QModelIndex,
     QIcon, QItemSelection, QMimeData, QDrag, QStyle, QPoint, QUrl, QHeaderView,
-    QStyleOptionHeader)
+    QStyleOptionHeader, QItemSelectionModel)
 
 from calibre.gui2.library.delegates import (RatingDelegate, PubDateDelegate,
     TextDelegate, DateDelegate, CompleteDelegate, CcTextDelegate,
@@ -24,7 +24,7 @@ from calibre.gui2.library.alternate_views import AlternateViews, setup_dnd_inter
 from calibre.utils.config import tweaks, prefs
 from calibre.gui2 import error_dialog, gprefs, FunctionDispatcher
 from calibre.gui2.library import DEFAULT_SORT
-from calibre.constants import filesystem_encoding
+from calibre.constants import filesystem_encoding, isosx
 from calibre import force_unicode
 
 class HeaderView(QHeaderView):  # {{{
@@ -542,6 +542,14 @@ class BooksView(QTableView):  # {{{
             if current_pos != pos:
                 h.moveSection(current_pos, pos)
 
+        # Because of a bug in Qt 5 we have to ensure that the header is actually
+        # relaid out by changing this value, without this sometimes ghost
+        # columns remain visible when changing libraries
+        for i in xrange(h.count()):
+            val = h.isSectionHidden(i)
+            h.setSectionHidden(i, not val)
+            h.setSectionHidden(i, val)
+
         sizes = state.get('column_sizes', {})
         for col, size in sizes.items():
             if col in cmap:
@@ -560,17 +568,6 @@ class BooksView(QTableView):  # {{{
             if not h.isSectionHidden(i) and h.sectionSize(i) < 3:
                 sz = h.sectionSizeHint(i)
                 h.resizeSection(i, sz)
-        # Because of a bug in Qt 5 we have to ensure that the header is actually
-        # relaid out by changing this value, without this sometimes the ghost
-        # of the ondevice column remains visible when changing libraries
-        try:
-            col = self._model.column_map.index('ondevice')
-        except ValueError:
-            pass  # DeviceBooksView
-        else:
-            val = h.isSectionHidden(col)
-            h.setSectionHidden(col, not val)
-            h.setSectionHidden(col, val)
 
     def get_default_state(self):
         old_state = {
@@ -908,6 +905,11 @@ class BooksView(QTableView):  # {{{
             return self.model().index(self.model().rowCount(QModelIndex()) - 1, orig.column())
         return index
 
+    def selectionCommand(self, index, event):
+        if event and event.type() == event.KeyPress and event.key() in (Qt.Key_Home, Qt.Key_End) and event.modifiers() & Qt.CTRL:
+            return QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows
+        return super(BooksView, self).selectionCommand(index, event)
+
     def ids_to_rows(self, ids):
         row_map = OrderedDict()
         ids = frozenset(ids)
@@ -1060,6 +1062,18 @@ class BooksView(QTableView):  # {{{
 
     def row_count(self):
         return self._model.count()
+
+    if isosx:
+        # Qt 5 item view handling of return key on OS X seems to be broken
+        # See https://bugreports.qt-project.org/browse/QTBUG-40938
+        def keyPressEvent(self, ev):
+            if ev.key() in (Qt.Key_Enter, Qt.Key_Return) and self.state() != self.EditingState:
+                ci = self.currentIndex()
+                if ci.isValid() and ci.flags() & Qt.ItemIsEditable:
+                    if self.edit(ci, self.EditKeyPressed, ev):
+                        ev.accept()
+                        return
+            return QTableView.keyPressEvent(self, ev)
 
 # }}}
 

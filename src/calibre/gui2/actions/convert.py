@@ -246,6 +246,10 @@ class ConvertAction(InterfaceAction):
             if job.failed:
                 self.gui.job_exception(job)
                 return
+            db = self.gui.current_db
+            if not db.new_api.has_id(book_id):
+                return error_dialog(self.gui, _('Book deleted'), _(
+                    'The book you were trying to convert has been deleted from the calibre library.'), show=True)
             same_fmt = getattr(job, 'conversion_of_same_fmt', False)
             manually_fine_tune_toc = getattr(job, 'manually_fine_tune_toc', False)
             fmtf = temp_files[-1].name
@@ -253,12 +257,12 @@ class ConvertAction(InterfaceAction):
                 raise Exception(_('Empty output file, '
                     'probably the conversion process crashed'))
 
-            db = self.gui.current_db
             if same_fmt and tweaks['save_original_format']:
                 db.save_original_format(book_id, fmt, notify=False)
 
             with open(temp_files[-1].name, 'rb') as data:
                 db.add_format(book_id, fmt, data, index_is_id=True)
+            self.gui.book_converted.emit(book_id, fmt)
             self.gui.status_bar.show_message(job.description +
                     (' completed'), 2000)
         finally:

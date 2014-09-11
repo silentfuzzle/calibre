@@ -180,12 +180,10 @@ class Document(QWebPage):  # {{{
     def add_window_objects(self):
         self.mainFrame().addToJavaScriptWindowObject("py_bridge", self)
         self.javascript('''
-                py_bridge.__defineGetter__('value', function() {
-                    return JSON.parse(this._pass_json_value);
-                });
-                py_bridge.__defineSetter__('value', function(val) {
-                    this._pass_json_value = JSON.stringify(val);
-                });
+        Object.defineProperty(py_bridge, 'value', {
+               get : function() { return JSON.parse(this._pass_json_value); },
+               set : function(val) { this._pass_json_value = JSON.stringify(val); }
+        });
         ''')
         self.loaded_javascript = False
 
@@ -1221,7 +1219,7 @@ class DocumentView(QWebView):  # {{{
 
         num_degrees_h = event.angleDelta().x() // 8
         vertical = abs(num_degrees) > abs(num_degrees_h)
-        scroll_amount = ((num_degrees if vertical else num_degrees_h)/ 120.0) * .2 * -1
+        scroll_amount = ((num_degrees if vertical else num_degrees_h)/ 120.0) * .2 * -1 * 8
         if vertical:
             self.scroll_by(0, self.document.viewportSize().height() * scroll_amount)
         else:

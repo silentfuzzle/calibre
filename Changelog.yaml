@@ -20,6 +20,205 @@
 #   new recipes:
 #     - title: 
 
+- version: 2.2.0
+  date: 2014-09-05
+
+  new features:
+    - title: "Kindle driver: Add option to not overwrite existing page number (apnx) files on the device when sending books to the device"
+
+    - title: "Kindle driver: Add option to allow customization of the page number (apnx) generation algorithm based on values in a custom column"
+
+    - title: "Metadata jacket: Allow customizing the jacket template to show the tags in alphabetical order"
+
+    - title: "View specific format window: If a conversion finishes in the background making a new format available, update the window."
+      tickets: [1363416]
+
+    - title: "E-book viewer: Automatically hide the mouse cursor if the mouse has not been used for a few seconds. This prevents the mouse cursor from obscuring text underneath it. The cursor will reappear automatically when you move the mouse."
+
+    - title: "Driver for SurfPad 3."
+      tickets: [1363025]
+
+  bug fixes:
+    - title: "Conversion: Fix incorrect conversion of CSS when the input document uses the same CSS class name in both upper and lower case."
+      tickets: [1328552]
+
+    - title: "Workaround for Qt 5 behavior change on OS X which prevented error handling during startup on OS X to not work"
+
+    - title: "DOCX Input: Fix non-breaking hyphens being ignored"
+
+    - title: "Workaround for Qt 5 bug that causes text copied to the clipboard to be lost when quitting the viewer on windows."
+
+    - title: "When detecting the encoding of HTML documents, if the document contains multiple charset declarations, prefer the HTML 5 syntax to the HTML 4 syntax."
+      tickets: [1364961]
+
+    - title: "E-book viewer: Fix text not being reflowed when resizing the viewer window and only the height changes."
+
+    - title: "Fix merging of book records not working correctly for custom columns of type text with fixed set of permitted values. Null values were incorrectly overwriting non-null values."
+
+    - title: "Creation of custom news sources failing on a computer on which no custom news sources have been previously created."
+      tickets: [1363666]
+
+    - title: "Workaround for Qt 5 on windows bug that makes the selected indication for items in any list/table disappear when the widget loses focus"
+      tickets: [1363420] 
+
+    - title: "Fix regression in 2.1 that prevented the saved column layout from being applied."
+      tickets: [1363470]
+
+    - title: "Edit Book: Fix the Check Book tool leaking threads"
+
+    - title: "Edit Book: Fix editor hanging when quitting during a background save operation and the save operation completes before the warning dialog is dismissed."
+      tickets: [1363122]
+
+    - title: "Fix a regression in calibre 2.0 that caused setting the value of a custom number column to zero via the book list to clear the field instead."
+      tickets: [1363076]
+
+    - title: "Check Book: Fix an error caused by empty style tags when auto-renaming mismatched font names."
+      tickets: [1363028]
+
+    - title: "When using the Embed Metadata or Polish Books tools to update metadata, fix custom columns values not being cleared in the book file even if they have been cleared in calibre"
+
+  improved recipes:
+    - Common Dreams
+    - LA Times
+    - Spektrum der Wissenschaft
+    - cracked.com
+
+  new recipes:
+    - title: The Hollywood Reporter 
+      author: Darko Miletic
+
+- version: 2.1.0
+  date: 2014-08-29
+
+  new features:
+    - title: "Prevent calibre from installing or running on Windows XP as there have been many reports of Qt 5 crashing on Windows XP and Windows XP is now no longer supported by Microsoft. If you are on Windows XP, please stay with calibre 1.48 until you are ready to upgrade your windows. Apologies for the inconvenience."
+
+    - title: "Kobo driver: Add support for new Kobo Aura H2O and firmware 3.8.0"
+
+    - title: "Driver for HTC C."
+      tickets: [1360678]
+
+    - title: "Add a new tool to easily test templates. Go to Preferences->Toolbars to add the tool to one of the calibre toolbars."
+      tickets: [1360550]
+
+    - title: "EPUB and MOBI catalog generation: Allow using the full template language including all custom columns"
+
+  bug fixes:
+    - title: "E-book viewer: Fix soft-hyphens causing rendering artifacts with some fonts due to a bug in Qt 5"
+
+    - title: "OS X: Workaround for Qt 5 bug that causes the popup menu on the author to author sort button in the edit metadata dialog to not respond if the mouse button if not released once before clicking menu entries."
+      tickets: [1362338]
+
+    - title: "Book list: Fix Ctrl+Home/End not selecting the first/last book"
+
+    - title: "PDF Output: Fix header and footer templates not working in calibre 2.0"
+      tickets: [1361483]
+
+    - title: "OS X: Workaround for Qt 5 bug that caused many keyboard shortcuts to not work in OS X"
+
+    - title: "Workaround for Qt 5 regression causing custom colors in color chooser dialogs to not be remembered between calibre sessions"
+
+    - title: "Conversion: Fix error when converting EPUB/HTML files that contain invalid margin or padding declarations."
+      tickets: [1360842]
+
+    - title: "Fix for calibre 2.0 crashing on startup on some linux systems when used with --detach"
+
+    - title: "E-book viewer: When right clicking on an image to view it in its own popup window, fix the rotate button not working correctly with the zoom buttons"
+
+    - title: "Workaround for Qt 5 bug causing crash when running jobs (conversion to PDF or MOBI; reading metadata from an EPUB without a cover) that require Qt WebKit on Ubuntu."
+      tickets: [1360693]
+
+    - title: "OS X: Fix background jobs stealing input focus if they require the use of Qt WebKit"
+
+    - title: "Preferences->Metadata plugboards: Show plugboards for disabled devices and formats whose metadata writer plugins have been disabled."
+      tickets: [1360766]
+
+    - title: "Fix calibre 2.0 not using system color scheme on windows and OS X"
+
+    - title: "Fix regression in calibre 2.0 that caused crashes when using drag and drop to re-order virtual library tabs"
+
+    - title: "Linux: Disable the optional system tray icon because of bugs in the system tray icon implementation in Qt 5 on linux."
+      tickets: [1360652]
+
+    - title: "E-book viewer: Fix navigating to a bookmark not updating the displayed page number."
+      tickets: [1360621]
+
+    - title: "Fix the 'unified title and toolbar on OS X' tweak causing calibre to fail to work because of a bug in PyQt5"
+
+    - title: "E-book viewer: Fix a regression in 2.0 that changed the speed of scrolling with the mouse wheel in flow mode"
+
+    - title: "Edit book: Workaround for regression in Qt 5 that causes typing the Cmd+some letter to generate text in the editor instead of being ignored."
+
+    - title: "Book polishing: Fix EPUB files with corrupted ZIP central directories not working and leaving behind detritus in the current working directory."
+      tickets: [1360385]
+
+    - title: "Edit Book: Workaround for Qt 5 regression that caused the 'See what changed' tool to freeze the editor when closing the window showing the changes."
+
+    - title: "Fix regression in 2.0 that broke viewing of LRF format ebooks."
+      tickets: [1360332]
+
+    - title: "Fix for a Qt 5 regression that caused the Copy to Library right click menu to be empty on OS X."
+      tickets: [1360069]
+
+
+- version: 2.0.0
+  date: 2014-08-21
+
+  new features:
+    - title: "For a summary of the major changes in calibre between 1.0 and 2.0, see http://calibre-ebook.com/new-in/eleven"
+      type: major
+
+    - title: "Add support for MTP devices (Android phones/tablets) on OS X"
+
+    - title: "Update the version of Qt used by calibre to Qt 5. This fixes various longstanding bugs in calibre that were caused by bugs in Qt 4."
+
+    - title: "Edit Book: Make the edit saved search/add saved search popup window non-modal."
+      tickets: [1354785]
+
+    - title: "Tag Browser: Show format specific icons for the format entries in the Tag Browser"
+
+    - title: "Library check: Add buttons to conveniently mark all fixable/deletable items."
+      tickets: [1353954]
+
+  bug fixes:
+    - title: "E-book viewer: Reloading the book now re-opens it at the current position even if the option to remember position when quitting is turned off"
+
+    - title: "E-book viewer: Remove extra spacing between document and scrollbars.  This is particularly noticeable when using a dark theme for the viewer."
+
+    - title: "PDF Output: Fix balanced parentheses in the text of items in the Table of Contents not being rendered properly by some PDF viewers."
+      tickets: [1358443]
+
+    - title: "Edit book: Abort terminal save on save error instead of quitting editor"
+
+    - title: "Get Books: Update the Project Gutenberg plugin for website changes"
+
+    - title: "Plugin loading: When multiple plugin classes are present in the __init__.py namespace, use the one with the qualified name that has the least components"
+
+    - title: "Edit Book: Prevent long saved searches from making the saved search dialog too wide"
+
+    - title: "Comic Input: Sort pages placed in sub-folders correctly (as long as all pages have the same number of parent folders)."
+
+    - title: "Conversion: Fix the word @page in a comment inside a stylesheet with no following {} causing the rest of the stylesheet to be ignored."
+
+    - title: "Fix comparing AZW3 to ORIGINAL_AZW3 from the book details panel not working"
+      tickets: [1354624] 
+
+  improved recipes:
+    - TIME Magazine
+    - The Atlantic
+    - Down to Earth
+    - Heraldo de Aragon
+    - Radikal (Turkey)
+    - Wired Daily Edition
+    - Orange County Register
+
+  new recipes:
+    - title: General Knowledge Today 
+      author: Kanika G
+
+    - title: BBC Arabic 
+      author: logophile777
+     
 - version: 1.48.0
   date: 2014-08-08
 

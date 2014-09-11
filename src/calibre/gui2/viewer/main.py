@@ -21,7 +21,7 @@ from calibre.gui2.viewer.behavior.base_behavior import BaseBehavior
 from calibre.gui2.widgets import ProgressIndicator
 from calibre.gui2 import (
     Application, ORG_NAME, APP_UID, choose_files, info_dialog, error_dialog,
-    open_url, setup_gui_option_parser, detach_gui)
+    open_url, setup_gui_option_parser)
 from calibre.ebooks.oeb.iterator.book import EbookIterator
 from calibre.ebooks import DRMError
 from calibre.constants import islinux, filesystem_encoding
@@ -82,6 +82,7 @@ class EbookViewer(MainWindow):
         self.pending_reference = None
         self.pending_bookmark  = None
         self.pending_restore   = False
+        self.cursor_hidden     = False
         self.existing_bookmarks= []
         self.selected_text     = None
         self.was_maximized     = False
@@ -168,6 +169,22 @@ class EbookViewer(MainWindow):
         self.action_toggle_paged_mode.toggled[bool].connect(self.toggle_paged_mode)
         if (start_in_fullscreen or self.view.document.start_in_fullscreen):
             self.action_full_screen.trigger()
+        self.hide_cursor_timer = t = QTimer(self)
+        t.setSingleShot(True), t.setInterval(3000)
+        t.timeout.connect(self.hide_cursor)
+        t.start()
+
+    def eventFilter(self, obj, ev):
+        if ev.type() == ev.MouseMove:
+            if self.cursor_hidden:
+                self.cursor_hidden = False
+                QApplication.instance().restoreOverrideCursor()
+            self.hide_cursor_timer.start()
+        return False
+
+    def hide_cursor(self):
+        self.cursor_hidden = True
+        QApplication.instance().setOverrideCursor(Qt.BlankCursor)
 
     def toggle_paged_mode(self, checked, at_start=False):
         in_paged_mode = not self.action_toggle_paged_mode.isChecked()
@@ -307,7 +324,6 @@ class EbookViewer(MainWindow):
         self.was_maximized = self.isMaximized()
         if not self.view.document.fullscreen_scrollbar:
             self.vertical_scrollbar.setVisible(False)
-        self.centralwidget.layout().setContentsMargins(0, 0, 0, 0)
 
         super(EbookViewer, self).showFullScreen()
 
@@ -413,6 +429,10 @@ class EbookViewer(MainWindow):
                 self.view.document.page_position.set_pos(bm['pos'])
             else:
                 self.view.goto_bookmark(bm)
+                # Going to a bookmark does not call scrolled() so we update the
+                # page position explicitly. Use a timer to ensure it is
+                # accurate.
+                QTimer.singleShot(100, self.update_page_number)
         else:
             self.pending_bookmark = bm
             if spine_index < 0 or spine_index >= len(self.iterator.spine):
@@ -672,14 +692,6 @@ class EbookViewer(MainWindow):
         self.view.load_path(path, pos=pos)
 
     def viewport_resize_started(self, event):
-        old, curr = event.size(), event.oldSize()
-        if not self.window_mode_changed and old.width() == curr.width():
-            # No relayout changes, so page position does not need to be saved
-            # This is needed as Qt generates a viewport resized event that
-            # changes only the height after a file has been loaded. This can
-            # cause the last read position bookmark to become slightly
-            # inaccurate
-            return
         if not self.resize_in_progress:
             # First resize, so save the current page position
             self.resize_in_progress = True
@@ -789,19 +801,23 @@ class EbookViewer(MainWindow):
         self.bookmarks.set_bookmarks(bookmarks)
         return self.build_bookmarks_menu(bookmarks)
 
+    @property
+    def current_page_bookmark(self):
+        bm = self.view.bookmark()
+        bm['spine'] = self.current_index
+        bm['title'] = 'calibre_current_page_bookmark'
+        return bm
+
     def save_current_position(self):
         if not self.get_remember_current_page_opt():
             return
         if hasattr(self, 'current_index'):
             try:
-                bm = self.view.bookmark()
-                bm['spine'] = self.current_index
-                bm['title'] = 'calibre_current_page_bookmark'
-                self.iterator.add_bookmark(bm)
+                self.iterator.add_bookmark(self.current_page_bookmark)
             except:
                 traceback.print_exc()
 
-    def load_ebook(self, pathtoebook, open_at=None):
+    def load_ebook(self, pathtoebook, open_at=None, reopen_at=None):
         if self.iterator is not None:
             self.save_current_position()
             self.iterator.__exit__()
@@ -871,6 +887,8 @@ class EbookViewer(MainWindow):
             self.current_index = -1
             QApplication.instance().alert(self, 5000)
             previous = self.set_bookmarks(self.iterator.bookmarks)
+            if reopen_at is not None:
+                previous = reopen_at
             if open_at is None and previous is not None:
                 self.goto_bookmark(previous)
             else:
@@ -969,7 +987,11 @@ class EbookViewer(MainWindow):
 
     def reload_book(self):
         if getattr(self.iterator, 'pathtoebook', None):
-            self.load_ebook(self.iterator.pathtoebook)
+            try:
+                reopen_at = self.current_page_bookmark
+            except Exception:
+                reopen_at = None
+            self.load_ebook(self.iterator.pathtoebook, reopen_at=reopen_at)
             return
 
     def __enter__(self):
@@ -986,7 +1008,7 @@ class EbookViewer(MainWindow):
             wg = vprefs.get('viewer_window_geometry', None)
             if wg is not None:
                 self.restoreGeometry(wg)
-            self.show_toc_on_open = vprefs.get('viewer_toc_isvisible', False)
+        self.show_toc_on_open = vprefs.get('viewer_toc_isvisible', False)
         desktop  = QApplication.instance().desktop()
         av = desktop.availableGeometry(self).height() - 30
         if self.height() > av:
@@ -1033,14 +1055,9 @@ def main(args=sys.argv):
 
     parser = option_parser()
     opts, args = parser.parse_args(args)
-    if getattr(opts, 'detach', False):
-        detach_gui()
-    try:
-        open_at = float(opts.open_at)
-    except:
-        open_at = None
+    open_at = float(opts.open_at.replace(',', '.')) if opts.open_at else None
     override = 'calibre-ebook-viewer' if islinux else None
-    app = Application(args, override_program_name=override)
+    app = Application(args, override_program_name=override, color_prefs=vprefs)
     app.load_builtin_fonts()
     app.setWindowIcon(QIcon(I('viewer.png')))
     QApplication.setOrganizationName(ORG_NAME)
@@ -1048,6 +1065,7 @@ def main(args=sys.argv):
     main = EbookViewer(args[1] if len(args) > 1 else None,
             debug_javascript=opts.debug_javascript, open_at=open_at,
                        start_in_fullscreen=opts.full_screen)
+    app.installEventFilter(main)
     # This is needed for paged mode. Without it, the first document that is
     # loaded will have extra blank space at the bottom, as
     # turn_off_internal_scrollbars does not take effect for the first
