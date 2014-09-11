@@ -6,9 +6,10 @@ from __future__ import (unicode_literals, division, absolute_import,
 __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
-import re
+import os
 from PyQt5.Qt import (Qt, QWebView, pyqtSlot)
 from calibre.ebooks.oeb.display.webview import load_html
+from calibre.constants import iswindows
        
 # This class displays an ebook network using an embedded Javascript application.
 class TOCNetworkView (QWebView):
@@ -24,7 +25,8 @@ class TOCNetworkView (QWebView):
     # jsonCode (string) - the data defining the edges and nodes in the network
     def load_network(self, jsonCode):
         self.jsonCode = jsonCode
-        path = 'C:/Users/Emily/Documents/GitHub/calibre/resources/adventurous_map_viewer/book_renderer.html'
+        path = P(u'adventurous_map_viewer/book_renderer.html').replace(os.sep, '/')
+        path = str(path)
         load_html(path, self, codec=getattr(path, 'encoding', 'utf-8'), mime_type=getattr(path,
         'mime_type', 'text/html'))
         
