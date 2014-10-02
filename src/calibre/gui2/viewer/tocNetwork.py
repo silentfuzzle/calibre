@@ -19,6 +19,7 @@ class TOCNetworkView (QWebView):
         
         self.manager = None
         self.loadFinished.connect(self.load_finished)
+        self.curr_page = -1;
         
     # Update the network displayed in the Javascript application
     # jsonCode (string) - the data defining the edges and nodes in the network
@@ -28,14 +29,35 @@ class TOCNetworkView (QWebView):
         path = str(path)
         load_html(path, self, codec=getattr(path, 'encoding', 'utf-8'), mime_type=getattr(path,
         'mime_type', 'text/html'))
+        self.loaded = False;
         
     # Displays the network when the Javascript code has finished loading
     def load_finished(self):
+        self.loaded = True;
         self.page().mainFrame().addToJavaScriptWindowObject("container", self)
+        self.create_toc_network()
+            
+    # Adds a new edge to the displayed network
+    # newJSON (string) - the data defining the edges and nodes in the network
+    def add_edge(self, newJSON):
+        self.jsonCode = newJSON
+        if (self.loaded):
+            self.create_toc_network()
         
-        jScript = """dataLoaded({jsonCode}); """
-        jScriptFormat = jScript.format(jsonCode=str(self.jsonCode))
+    # Update the network with the the current stored json code
+    def create_toc_network(self):
+        jScript = """dataLoaded({jsonCode}, {page}); """
+        jScriptFormat = jScript.format(jsonCode=str(self.jsonCode), page=self.curr_page)
         self.page().mainFrame().evaluateJavaScript(jScriptFormat)
+        
+    # Update the network to show the user's new position
+    # page (float) - the first page of the section the user is viewing
+    def set_curr_page(self, page):
+        self.curr_page = page
+        if (self.loaded): 
+            jScript = """changePage({page}); """
+            jScriptFormat = jScript.format(page=page)
+            self.page().mainFrame().evaluateJavaScript(jScriptFormat)
         
     # Sets the pointer to the EbookViewer object
     # manager (EbookViewer) - the class controlling the ebook viewer interface

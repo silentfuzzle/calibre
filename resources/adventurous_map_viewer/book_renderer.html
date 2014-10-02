@@ -2,7 +2,8 @@
   <meta charset="utf-8">
   <body> 
  <style> 
-.link {  
+.link {
+fill: none;
 stroke: #666;
 opacity: 0.6;
 stroke-width: 1.5px; 
@@ -30,31 +31,45 @@ pointer-events: none;
 
 //d3.json("eBookGraph.json", dataLoaded)
 
-//var data = {"directed": true, "graph": [], "nodes": [{"label": "5.0", "id": "5.0", "title": "Adventurous Reader"}, {"label": "8.0", "id": "8.0", "title": "Displaying an eBook as a Website Instead of a Webpage"}, {"label": "2.0", "id": "2.0", "title": "About the Author"}, {"label": "55.0", "id": "55.0", "title": "Jadu Calendar"}, {"label": "14.0", "id": "14.0", "title": "What's the problem with presenting a non-linear story in a linear format?"}, {"label": "35.0", "id": "35.0", "title": "Ramda"}, {"label": "16.0", "id": "16.0", "title": "Jigo Kadas"}, {"label": "24.0", "id": "24.0", "title": "Kadas (People)"}, {"label": "3.0", "id": "3.0", "title": "About Pajar"}, {"label": "32.0", "id": "32.0", "title": "Zarkis"}, {"label": "1", "id": "1", "title": "Pajar"}, {"label": "31.0", "id": "31.0", "title": "Kadas (Planet)"}, {"label": "44.0", "id": "44.0", "title": "Baltarik Military"}, {"label": "23.0", "id": "23.0", "title": "Barkes Lookup"}, {"label": "28.0", "id": "28.0", "title": "Kadas (Bloodline)"}, {"label": "47.0", "id": "47.0", "title": "The Ramda Choosing"}, {"label": "20.0", "id": "20.0", "title": "Kadas (Disambiguation)"}, {"label": "40.0", "id": "40.0", "title": "Baltarik"}, {"label": "21.0", "id": "21.0", "title": "Portisk"}], "links": [{"source": 8, "target": 0}], "multigraph": false}
-//dataLoaded(data)
+var width = 500
+height = 500;
+    
+// Set the viewer window to fill the TOC panel
+var svg = d3.select("body")
+    .append("svg")
+      .attr({
+        "width": "100%",
+        "height": "100%"
+      })
+      .attr("viewBox", "0 0 " + width + " " + height )
+      .attr("preserveAspectRatio", "xMidYMid meet")
+      .attr("pointer-events", "all")
+    .call(d3.behavior.zoom().on("zoom", redraw));
+    
+var vis;
+var currPage = -1;
+var node;
+var link;
 
-function loadNetwork(jsonPath) {
-    alert (jsonPath)
-    d3.json(jsonPath, dataLoaded)
-    alert ("next")
-}
+///////////////////////////////////////////////////////////////////////////////
+//CALLED FROM PYTHON
+///////////////////////////////////////////////////////////////////////////////
 
-function dataLoaded(data) {
-        var links = data.links
-        var nodes = data.nodes
+// Display a network from passed JSON data
+// data (string) - json code
+// pageNum (float) - the number of the first page of the section the user is currently viewing
+function dataLoaded(data, pageNum) {
+    var links = data.links
+    var nodes = data.nodes
         
-    // Compute the distinct nodes from the links.
+    // Set the links to point to node objects
     links.forEach(function(link) {
-        link.source = nodes[link.source] || 
-        (nodes[link.source] = {name: link.source});
-        link.target = nodes[link.target] || 
-        (nodes[link.target] = {name: link.target});
+        link.source = nodes[link.source] || (nodes[link.source] = {name: link.source});
+        link.target = nodes[link.target] || (nodes[link.target] = {name: link.target});
         link.value = +link.value;
     });
 
-    var width = 500
-    height = 500;
-
+    // Set the type of network to display and its parameters
     var force = d3.layout.force() 
         .nodes(d3.values(nodes)) 
         .links(links) 
@@ -63,34 +78,38 @@ function dataLoaded(data) {
         .charge(-200) 
         .on("tick", tick) 
         .start(); 
+        
+    // Clear any old network data from previous renderings
+    d3.selectAll("svg > *").remove();
 
-    var svg = d3.select("body")
-        .append("svg")
-          .attr({
-            "width": "100%",
-            "height": "100%"
-          })
-          .attr("viewBox", "0 0 " + width + " " + height )
-          .attr("preserveAspectRatio", "xMidYMid meet")
-          .attr("pointer-events", "all")
-        .call(d3.behavior.zoom().on("zoom", redraw));
-
-    var vis = svg
-        .append('svg:g');
-
-    function redraw() {
-      vis.attr("transform",
-          "translate(" + d3.event.translate + ")"
-          + " scale(" + d3.event.scale + ")");
-    }
-
-    var link = svg.selectAll(".link") 
-        .data(force.links()) 
-        .enter().append("line") 
+    // Reset the variables for displaying links as arrows
+    svg.append("defs").selectAll("marker")
+        .data(["suit"])
+      .enter().append("marker")
+        .attr("id", function(d) { return d; })
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 15)
+        .attr("refY", -1.5)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+      .append("path")
+        .attr("d", "M0,-5L10,0L0,5");
+    
+    vis = svg.append('svg:g');
+    
+    // Create an object that stores all links added to the network
+    // "marker-end" - used for displaying links as arrows
+    // .style - used for resizing the links as the user zooms in or out of the network
+    link = vis.selectAll("path")
+        .data(force.links())
+      .enter().append("path")
         .attr("class", "link")
-        .style("opacity", 0.4); 
-
-    var node = svg.selectAll(".node") 
+        .attr("marker-end", "url(#suit)")
+        .style("stroke-width", function(d) { return Math.sqrt(d.value); });
+    
+    // Create an object that stores all the nodes added to the network
+    node = vis.selectAll(".node") 
         .data(force.nodes()) 
         .enter().append("g") 
         .attr("class", "node") 
@@ -100,28 +119,80 @@ function dataLoaded(data) {
         .on("dblclick", dblclick)
         .call(force.drag); 
 
+    // Set the appearance of the node to be a circle
     node.append("circle") 
         .attr("r", 8)
-        .style("fill", "#3182bd");
 
+    // Set the text appearing next to the node and other data the node stores
     node.append("text") 
         .attr("x", 12) 
         .attr("dy", ".35em") 
         .attr("page", function(d) { return d.id; })
         .style("fill", "#000000")
         .text(function(d) { return d.title; });
+        
+    // Set the color of the nodes
+    changePage(pageNum);
+}
 
-    function tick() { 
-        link 
-        .attr("x1", function(d) { return d.source.x; }) 
-        .attr("y1", function(d) { return d.source.y; }) 
-        .attr("x2", function(d) { return d.target.x; }) 
-        .attr("y2", function(d) { return d.target.y; }); 
+// Set the color of the nodes
+// pageNum (float) - the number of the first page of the section the user is currently viewing
+function changePage(pageNum) {
+    currPage = pageNum;
+    node.select("circle").style("fill", fillNode);
+}
 
-        node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; }); 
+///////////////////////////////////////////////////////////////////////////////
+//DRAW METHODS
+///////////////////////////////////////////////////////////////////////////////
+
+// Color a node in the network
+// d - a node object pulled from the svg
+function fillNode(d) {
+    if (d.id == currPage) { 
+        // Color the node of the section the user is currently viewing a different color
+        return "#555555"; 
+    } 
+    else { 
+        return "#3182bd"; 
     }
 }
- 
+
+// Draws a directed link between nodes
+// d - a link object pulled from the svg
+function drawCurve(d) {
+    var dx = d.target.x - d.source.x,
+      dy = d.target.y - d.source.y,
+      dr = Math.sqrt(dx * dx + dy * dy);
+    return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
+}
+    
+// Animates the force-directed network
+function tick() { 
+    link.attr("d", drawCurve);
+    node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; }); 
+}
+
+// Scales and pans the network as specified by the user
+function redraw() {
+  vis.attr("transform",
+      "translate(" + d3.event.translate + ")"
+      + " scale(" + d3.event.scale + ")");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//EVENTS
+///////////////////////////////////////////////////////////////////////////////
+
+// Calls Python to send the user to the section corresponding to the node clicked in the viewer
+function click() {
+    // Get the first page number of the section from the node that was clicked
+    pageNum = d3.select(this).select("text").attr("page");
+    
+    // Call the Python code
+    container.change_page(pageNum);
+}
+
 function mouseover() { 
     d3.select(this).select("text").transition()
     .duration(750)
@@ -146,11 +217,6 @@ function mouseout() {
     .style("opacity", 0.6)
     .style("font", "7px serif");
 } 
-// action to take on mouse click
-function click() {
-    pageNum = d3.select(this).select("text").attr("page")
-    container.change_page(pageNum)
-}
 
 // action to take on mouse double click
 function dblclick() {

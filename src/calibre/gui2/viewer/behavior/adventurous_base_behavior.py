@@ -39,6 +39,7 @@ class BaseAdventurousBehavior (BaseBehavior):
         print ("AdventurousBase curr_sec set")
         super(BaseAdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
         self.num_pages = curr_sec.pages
+        self.toc_view.set_curr_page(curr_sec.start_page)
         
         # Only setup of the scrollbar and position label everytime if this object is an instance of this class
         if (type(self) is BaseAdventurousBehavior):
@@ -98,9 +99,9 @@ class BaseAdventurousBehavior (BaseBehavior):
         if (corrected_end_sec != start_sec):
             edge_added = self.ebook_network.add_edge(start_sec.start_page, corrected_end_sec.start_page)
         
-            # Reload the network to display the new edge
+            # Add the new edge to the network display
             if (edge_added):
-                self.toc_view.load_network(self.ebook_network.data)
+                self.toc_view.add_edge(self.ebook_network.data)
     
     # Return a section's TOC and SpineItem entries if it exists in the TOC
     # Return the section's parent's TOC and SpineItem entries if it doesn't exist in the TOC

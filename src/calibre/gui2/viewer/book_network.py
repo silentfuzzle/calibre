@@ -32,7 +32,6 @@ class EBookNetwork (object):
                     self.testCount = self.testCount + 1
                     spine_index = spine.index(t.abspath)
                     self.bookGraph.add_node(str(spine[spine_index].start_page),label=str(spine[spine_index].start_page),title=t.text)
-            print (self.testCount)
             
             self.save_graph()
             
