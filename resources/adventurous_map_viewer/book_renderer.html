@@ -17,7 +17,7 @@ text {
 font: 7px serif; 
 opacity: 0.6;
 pointer-events: none; 
-} 
+}
 </style> 
 
 <script src=d3.v3.min.js></script>
@@ -33,7 +33,10 @@ pointer-events: none;
 
 var width = 500
 height = 500;
-    
+
+var textDefaultXOffset = 12;
+var textDefaultOpacity = 0.6;
+  
 // Set the viewer window to fill the TOC panel
 var svg = d3.select("body")
     .append("svg")
@@ -43,12 +46,17 @@ var svg = d3.select("body")
       })
       .attr("viewBox", "0 0 " + width + " " + height )
       .attr("preserveAspectRatio", "xMidYMid meet")
-      .attr("pointer-events", "all")
-    .call(d3.behavior.zoom().on("zoom", redraw));
+      .attr("pointer-events", "all");
+
+// Controls the zoom and pan functions initiated by the user
+var zoomListener = d3.behavior.zoom()
+  .scaleExtent([0.1, 3])
+  .on("zoom", redraw);
+zoomListener(svg);
     
 var vis;
 var currPage = -1;
-var node;
+var node = 0;
 var link;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -58,7 +66,7 @@ var link;
 // Display a network from passed JSON data
 // data (string) - json code
 // pageNum (float) - the number of the first page of the section the user is currently viewing
-function dataLoaded(data, pageNum) {
+function dataLoaded(data, pageNum) {    
     var links = data.links
     var nodes = data.nodes
         
@@ -113,6 +121,8 @@ function dataLoaded(data, pageNum) {
         .data(force.nodes()) 
         .enter().append("g") 
         .attr("class", "node") 
+        .attr("x", function(d) { return d.x; })
+        .attr("y", function(d) { return d.y; })
         .on("mouseover", mouseover) 
         .on("mouseout", mouseout) 
         .on("click", click)
@@ -125,11 +135,20 @@ function dataLoaded(data, pageNum) {
 
     // Set the text appearing next to the node and other data the node stores
     node.append("text") 
-        .attr("x", 12) 
+        .attr("x", textDefaultXOffset) 
         .attr("dy", ".35em") 
         .attr("page", function(d) { return d.id; })
         .style("fill", "#000000")
         .text(function(d) { return d.title; });
+    
+    // Wrap the text of long titles
+    node.selectAll("text")
+      .call(wrap, 100);
+      
+    // Set the opacity of wrapped text
+    node.selectAll("text")
+    .selectAll('tspan')
+    .style("opacity", textDefaultOpacity);
         
     // Set the color of the nodes
     changePage(pageNum);
@@ -145,6 +164,35 @@ function changePage(pageNum) {
 ///////////////////////////////////////////////////////////////////////////////
 //DRAW METHODS
 ///////////////////////////////////////////////////////////////////////////////
+
+// Wraps the text labeling each node
+// text - the text attribute selected from all nodes
+// width - the maximum width of a label
+function wrap(text, width) {
+  text.each(function() {
+    var text = d3.select(this),
+        words = text.text().split(/\s+/).reverse(),
+        word,
+        line = [],
+        lineNumber = 0,
+        lineHeight = 1.1, // ems
+        y = 0,
+        x = textDefaultXOffset,
+        dy = parseFloat(text.attr("dy")),
+        tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
+    while (word = words.pop()) {
+      line.push(word);
+      tspan.text(line.join(" "));
+      if (tspan.node().getComputedTextLength() > width) {
+        line.pop();
+        tspan.text(line.join(" "));
+        line = [word];
+        lineNumber = lineNumber + 1;
+        tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", lineNumber * lineHeight + dy + "em").text(word);
+      }
+    }
+  });
+}
 
 // Color a node in the network
 // d - a node object pulled from the svg
@@ -185,7 +233,7 @@ function redraw() {
 ///////////////////////////////////////////////////////////////////////////////
 
 // Calls Python to send the user to the section corresponding to the node clicked in the viewer
-function click() {
+function click() {    
     // Get the first page number of the section from the node that was clicked
     pageNum = d3.select(this).select("text").attr("page");
     
@@ -196,7 +244,7 @@ function click() {
 function mouseover() { 
     d3.select(this).select("text").transition()
     .duration(750)
-    .attr("x", 22)
+    .selectAll('tspan').attr("x", 22)
     .style("stroke-width", ".5px")
     .style("opacity", 1)
     .style("font", "17.5px serif");
@@ -211,10 +259,10 @@ function mouseout() {
     .attr("r", 8); 
     d3.select(this).select("text").transition()
     .duration(750)
-    .attr("x", 12)
+    .selectAll('tspan').attr("x", textDefaultXOffset)
     .style("stroke", "none")
     .style("stroke", "none")
-    .style("opacity", 0.6)
+    .style("opacity", textDefaultOpacity)
     .style("font", "7px serif");
 } 
 
