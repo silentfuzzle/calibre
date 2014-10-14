@@ -350,6 +350,20 @@ class BuiltinRawField(BuiltinFormatterFunction):
     def evaluate(self, formatter, kwargs, mi, locals, name):
         return unicode(getattr(mi, name, None))
 
+class BuiltinRawList(BuiltinFormatterFunction):
+    name = 'raw_list'
+    arg_count = 2
+    category = 'Get values from metadata'
+    __doc__ = doc = _('raw_list(name, separator) -- returns the metadata list '
+            'named by name without applying any formatting or sorting and '
+            'with items separated by separator.')
+
+    def evaluate(self, formatter, kwargs, mi, locals, name, separator):
+        res = getattr(mi, name, None)
+        if not isinstance(res, list):
+            return "%s is not a list" % name
+        return separator.join(res)
+
 class BuiltinSubstr(BuiltinFormatterFunction):
     name = 'substr'
     arg_count = 3
@@ -1423,9 +1437,30 @@ class BuiltinAuthorLinks(BuiltinFormatterFunction):
             return pair_sep.join(n + val_sep + link_data[n] for n in names)
         return _('This function can be used only in the GUI')
 
+class BuiltinAuthorSorts(BuiltinFormatterFunction):
+    name = 'author_sorts'
+    arg_count = 1
+    category = 'Get values from metadata'
+    __doc__ = doc = _('author_sorts(val_separator) -- returns a string '
+                      'containing a list of author\'s sort values for the '
+                      'authors of the book. The sort is the one in the author '
+                      'metadata (different from the author_sort in books). The '
+                      'returned list has the form author sort 1 val_separator '
+                      'author sort 2 etc. The author sort values in this list '
+                      'are in the same order as the authors of the book. If '
+                      'you want spaces around val_separator then include them '
+                      'in the separator string')
+
+    def evaluate(self, formatter, kwargs, mi, locals, val_sep):
+        sort_data = mi.author_sort_map
+        if not sort_data:
+            return ''
+        names = [sort_data.get(n) for n in mi.authors if n.strip()]
+        return val_sep.join(n for n in names)
+
 _formatter_builtins = [
-    BuiltinAdd(), BuiltinAnd(), BuiltinApproximateFormats(),
-    BuiltinAssign(), BuiltinAuthorLinks(), BuiltinBooksize(),
+    BuiltinAdd(), BuiltinAnd(), BuiltinApproximateFormats(), BuiltinAssign(),
+    BuiltinAuthorLinks(), BuiltinAuthorSorts(), BuiltinBooksize(),
     BuiltinCapitalize(), BuiltinCmp(), BuiltinContains(), BuiltinCount(),
     BuiltinCurrentLibraryName(), BuiltinCurrentLibraryPath(),
     BuiltinDaysBetween(), BuiltinDivide(), BuiltinEval(), BuiltinFirstNonEmpty(),
@@ -1437,8 +1472,8 @@ _formatter_builtins = [
     BuiltinInList(), BuiltinListDifference(), BuiltinListEquals(),
     BuiltinListIntersection(), BuiltinListitem(), BuiltinListRe(),
     BuiltinListReGroup(), BuiltinListSort(), BuiltinListUnion(), BuiltinLookup(),
-    BuiltinLowercase(), BuiltinMultiply(), BuiltinNot(),
-    BuiltinOndevice(), BuiltinOr(), BuiltinPrint(), BuiltinRawField(),
+    BuiltinLowercase(), BuiltinMultiply(), BuiltinNot(), BuiltinOndevice(),
+    BuiltinOr(), BuiltinPrint(), BuiltinRawField(), BuiltinRawList(),
     BuiltinRe(), BuiltinReGroup(), BuiltinSelect(), BuiltinSeriesSort(),
     BuiltinShorten(), BuiltinStrcat(), BuiltinStrcatMax(),
     BuiltinStrcmp(), BuiltinStrInList(), BuiltinStrlen(), BuiltinSubitems(),

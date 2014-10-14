@@ -26,6 +26,9 @@ class CalibreBehavior (BaseBehavior):
     def goto_page(self, new_page, goto_page_method):
         goto_page_method(new_page)
         
+    def update_page_label(self, new_page):
+        return new_page
+        
     # Returns the maximum number of pages to display to the user
     # Always the number of pages in the ebook
     def get_num_pages(self):

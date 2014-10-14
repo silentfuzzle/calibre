@@ -606,7 +606,7 @@ class Cache(object):
         ''' Like :meth:`get_metadata` except that it returns a ProxyMetadata
         object that only reads values from the database on demand. This is much
         faster than get_metadata when only a small number of fields need to be
-        accessed from the reutrned metadata object. '''
+        accessed from the returned metadata object. '''
         return ProxyMetadata(self, book_id)
 
     @api
@@ -670,7 +670,7 @@ class Cache(object):
         Copy the cover to the file like object ``dest``. Returns False
         if no cover exists or dest is the same file as the current cover.
         dest can also be a path in which case the cover is
-        copied to it iff the path is different from the current path (taking
+        copied to it if and only if the path is different from the current path (taking
         case sensitivity into account).
         '''
         try:

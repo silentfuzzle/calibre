@@ -329,7 +329,7 @@ class CoverDelegate(QStyledItemDelegate):
         self.animation.setEasingCurve(QEasingCurve.OutInCirc)
         self.animation.setDuration(500)
         self.set_dimensions()
-        self.cover_cache = CoverCache(limit=gprefs['cover_grid_cache_size'])
+        self.cover_cache = CoverCache()
         self.render_queue = LifoQueue()
         self.animating = None
         self.highlight_color = QColor(Qt.white)
@@ -948,6 +948,7 @@ class GridView(QListView):
 
     def restore_current_book_state(self, state):
         book_id = state
+        self.setFocus(Qt.OtherFocusReason)
         try:
             row = self.model().db.data.id_to_index(book_id)
         except (IndexError, ValueError, KeyError, TypeError, AttributeError):

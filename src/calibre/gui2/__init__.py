@@ -2,7 +2,7 @@ __license__   = 'GPL v3'
 __copyright__ = '2008, Kovid Goyal <kovid at kovidgoyal.net>'
 """ The GUI """
 import os, sys, Queue, threading, glob
-from threading import RLock
+from threading import RLock, Lock
 from urllib import unquote
 from PyQt5.Qt import (
     QFileInfo, QObject, QBuffer, Qt, QStyle, QByteArray, QTranslator,
@@ -197,6 +197,8 @@ def _config():  # {{{
         help='Search history for the main GUI')
     c.add_opt('viewer_search_history', default=[],
         help='Search history for the ebook viewer')
+    c.add_opt('viewer_toc_search_history', default=[],
+        help='Search history for the ToC in the ebook viewer')
     c.add_opt('lrf_viewer_search_history', default=[],
         help='Search history for the LRF viewer')
     c.add_opt('scheduler_search_history', default=[],
@@ -1122,13 +1124,31 @@ def open_local_file(path):
         url = QUrl.fromLocalFile(path)
         open_url(url)
 
+_ea_lock = Lock()
+
 def ensure_app():
     global _store_app
-    if _store_app is None and QApplication.instance() is None:
-        args = sys.argv[:1]
-        if islinux or isbsd:
-            args += ['-platformpluginpath', sys.extensions_location, '-platform', 'headless']
-        _store_app = QApplication(args)
+    with _ea_lock:
+        if _store_app is None and QApplication.instance() is None:
+            args = sys.argv[:1]
+            if islinux or isbsd:
+                args += ['-platformpluginpath', sys.extensions_location, '-platform', 'headless']
+            _store_app = QApplication(args)
+            import traceback
+            # This is needed because as of PyQt 5.4 if sys.execpthook ==
+            # sys.__excepthook__ PyQt will abort the application on an
+            # unhandled python exception in a slot or virtual method. Since ensure_app()
+            # is used in worker processes for background work like rendering html
+            # or running a headless browser, we circumvent this as I really
+            # dont feel like going through all the code and making sure no
+            # unhandled exceptions ever occur. All the actual GUI apps already
+            # override sys.except_hook with a proper error handler.
+            def eh(t, v, tb):
+                try:
+                    traceback.print_exception(t, v, tb, file=sys.stderr)
+                except:
+                    pass
+            sys.excepthook = eh
 
 def must_use_qt():
     ''' This function should be called if you want to use Qt for some non-GUI

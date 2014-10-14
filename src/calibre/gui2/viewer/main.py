@@ -30,8 +30,11 @@ from calibre.customize.ui import available_input_formats
 from calibre import as_unicode, force_unicode, isbytestring
 from calibre.ptempfile import reset_base_dir
 from calibre.utils.zipfile import BadZipfile
+from calibre.utils.localization import canonicalize_lang, lang_as_iso639_1, get_lang
 
 vprefs = JSONConfig('viewer')
+dprefs = JSONConfig('viewer_dictionaries')
+dprefs.defaults['word_lookups'] = {}
 
 class Worker(Thread):
 
@@ -53,6 +56,22 @@ class RecentAction(QAction):
     def __init__(self, path, parent):
         self.path = path
         QAction.__init__(self, os.path.basename(path), parent)
+
+def default_lookup_website(lang):
+    if lang == 'und':
+        lang = get_lang()
+    lang = lang_as_iso639_1(lang) or lang
+    if lang == 'en':
+        prefix = 'https://www.wordnik.com/words/'
+    else:
+        prefix = 'http://%s.wiktionary.org/wiki/' % lang
+    return prefix + '{word}'
+
+def lookup_website(lang):
+    if lang == 'und':
+        lang = get_lang()
+    wm = dprefs['word_lookups']
+    return wm.get(lang, default_lookup_website(lang))
 
 class EbookViewer(MainWindow):
 
@@ -123,6 +142,8 @@ class EbookViewer(MainWindow):
             self.toc.pressed[QModelIndex].connect(self.toc_clicked)
         self.search.search.connect(self.find)
         self.search.focus_to_library.connect(lambda: self.view.setFocus(Qt.OtherFocusReason))
+        self.toc.pressed[QModelIndex].connect(self.toc_clicked)
+        self.toc.searched.connect(partial(self.toc_clicked, force=True))
         self.reference.goto.connect(self.goto)
         self.bookmarks.edited.connect(self.bookmarks_edited)
         self.bookmarks.activated.connect(self.goto_bookmark)
@@ -285,17 +306,14 @@ class EbookViewer(MainWindow):
                 at_start=True)
 
     def lookup(self, word):
-        from calibre.utils.localization import canonicalize_lang, lang_as_iso639_1
         from urllib import quote
-        lang = lang_as_iso639_1(self.view.current_language)
-        if not lang:
-            lang = canonicalize_lang(lang) or 'en'
         word = quote(word.encode('utf-8'))
-        if lang == 'en':
-            prefix = 'https://www.wordnik.com/words/'
-        else:
-            prefix = 'http://%s.wiktionary.org/wiki/' % lang
-        open_url(prefix + word)
+        try:
+            url = lookup_website(canonicalize_lang(self.view.current_language) or 'en').format(word=word)
+        except Exception:
+            traceback.print_exc()
+            url = default_lookup_website(canonicalize_lang(self.view.current_language) or 'en').format(word=word)
+        open_url(url)
 
     def get_remember_current_page_opt(self):
         from calibre.gui2.viewer.documentview import config
@@ -575,16 +593,15 @@ class EbookViewer(MainWindow):
         if self.view.search(text, backwards=backwards):
             self.scrolled(self.view.scroll_fraction)
 
-    def internal_link_clicked(self, frac):
-        self.update_page_number()  # Ensure page number is accurate as it is used for history
+    def internal_link_clicked(self, prev_pos):
         self.history.add(self.page_behavior.absolute_position)
-        print ("added to history")
 
     def link_clicked(self, url):
         path = os.path.abspath(unicode(url.toLocalFile()))
         frag = None
         if path in self.iterator.spine:
-            self.internal_link_clicked(0)
+            self.update_page_number()  # Ensure page number is accurate as it is used for history
+            self.history.add(self.page_behavior.absolute_position)
             path = self.iterator.spine[self.iterator.spine.index(path)]
             if url.hasFragment():
                 frag = unicode(url.fragment())
@@ -723,6 +740,7 @@ class EbookViewer(MainWindow):
 
     def update_page_number(self):
         self.set_page_number(self.view.document.scroll_fraction)
+        return self.page_behavior.absolute_position
 
     def close_progress_indicator(self):
         self.pi.stop()
@@ -821,6 +839,7 @@ class EbookViewer(MainWindow):
             self.save_current_position()
             self.iterator.__exit__()
         self.iterator = EbookIterator(pathtoebook)
+        self.history.clear()
         self.open_progress_indicator(_('Loading ebook...'))
         worker = Worker(target=partial(self.iterator.__enter__, view_kepub=True))
         worker.start()
@@ -973,6 +992,7 @@ class EbookViewer(MainWindow):
             'Next occurrence': self.view.search_action,
             'Bookmark': bac,
             'Reload': self.action_reload,
+            'Table of Contents': self.action_table_of_contents,
         }.get(key, None)
         if action is not None:
             event.accept()
