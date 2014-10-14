@@ -18,6 +18,7 @@ class TOCNetworkView (QWebView):
         QWebView.__init__(self, *args)
         
         self.manager = None
+        self.setMinimumWidth(80)
         self.loadFinished.connect(self.load_finished)
         self.curr_page = -1;
         

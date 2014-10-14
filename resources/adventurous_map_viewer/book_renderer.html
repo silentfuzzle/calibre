@@ -15,7 +15,7 @@ stroke-width: 1.5px;
 } 
 text { 
 font: 7px serif; 
-opacity: 0.6;
+opacity: 1;
 pointer-events: none; 
 }
 </style> 
@@ -44,7 +44,7 @@ var svg = d3.select("body")
         "width": "100%",
         "height": "100%"
       })
-      .attr("viewBox", "0 0 " + width + " " + height )
+      //.attr("viewBox", "0 0 " + width + " " + height )
       .attr("preserveAspectRatio", "xMidYMid meet")
       .attr("pointer-events", "all");
 
@@ -55,6 +55,7 @@ var zoomListener = d3.behavior.zoom()
 zoomListener(svg);
     
 var vis;
+var force;
 var currPage = -1;
 var node = 0;
 var link;
@@ -66,9 +67,9 @@ var link;
 // Display a network from passed JSON data
 // data (string) - json code
 // pageNum (float) - the number of the first page of the section the user is currently viewing
-function dataLoaded(data, pageNum) {    
-    var links = data.links
-    var nodes = data.nodes
+function dataLoaded(data, pageNum) {
+    var links = data.links;
+    var nodes = data.nodes;
         
     // Set the links to point to node objects
     links.forEach(function(link) {
@@ -78,14 +79,14 @@ function dataLoaded(data, pageNum) {
     });
 
     // Set the type of network to display and its parameters
-    var force = d3.layout.force() 
-        .nodes(d3.values(nodes)) 
+    force = d3.layout.force() 
+        .nodes(nodes) 
         .links(links) 
         .size([width, height]) 
         .linkDistance(50) 
-        .charge(-200) 
-        .on("tick", tick) 
-        .start(); 
+        .charge(-100) 
+        .on("tick", tick)
+        .start();
         
     // Clear any old network data from previous renderings
     d3.selectAll("svg > *").remove();
@@ -104,11 +105,14 @@ function dataLoaded(data, pageNum) {
       .append("path")
         .attr("d", "M0,-5L10,0L0,5");
     
+    // This group contains all elements of the network
+    // Allows users to zoom and pan by manipulating the svg
     vis = svg.append('svg:g');
     
     // Create an object that stores all links added to the network
     // "marker-end" - used for displaying links as arrows
     // .style - used for resizing the links as the user zooms in or out of the network
+    // .attr("class", "link") - sets the .link css attributes to links
     link = vis.selectAll("path")
         .data(force.links())
       .enter().append("path")
@@ -117,12 +121,11 @@ function dataLoaded(data, pageNum) {
         .style("stroke-width", function(d) { return Math.sqrt(d.value); });
     
     // Create an object that stores all the nodes added to the network
+    // .attr("class", "node") - sets the .node circle attributes to node circles
     node = vis.selectAll(".node") 
         .data(force.nodes()) 
-        .enter().append("g") 
+      .enter().append("g") 
         .attr("class", "node") 
-        .attr("x", function(d) { return d.x; })
-        .attr("y", function(d) { return d.y; })
         .on("mouseover", mouseover) 
         .on("mouseout", mouseout) 
         .on("click", click)
@@ -131,7 +134,7 @@ function dataLoaded(data, pageNum) {
 
     // Set the appearance of the node to be a circle
     node.append("circle") 
-        .attr("r", 8)
+        .attr("r", 8);
 
     // Set the text appearing next to the node and other data the node stores
     node.append("text") 
@@ -215,10 +218,14 @@ function drawCurve(d) {
     return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
 }
     
+///////////////////////////////////////////////////////////////////////////////
+//POSITION METHODS
+///////////////////////////////////////////////////////////////////////////////
+
 // Animates the force-directed network
 function tick() { 
     link.attr("d", drawCurve);
-    node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; }); 
+    node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
 }
 
 // Scales and pans the network as specified by the user
@@ -228,16 +235,60 @@ function redraw() {
       + " scale(" + d3.event.scale + ")");
 }
 
+// Centers a node on the display
+// source - an object containing a node svg object
+function centerNode(source) {
+    scale = zoomListener.scale();
+    x1 = d3.select(source).attr("x");
+    y1 = d3.select(source).attr("y");
+    
+    // Center the node at 0 on the svg
+    x2 = (width / 2 - x1);
+    y2 = (height / 2 - y1);
+    
+    // Get the screen position of the node at the center of the svg
+    var sPos = getScreenCoords(x1, y1, [x2, y2], scale);
+    
+    // Center the node on the display
+    x2 = x2 + (width / 2 - sPos[0]);
+    y2 = y2 + (height / 2 - sPos[1]);
+    
+    // Apply the transformation to the display
+    zoomListener.scale(scale);
+    zoomListener.translate([x2, y2]);
+    zoomListener.event(vis);
+    zoomListener.center(null);
+}
+
+// Returns the position of the center of a node on the screen
+function getScreenCoords(x, y, translate, scale) {
+    var xn = translate[0] + x*scale;
+    var yn = translate[1] + y*scale;
+    
+    return [xn, yn];
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //EVENTS
 ///////////////////////////////////////////////////////////////////////////////
 
 // Calls Python to send the user to the section corresponding to the node clicked in the viewer
-function click() {    
+function click() {
+    // Create references to the node's position
+    var thisNode = d3.select(this)
+        .attr("x", function(d) { return d.x; })
+        .attr("y", function(d) { return d.y; });
+        
+    centerNode(this);
+    
+    // Remove the references to the nodes position so that it is updated properly
+    thisNode.attr("x", 0);
+    thisNode.attr("y", 0);
+    
     // Get the first page number of the section from the node that was clicked
     pageNum = d3.select(this).select("text").attr("page");
     
-    // Call the Python code
+    // Call the Python code to change pages
     container.change_page(pageNum);
 }
 
