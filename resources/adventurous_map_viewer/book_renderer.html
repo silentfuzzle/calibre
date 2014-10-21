@@ -36,6 +36,15 @@ height = 500;
 
 var textDefaultXOffset = 12;
 var textDefaultOpacity = 0.6;
+
+var nodeDefaultRadius = 8;
+var arrowOffset = 10;
+    
+var vis;
+var force;
+var currPage = -1;
+var node = 0;
+var link;
   
 // Set the viewer window to fill the TOC panel
 var svg = d3.select("body")
@@ -44,7 +53,6 @@ var svg = d3.select("body")
         "width": "100%",
         "height": "100%"
       })
-      //.attr("viewBox", "0 0 " + width + " " + height )
       .attr("preserveAspectRatio", "xMidYMid meet")
       .attr("pointer-events", "all");
 
@@ -53,12 +61,6 @@ var zoomListener = d3.behavior.zoom()
   .scaleExtent([0.1, 3])
   .on("zoom", redraw);
 zoomListener(svg);
-    
-var vis;
-var force;
-var currPage = -1;
-var node = 0;
-var link;
 
 ///////////////////////////////////////////////////////////////////////////////
 //CALLED FROM PYTHON
@@ -70,6 +72,29 @@ var link;
 function dataLoaded(data, pageNum) {
     var links = data.links;
     var nodes = data.nodes;
+    
+    var nodeDictionary = new Object();
+    if (node != 0) {
+        // The user has created a new link, prepare to reload the network
+        force.stop();
+        
+        // Save the current node positions in a dictionary
+        node.each(function(d) {
+            pos = [];
+            pos[0] = d.x;
+            pos[1] = d.y;
+            var page = d.id;
+            nodeDictionary[page] = pos;
+        });
+        
+        // Set the initial node positions to the saved positions
+        nodes.forEach(function(n) {
+            var x = nodeDictionary[n.id][0];
+            var y = nodeDictionary[n.id][1];
+            n.x = x;
+            n.y = y;
+        });
+    }
         
     // Set the links to point to node objects
     links.forEach(function(link) {
@@ -92,13 +117,14 @@ function dataLoaded(data, pageNum) {
     d3.selectAll("svg > *").remove();
 
     // Reset the variables for displaying links as arrows
+    // .append("path") - creates a triangle shape to place at the end of an arrow
     svg.append("defs").selectAll("marker")
         .data(["suit"])
       .enter().append("marker")
         .attr("id", function(d) { return d; })
         .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 15)
-        .attr("refY", -1.5)
+        .attr("refX", nodeDefaultRadius + arrowOffset)
+        .attr("refY", 0)
         .attr("markerWidth", 6)
         .attr("markerHeight", 6)
         .attr("orient", "auto")
@@ -110,7 +136,7 @@ function dataLoaded(data, pageNum) {
     vis = svg.append('svg:g');
     
     // Create an object that stores all links added to the network
-    // "marker-end" - used for displaying links as arrows
+    // "marker-end" - associates a triangle with a link to create a directed arrow
     // .style - used for resizing the links as the user zooms in or out of the network
     // .attr("class", "link") - sets the .link css attributes to links
     link = vis.selectAll("path")
@@ -126,6 +152,9 @@ function dataLoaded(data, pageNum) {
         .data(force.nodes()) 
       .enter().append("g") 
         .attr("class", "node") 
+        .attr("page", function(d) { return d.id; })
+        .attr("x", function(d) { return d.x; })
+        .attr("y", function(d) { return d.y; })
         .on("mouseover", mouseover) 
         .on("mouseout", mouseout) 
         .on("click", click)
@@ -134,13 +163,12 @@ function dataLoaded(data, pageNum) {
 
     // Set the appearance of the node to be a circle
     node.append("circle") 
-        .attr("r", 8);
+        .attr("r", nodeDefaultRadius);
 
     // Set the text appearing next to the node and other data the node stores
     node.append("text") 
         .attr("x", textDefaultXOffset) 
         .attr("dy", ".35em") 
-        .attr("page", function(d) { return d.id; })
         .style("fill", "#000000")
         .text(function(d) { return d.title; });
     
@@ -152,9 +180,14 @@ function dataLoaded(data, pageNum) {
     node.selectAll("text")
     .selectAll('tspan')
     .style("opacity", textDefaultOpacity);
-        
+    
     // Set the color of the nodes
     changePage(pageNum);
+    
+    // Make sure the display is set to the current scale and location
+    zoomListener.scale(zoomListener.scale());
+    zoomListener.translate(zoomListener.translate());
+    zoomListener.event(vis);
 }
 
 // Set the color of the nodes
@@ -212,10 +245,10 @@ function fillNode(d) {
 // Draws a directed link between nodes
 // d - a link object pulled from the svg
 function drawCurve(d) {
-    var dx = d.target.x - d.source.x,
-      dy = d.target.y - d.source.y,
-      dr = Math.sqrt(dx * dx + dy * dy);
-    return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
+    // M - move to position
+    // L - draw a line from current position to given position
+    // See svg path attribute for more information
+    return "M" + d.source.x + "," + d.source.y + "L" + d.target.x + "," + d.target.y;
 }
     
 ///////////////////////////////////////////////////////////////////////////////
@@ -226,6 +259,10 @@ function drawCurve(d) {
 function tick() { 
     link.attr("d", drawCurve);
     node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+    
+    // Update references to the node's position
+    node.attr("x", function(d) { return d.x; })
+        .attr("y", function(d) { return d.y; });
 }
 
 // Scales and pans the network as specified by the user
@@ -235,7 +272,7 @@ function redraw() {
       + " scale(" + d3.event.scale + ")");
 }
 
-// Centers a node on the display
+// Centers a node on the screen
 // source - an object containing a node svg object
 function centerNode(source) {
     scale = zoomListener.scale();
@@ -257,10 +294,13 @@ function centerNode(source) {
     zoomListener.scale(scale);
     zoomListener.translate([x2, y2]);
     zoomListener.event(vis);
-    zoomListener.center(null);
 }
 
 // Returns the position of the center of a node on the screen
+// x - the x-position of a node on the svg
+// y - the y-position of a node on the svg
+// translate - the transformation required to center the node on the svg
+// scale - the current scale of the svg
 function getScreenCoords(x, y, translate, scale) {
     var xn = translate[0] + x*scale;
     var yn = translate[1] + y*scale;
@@ -273,48 +313,40 @@ function getScreenCoords(x, y, translate, scale) {
 ///////////////////////////////////////////////////////////////////////////////
 
 // Calls Python to send the user to the section corresponding to the node clicked in the viewer
-function click() {
-    // Create references to the node's position
-    var thisNode = d3.select(this)
-        .attr("x", function(d) { return d.x; })
-        .attr("y", function(d) { return d.y; });
-        
+function click() {        
     centerNode(this);
     
-    // Remove the references to the nodes position so that it is updated properly
-    thisNode.attr("x", 0);
-    thisNode.attr("y", 0);
-    
     // Get the first page number of the section from the node that was clicked
-    pageNum = d3.select(this).select("text").attr("page");
+    pageNum = d3.select(this).attr("page");
     
     // Call the Python code to change pages
     container.change_page(pageNum);
 }
 
-function mouseover() { 
+function mouseover() {
+    var nodeRadius = 16;
     d3.select(this).select("text").transition()
-    .duration(750)
-    .selectAll('tspan').attr("x", 22)
-    .style("stroke-width", ".5px")
-    .style("opacity", 1)
-    .style("font", "17.5px serif");
+        .duration(750)
+        .selectAll('tspan').attr("x", 22)
+        .style("stroke-width", ".5px")
+        .style("opacity", 1)
+        .style("font", "17.5px serif");
     d3.select(this).select("circle").transition() 
-    .duration(750) 
-    .attr("r", 16); 
+        .duration(750) 
+        .attr("r", nodeRadius); 
 } 
 
 function mouseout() { 
     d3.select(this).select("circle").transition() 
-    .duration(750) 
-    .attr("r", 8); 
+        .duration(750) 
+        .attr("r", nodeDefaultRadius); 
     d3.select(this).select("text").transition()
-    .duration(750)
-    .selectAll('tspan').attr("x", textDefaultXOffset)
-    .style("stroke", "none")
-    .style("stroke", "none")
-    .style("opacity", textDefaultOpacity)
-    .style("font", "7px serif");
+        .duration(750)
+        .selectAll('tspan').attr("x", textDefaultXOffset)
+        .style("stroke", "none")
+        .style("stroke", "none")
+        .style("opacity", textDefaultOpacity)
+        .style("font", "7px serif");
 } 
 
 // action to take on mouse double click
