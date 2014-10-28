@@ -89,6 +89,7 @@ class EbookViewer(MainWindow):
                  start_in_fullscreen=False):
         MainWindow.__init__(self, debug_javascript)
         self.viewer_mode = self.ADVENTUROUS_MODE
+        self.page_behavior = None
         self.view.initialize_view(debug_javascript)
         self.view.magnification_changed.connect(self.magnification_changed)
         self.show_toc_on_open = False
@@ -740,7 +741,10 @@ class EbookViewer(MainWindow):
 
     def update_page_number(self):
         self.set_page_number(self.view.document.scroll_fraction)
-        return self.page_behavior.absolute_position
+        if (self.page_behavior is not None):
+            return self.page_behavior.absolute_position
+        else:
+            return self.pos.value()
 
     def close_progress_indicator(self):
         self.pi.stop()
@@ -885,7 +889,7 @@ class EbookViewer(MainWindow):
                 else:
                     if (self.viewer_mode == self.BASE_ADVENTUROUS_MODE):
                         self.page_behavior = BaseAdventurousBehavior(self.iterator.toc, self.iterator.spine, total_num_pages, title, pathtoebook, self.toc, self.setup_vscrollbar)
-                
+
             if isbytestring(pathtoebook):
                 pathtoebook = force_unicode(pathtoebook, filesystem_encoding)
             vh = vprefs.get('viewer_open_history', [])

@@ -6,7 +6,6 @@
 fill: none;
 stroke: #666;
 opacity: 0.6;
-stroke-width: 1.5px; 
 } 
 .node circle { 
 stroke: #fff; 
@@ -24,21 +23,24 @@ pointer-events: none;
 
 <script> 
 /*
- * images management
  * Copyright 2014 Emily Palmieri <silentfuzzle@gmail.com>
  * License: GNU GPL v3
  */
 
 //d3.json("eBookGraph.json", dataLoaded)
 
-var width = 500
-height = 500;
+var width = 500,
+    height = 500;
 
-var textDefaultXOffset = 12;
 var textDefaultOpacity = 0.6;
+var textOffset = 4;
 
 var nodeDefaultRadius = 8;
-var arrowOffset = 10;
+var nodeMaxRadius = 16;
+
+var straightLinks = true;
+var linkDefaultWidth = 1.5;
+var linkMaxWidth = 5;
     
 var vis;
 var force;
@@ -93,15 +95,14 @@ function dataLoaded(data, pageNum) {
             var y = nodeDictionary[n.id][1];
             n.x = x;
             n.y = y;
+            n.r = nodeDefaultRadius;
         });
     }
-        
-    // Set the links to point to node objects
-    links.forEach(function(link) {
-        link.source = nodes[link.source] || (nodes[link.source] = {name: link.source});
-        link.target = nodes[link.target] || (nodes[link.target] = {name: link.target});
-        link.value = +link.value;
-    });
+    else {
+        nodes.forEach(function(n) {
+            n.r = nodeDefaultRadius;
+        });
+    }
 
     // Set the type of network to display and its parameters
     force = d3.layout.force() 
@@ -118,16 +119,18 @@ function dataLoaded(data, pageNum) {
 
     // Reset the variables for displaying links as arrows
     // .append("path") - creates a triangle shape to place at the end of an arrow
+    // markerUnits - prevents the arrow from resizing with the stroke-width of a link
     svg.append("defs").selectAll("marker")
         .data(["suit"])
       .enter().append("marker")
         .attr("id", function(d) { return d; })
         .attr("viewBox", "0 -5 10 10")
-        .attr("refX", nodeDefaultRadius + arrowOffset)
+        .attr("refX", 10)
         .attr("refY", 0)
-        .attr("markerWidth", 6)
-        .attr("markerHeight", 6)
+        .attr("markerWidth", 10)
+        .attr("markerHeight", 10)
         .attr("orient", "auto")
+        .attr("markerUnits", "userSpaceOnUse")
       .append("path")
         .attr("d", "M0,-5L10,0L0,5");
     
@@ -141,11 +144,14 @@ function dataLoaded(data, pageNum) {
     // .attr("class", "link") - sets the .link css attributes to links
     link = vis.selectAll("path")
         .data(force.links())
-      .enter().append("path")
+      .enter().append("g")
         .attr("class", "link")
-        .attr("marker-end", "url(#suit)")
-        .style("stroke-width", function(d) { return Math.sqrt(d.value); });
+        .attr("marker-end", "url(#suit)");
     
+    // Make path attributes accessible for animation/modification
+    link.append("path")
+        .style("stroke-width", linkDefaultWidth + "px"); 
+        
     // Create an object that stores all the nodes added to the network
     // .attr("class", "node") - sets the .node circle attributes to node circles
     node = vis.selectAll(".node") 
@@ -163,11 +169,11 @@ function dataLoaded(data, pageNum) {
 
     // Set the appearance of the node to be a circle
     node.append("circle") 
-        .attr("r", nodeDefaultRadius);
+        .attr("r", function(d) { return d.r; });
 
     // Set the text appearing next to the node and other data the node stores
     node.append("text") 
-        .attr("x", textDefaultXOffset) 
+        .attr("x", nodeDefaultRadius + textOffset) 
         .attr("dy", ".35em") 
         .style("fill", "#000000")
         .text(function(d) { return d.title; });
@@ -205,33 +211,40 @@ function changePage(pageNum) {
 // text - the text attribute selected from all nodes
 // width - the maximum width of a label
 function wrap(text, width) {
-  text.each(function() {
-    var text = d3.select(this),
-        words = text.text().split(/\s+/).reverse(),
-        word,
-        line = [],
-        lineNumber = 0,
-        lineHeight = 1.1, // ems
-        y = 0,
-        x = textDefaultXOffset,
-        dy = parseFloat(text.attr("dy")),
-        tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
-    while (word = words.pop()) {
-      line.push(word);
-      tspan.text(line.join(" "));
-      if (tspan.node().getComputedTextLength() > width) {
-        line.pop();
-        tspan.text(line.join(" "));
-        line = [word];
-        lineNumber = lineNumber + 1;
-        tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", lineNumber * lineHeight + dy + "em").text(word);
-      }
-    }
-  });
+    text.each(function() {
+        var text = d3.select(this),
+            words = text.text().split(/\s+/).reverse(),
+            word,
+            line = [],
+            lineNumber = 0,
+            lineHeight = 1.1, // ems
+            y = 0,
+            x = nodeDefaultRadius + textOffset,
+            dy = parseFloat(text.attr("dy")),
+            tspan = text.text(null).append("tspan")
+                .attr("x", x)
+                .attr("y", y)
+                .attr("dy", dy + "em");
+        while (word = words.pop()) {
+            line.push(word);
+            tspan.text(line.join(" "));
+            if (tspan.node().getComputedTextLength() > width) {
+                line.pop();
+                tspan.text(line.join(" "));
+                line = [word];
+                lineNumber = lineNumber + 1;
+                tspan = text.append("tspan")
+                    .attr("x", x)
+                    .attr("y", y)
+                    .attr("dy", lineNumber * lineHeight + dy + "em")
+                    .text(word);
+            }
+        }
+    });
 }
 
 // Color a node in the network
-// d - a node object pulled from the svg
+// d - node data
 function fillNode(d) {
     if (d.id == currPage) { 
         // Color the node of the section the user is currently viewing a different color
@@ -242,13 +255,105 @@ function fillNode(d) {
     }
 }
 
+// Animates the growing of a node's radius
+// d - node data
+function growRadius(d) {
+    // Create a function that returns the radius at time t
+    var interpolation = d3.interpolateNumber(d.r, nodeMaxRadius);
+    
+    // Get the links associated with the node
+    var nodeLinks = getUpdateLinks(d.id);
+    
+    // Animate the node and its associated links
+    return function(t) {
+        d.r = interpolation(t);
+        nodeLinks.forEach(updateLinkPath);
+        
+        return d.r;
+    }
+}
+
+// Animates the shrinking of a node's radius
+// d - node data
+function shrinkRadius(d) {
+    // Create a function that returns the radius at time t
+    var interpolation = d3.interpolateNumber(d.r, nodeDefaultRadius);
+    
+    // Get the links associated with the node
+    var nodeLinks = getUpdateLinks(d.id);
+    
+    // Animate the node and its associated links
+    return function(t) {
+        d.r = interpolation(t);
+        nodeLinks.forEach(updateLinkPath);
+        
+        return d.r;
+    }
+}
+
+// Animate a link so that's end points remain at the edge of an animated node
+// link - a link sgv element
+function updateLinkPath(link) {
+    d3.select(link).select("path").attr("d", drawCurve);
+}
+
 // Draws a directed link between nodes
 // d - a link object pulled from the svg
 function drawCurve(d) {
-    // M - move to position
-    // L - draw a line from current position to given position
-    // See svg path attribute for more information
-    return "M" + d.source.x + "," + d.source.y + "L" + d.target.x + "," + d.target.y;
+    var sourceX = d.source.x;
+    var sourceY = d.source.y;
+    var targetX = d.target.x;
+    var targetY = d.target.y;
+    
+    var theta = Math.atan((targetX - sourceX) / (targetY - sourceY));
+    var phi = Math.atan((targetY - sourceY) / (targetX - sourceX));
+    
+    var sinTheta = d.source.r * Math.sin(theta);
+    var cosTheta = d.source.r * Math.cos(theta);
+    var sinPhi = d.target.r * Math.sin(phi);
+    var cosPhi = d.target.r * Math.cos(phi);
+    
+    // Set the position of the link's end point at the source node
+    // such that it is on the edge closest to the target node
+    if (d.target.y > d.source.y) {
+        sourceX = sourceX + sinTheta;
+        sourceY = sourceY + cosTheta;
+    }
+    else {
+        sourceX = sourceX - sinTheta;
+        sourceY = sourceY - cosTheta;
+    }
+    
+    // Set the position of the link's end point at the target node
+    // such that it is on the edge closest to the source node
+    if (d.source.x > d.target.x) {
+        targetX = targetX + cosPhi;
+        targetY = targetY + sinPhi;    
+    }
+    else {
+        targetX = targetX - cosPhi;
+        targetY = targetY - sinPhi;   
+    }
+    
+    if (straightLinks) {
+        // Draw a line between the two calculated points
+        // M - move to position
+        // L - draw a line from current position to end position
+        return "M" + sourceX + "," + sourceY + "L" + targetX + "," + targetY;
+    }
+    else {
+        // Draw an arc between the two calculated points
+        // M - move to position
+        // A - draw arc from current position to end position
+        //  about an ellipse with x- and y-radius (dr, dr)
+        //  rotated 0 radians relative to the current coordinate system
+        var dx = targetX - sourceX,
+            dy = targetY - sourceY,
+            dr = Math.sqrt(dx * dx + dy * dy);
+        return "M" + sourceX + "," + sourceY + 
+            "A" + dr + "," + dr + " 0 0,1 " + targetX + "," + targetY;
+    }
+    // See svg "path" attribute for more information
 }
     
 ///////////////////////////////////////////////////////////////////////////////
@@ -257,7 +362,7 @@ function drawCurve(d) {
 
 // Animates the force-directed network
 function tick() { 
-    link.attr("d", drawCurve);
+    link.select("path").attr("d", drawCurve);
     node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
     
     // Update references to the node's position
@@ -324,36 +429,71 @@ function click() {
 }
 
 function mouseover() {
-    var nodeRadius = 16;
+    d3.select(this).select("circle").transition() 
+        .duration(750) 
+        .attrTween("r", growRadius);
+        
     d3.select(this).select("text").transition()
         .duration(750)
-        .selectAll('tspan').attr("x", 22)
+        .selectAll('tspan').attr("x", nodeMaxRadius + textOffset)
+        .attr("y", 0.1)
         .style("stroke-width", ".5px")
         .style("opacity", 1)
         .style("font", "17.5px serif");
-    d3.select(this).select("circle").transition() 
-        .duration(750) 
-        .attr("r", nodeRadius); 
+        
+    // Emphasize links pointing away from the current node
+    var page = d3.select(this).attr("page");
+    var nodeLinks = getUpdateLinks(page);
+    nodeLinks.forEach(function(link) {
+        d3.select(link).select("path").transition()
+            .duration(750)
+            .style("stroke-width", linkMaxWidth + "px");
+    });
 } 
 
 function mouseout() { 
     d3.select(this).select("circle").transition() 
         .duration(750) 
-        .attr("r", nodeDefaultRadius); 
+        .attrTween("r", shrinkRadius);
+        
     d3.select(this).select("text").transition()
         .duration(750)
-        .selectAll('tspan').attr("x", textDefaultXOffset)
+        .selectAll('tspan').attr("x", nodeDefaultRadius + textOffset)
+        .attr("y", 0)
         .style("stroke", "none")
         .style("stroke", "none")
         .style("opacity", textDefaultOpacity)
         .style("font", "7px serif");
+        
+    // Demphasize links pointing away from the current node
+    var page = d3.select(this).attr("page");
+    var nodeLinks = getUpdateLinks(page);
+    nodeLinks.forEach(function(link) {
+        d3.select(link).select("path").transition()
+            .duration(750)
+            .style("stroke-width", linkDefaultWidth + "px");
+    });
 } 
 
 // action to take on mouse double click
 function dblclick() {
-    d3.select(this).select("circle").transition()
-    .duration(750)
-    .attr("r", 6);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//MISCELLANEOUS
+///////////////////////////////////////////////////////////////////////////////
+
+// Returns a list of link svg elements associated with a node with id page
+// page - the id of a node
+function getUpdateLinks(page) {
+    var nodeLinks = [];
+    link.each(function(d) {
+        if (d.source.id == page || d.target.id == page) {
+            nodeLinks.push(this);
+        }
+    });
+    
+    return nodeLinks;
 }
 
 </script>
