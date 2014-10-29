@@ -6,18 +6,32 @@
 fill: none;
 stroke: #666;
 opacity: 0.6;
-} 
+}
+
 .node circle { 
 stroke: #fff; 
 opacity: 0.6;
 stroke-width: 1.5px; 
-} 
+}
+
 text { 
-font: 7px serif; 
 opacity: 1;
 pointer-events: none; 
 }
+
+.btnText {
+font: 10px serif;
+opacity: 1;
+}
 </style> 
+
+<div id="controls">
+    <p>Position nodes: 
+        <button onclick="toggleZoomListener()"><text class="btnText">Off</text></button>
+    </p>
+</div>
+
+<div id="networkContainer"></div>
 
 <script src=d3.v3.min.js></script>
 
@@ -29,11 +43,17 @@ pointer-events: none;
 
 //d3.json("eBookGraph.json", dataLoaded)
 
+///////////////////////////////////////////////////////////////////////////////
+//LAYOUT AND BEHAVIOR VARIABLES
+///////////////////////////////////////////////////////////////////////////////
+
 var width = 500,
     height = 500;
 
 var textDefaultOpacity = 0.6;
 var textOffset = 4;
+var textDefaultSize = 7;
+var textMaxSize = 17.5;
 
 var nodeDefaultRadius = 8;
 var nodeMaxRadius = 16;
@@ -42,6 +62,10 @@ var straightLinks = true;
 var linkDefaultWidth = 1.5;
 var linkMaxWidth = 5;
     
+///////////////////////////////////////////////////////////////////////////////
+//SETUP
+///////////////////////////////////////////////////////////////////////////////
+
 var vis;
 var force;
 var currPage = -1;
@@ -49,7 +73,7 @@ var node = 0;
 var link;
   
 // Set the viewer window to fill the TOC panel
-var svg = d3.select("body")
+var svg = d3.select("div#networkContainer")
     .append("svg")
       .attr({
         "width": "100%",
@@ -59,10 +83,10 @@ var svg = d3.select("body")
       .attr("pointer-events", "all");
 
 // Controls the zoom and pan functions initiated by the user
+var zoomListening = true;
 var zoomListener = d3.behavior.zoom()
   .scaleExtent([0.1, 3])
   .on("zoom", redraw);
-zoomListener(svg);
 
 ///////////////////////////////////////////////////////////////////////////////
 //CALLED FROM PYTHON
@@ -82,11 +106,11 @@ function dataLoaded(data, pageNum) {
         
         // Save the current node positions in a dictionary
         node.each(function(d) {
-            pos = [];
-            pos[0] = d.x;
-            pos[1] = d.y;
-            var page = d.id;
-            nodeDictionary[page] = pos;
+            var nodeInfo = [];
+            nodeInfo[0] = d.x;
+            nodeInfo[1] = d.y;
+            nodeInfo[2] = d.fixed;
+            nodeDictionary[d.id] = nodeInfo;
         });
         
         // Set the initial node positions to the saved positions
@@ -96,11 +120,14 @@ function dataLoaded(data, pageNum) {
             n.x = x;
             n.y = y;
             n.r = nodeDefaultRadius;
+            n.fixed = nodeDictionary[n.id][2];
         });
     }
     else {
+        // Set the default value for nodes when the network is initialized for the first time
         nodes.forEach(function(n) {
             n.r = nodeDefaultRadius;
+            n.fixed = false;
         });
     }
 
@@ -164,8 +191,7 @@ function dataLoaded(data, pageNum) {
         .on("mouseover", mouseover) 
         .on("mouseout", mouseout) 
         .on("click", click)
-        .on("dblclick", dblclick)
-        .call(force.drag); 
+        .on("dblclick", dblclick); 
 
     // Set the appearance of the node to be a circle
     node.append("circle") 
@@ -180,12 +206,12 @@ function dataLoaded(data, pageNum) {
     
     // Wrap the text of long titles
     node.selectAll("text")
-      .call(wrap, 100);
+        .call(wrap, 100);
       
     // Set the opacity of wrapped text
     node.selectAll("text")
-    .selectAll('tspan')
-    .style("opacity", textDefaultOpacity);
+        .selectAll('tspan')
+        .style("opacity", textDefaultOpacity);
     
     // Set the color of the nodes
     changePage(pageNum);
@@ -194,6 +220,7 @@ function dataLoaded(data, pageNum) {
     zoomListener.scale(zoomListener.scale());
     zoomListener.translate(zoomListener.translate());
     zoomListener.event(vis);
+    setZoomListener();
 }
 
 // Set the color of the nodes
@@ -224,7 +251,8 @@ function wrap(text, width) {
             tspan = text.text(null).append("tspan")
                 .attr("x", x)
                 .attr("y", y)
-                .attr("dy", dy + "em");
+                .attr("dy", dy + "em")
+                .style("font", textDefaultSize + "px serif");
         while (word = words.pop()) {
             line.push(word);
             tspan.text(line.join(" "));
@@ -237,6 +265,7 @@ function wrap(text, width) {
                     .attr("x", x)
                     .attr("y", y)
                     .attr("dy", lineNumber * lineHeight + dy + "em")
+                    .style("font", textDefaultSize + "px serif")
                     .text(word);
             }
         }
@@ -418,14 +447,19 @@ function getScreenCoords(x, y, translate, scale) {
 ///////////////////////////////////////////////////////////////////////////////
 
 // Calls Python to send the user to the section corresponding to the node clicked in the viewer
-function click() {        
-    centerNode(this);
-    
-    // Get the first page number of the section from the node that was clicked
-    pageNum = d3.select(this).attr("page");
-    
-    // Call the Python code to change pages
-    container.change_page(pageNum);
+function click() {
+    if (zoomListening) {
+        centerNode(this);
+        
+        // Get the first page number of the section from the node that was clicked
+        pageNum = d3.select(this).attr("page");
+        
+        // Call the Python code to change pages
+        container.change_page(pageNum);
+    }
+    else {
+        d3.select(this).attr("fixed", function(d) { d.fixed = true; return d.fixed; });
+    }
 }
 
 function mouseover() {
@@ -437,9 +471,8 @@ function mouseover() {
         .duration(750)
         .selectAll('tspan').attr("x", nodeMaxRadius + textOffset)
         .attr("y", 0.1)
-        .style("stroke-width", ".5px")
         .style("opacity", 1)
-        .style("font", "17.5px serif");
+        .style("font", textMaxSize + "px serif");
         
     // Emphasize links pointing away from the current node
     var page = d3.select(this).attr("page");
@@ -460,10 +493,8 @@ function mouseout() {
         .duration(750)
         .selectAll('tspan').attr("x", nodeDefaultRadius + textOffset)
         .attr("y", 0)
-        .style("stroke", "none")
-        .style("stroke", "none")
         .style("opacity", textDefaultOpacity)
-        .style("font", "7px serif");
+        .style("font", textDefaultSize + "px serif");
         
     // Demphasize links pointing away from the current node
     var page = d3.select(this).attr("page");
@@ -477,6 +508,18 @@ function mouseout() {
 
 // action to take on mouse double click
 function dblclick() {
+    d3.select(this).attr("fixed", function(d) { d.fixed = false; return d.fixed; });
+}
+
+// Flips the control scheme between positioning nodes and navigating nodes
+function toggleZoomListener() {
+    if (zoomListening) {
+        zoomListening = false;
+    }
+    else {
+        zoomListening = true;
+    }
+    setZoomListener();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -494,6 +537,37 @@ function getUpdateLinks(page) {
     });
     
     return nodeLinks;
+}
+
+// Sets the controls scheme based on the selected mode
+function setZoomListener() {
+    if (zoomListening) {
+        addZoomListener();
+    }
+    else {
+        removeZoomListener();
+    }
+}
+
+// Sets the control scheme to positioning nodes
+function removeZoomListener() {
+    svg.on("mousedown.zoom", null);
+    svg.on("mousemove.zoom", null);
+    svg.on("dblclick.zoom", null);
+    svg.on("touchstart.zoom", null);
+    svg.on("wheel.zoom", null);
+    svg.on("mousewheel.zoom", null);
+    svg.on("MozMousePixelScroll.zoom", null);
+    node.call(force.drag);
+    d3.select("div#controls button").select("text").text("On");
+}
+
+// Sets the control scheme to navigating nodes
+function addZoomListener() {
+    node.on('mousedown.drag', null);
+    node.on('touchstart.drag', null);
+    zoomListener(svg);
+    d3.select("div#controls button").select("text").text("Off");
 }
 
 </script>
