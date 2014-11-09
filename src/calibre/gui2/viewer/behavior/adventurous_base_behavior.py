@@ -30,6 +30,7 @@ class BaseAdventurousBehavior (BaseBehavior):
         self.toc_view = toc_view
         self.ebook_network = EBookNetwork(spine, toc, title, pathtoebook)
         self.toc_view.load_network(self.ebook_network.data)
+        self.history_offset = 0
         
     # Sets the current section of the book the user is viewing
     # and the number of pages in that section
@@ -39,7 +40,8 @@ class BaseAdventurousBehavior (BaseBehavior):
         print ("AdventurousBase curr_sec set")
         super(BaseAdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
         self.num_pages = curr_sec.pages
-        self.toc_view.set_curr_page(curr_sec.start_page)
+        self.toc_view.set_curr_page(curr_sec.start_page, self.history_offset)
+        self.history_offset = 0
         
         # Only setup of the scrollbar and position label everytime if this object is an instance of this class
         if (type(self) is BaseAdventurousBehavior):

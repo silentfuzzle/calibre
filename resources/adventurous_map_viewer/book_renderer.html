@@ -4,7 +4,6 @@
  <style> 
 .link {
 fill: none;
-stroke: #666;
 opacity: 0.6;
 }
 
@@ -57,10 +56,14 @@ var textMaxSize = 17.5;
 
 var nodeDefaultRadius = 8;
 var nodeMaxRadius = 16;
+var nodeDefaultColor = "#3182bd";
+var nodeHighlightColor = "#555555";
 
 var straightLinks = true;
 var linkDefaultWidth = 1.5;
 var linkMaxWidth = 5;
+var linkDefaultColor = "#666";
+var linkHighlightColor = "red";
     
 ///////////////////////////////////////////////////////////////////////////////
 //SETUP
@@ -87,6 +90,9 @@ var zoomListening = true;
 var zoomListener = d3.behavior.zoom()
   .scaleExtent([0.1, 3])
   .on("zoom", redraw);
+
+  // Stores the history of positions the user has navigated to
+var history = new DoubleList();
 
 ///////////////////////////////////////////////////////////////////////////////
 //CALLED FROM PYTHON
@@ -136,8 +142,8 @@ function dataLoaded(data, pageNum) {
         .nodes(nodes) 
         .links(links) 
         .size([width, height]) 
-        .linkDistance(50) 
-        .charge(-100) 
+        .linkDistance(50)
+        .charge(-100)
         .on("tick", tick)
         .start();
         
@@ -214,7 +220,7 @@ function dataLoaded(data, pageNum) {
         .style("opacity", textDefaultOpacity);
     
     // Set the color of the nodes
-    changePage(pageNum);
+    changePage(pageNum, 0);
     
     // Make sure the display is set to the current scale and location
     zoomListener.scale(zoomListener.scale());
@@ -223,15 +229,34 @@ function dataLoaded(data, pageNum) {
     setZoomListener();
 }
 
-// Set the color of the nodes
+// Set the color of the nodes and links based on the user's history and position
 // pageNum (float) - the number of the first page of the section the user is currently viewing
-function changePage(pageNum) {
+// historyOffset (int) - An integer representing how the user navigated to the section
+//      0 - the user clicked a link in the e-book or a node in the network
+//      1 - the user navigated to the next section in their history
+//      -1 - the user navigated to the previous section in their history
+function changePage(pageNum, historyOffset) {
     currPage = pageNum;
+    
+    // Update the user's position in their history
+    var currNode = null;
+    if (historyOffset == 0) {
+        currNode = history.makeNode(pageNum);
+    }
+    else if (historyOffset == 1) {
+        currNode = history.nextNode();
+    }
+    else {
+        currNode = history.prevNode();
+    }
+    
+    // Color the links and nodes
+    colorHistory(currNode);
     node.select("circle").style("fill", fillNode);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//DRAW METHODS
+//DRAW NODE METHODS
 ///////////////////////////////////////////////////////////////////////////////
 
 // Wraps the text labeling each node
@@ -272,15 +297,15 @@ function wrap(text, width) {
     });
 }
 
-// Color a node in the network
+// Color a node in the network based on whether the user is currently viewing it
 // d - node data
 function fillNode(d) {
     if (d.id == currPage) { 
         // Color the node of the section the user is currently viewing a different color
-        return "#555555"; 
+        return nodeHighlightColor; 
     } 
     else { 
-        return "#3182bd"; 
+        return nodeDefaultColor; 
     }
 }
 
@@ -317,6 +342,53 @@ function shrinkRadius(d) {
         nodeLinks.forEach(updateLinkPath);
         
         return d.r;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//DRAW LINK METHODS
+///////////////////////////////////////////////////////////////////////////////
+
+// Highlights the most recent continuous path of links in the user's history
+// currNode - the user's current position in their history
+function colorHistory(currNode) {
+    // Find all possible links that could be highlighted
+    var endPoints = [];
+    var node = currNode;
+    while (node.prev != null) {
+        var linkInfo = { source: node.prev.pos, target: node.pos, linkSVG: null };
+        endPoints.push(linkInfo);
+        node = node.prev;
+    }
+    
+    // For each possible link, find it's SVG element
+    link.each(function(d) {
+        // Make sure all links start at their default color
+        d3.select(this).select("path").style("stroke", linkDefaultColor);
+        
+        // Save each possible link's SVG element
+        var i = 0;
+        var found = false;
+        while (i < endPoints.length && !found) {
+            if (d.source.id == endPoints[i].source && d.target.id == endPoints[i].target) {
+                endPoints[i].linkSVG = this;
+                found = true;
+            }
+            i++;
+        }
+    });
+    
+    // Determine if a link should be highlighted and highlight it if so
+    var e = 0;
+    var end = false;
+    while (e < endPoints.length && !end) {
+        if (endPoints[e].linkSVG != null) {
+            d3.select(endPoints[e].linkSVG).select("path").style("stroke", linkHighlightColor);
+        }
+        else {
+            end = true;
+        }
+        e++;
     }
 }
 
@@ -448,18 +520,21 @@ function getScreenCoords(x, y, translate, scale) {
 
 // Calls Python to send the user to the section corresponding to the node clicked in the viewer
 function click() {
-    if (zoomListening) {
-        centerNode(this);
-        
-        // Get the first page number of the section from the node that was clicked
-        pageNum = d3.select(this).attr("page");
-        
-        // Call the Python code to change pages
-        container.change_page(pageNum);
-    }
-    else {
+    if (!zoomListening) {
+        // Freeze node position
         d3.select(this).attr("fixed", function(d) { d.fixed = true; return d.fixed; });
     }
+    
+    // Disallow navigation if the user is dragging a node or panning the view
+    if (d3.event.defaultPrevented) return;
+    
+    centerNode(this);
+    
+    // Get the first page number of the section from the node that was clicked
+    pageNum = d3.select(this).attr("page");
+    
+    // Call the Python code to change pages
+    container.change_page(pageNum);
 }
 
 function mouseover() {
@@ -525,6 +600,41 @@ function toggleZoomListener() {
 ///////////////////////////////////////////////////////////////////////////////
 //MISCELLANEOUS
 ///////////////////////////////////////////////////////////////////////////////
+
+// Defines a Double-Linked List storage structure for storing the user's history
+function DoubleList() {
+    this.currNode = null;
+    
+    // Set the current position to the next position in history
+    this.nextNode = function() {
+        this.currNode = this.currNode.next;
+        return this.currNode;
+    };
+    
+    // Set the current position to the previous position in history
+    this.prevNode = function() {
+        this.currNode = this.currNode.prev;
+        return this.currNode;
+    };
+    
+    // Create a new position in history
+    this.makeNode = function(position) {
+            var node = { pos: position, next: null, prev: null };
+            this.addNode(node);
+            return node;
+        };
+        
+    // Add a new position in history, replacing the position after the current position
+    this.addNode = function(node) {
+            if (this.currNode != null) {
+                this.currNode.next = node;
+                node.prev = this.currNode;
+            }
+            
+            // If a current position doesn't exist, set it to the new position
+            this.currNode = node;
+        };
+}
 
 // Returns a list of link svg elements associated with a node with id page
 // page - the id of a node

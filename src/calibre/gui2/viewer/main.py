@@ -483,9 +483,9 @@ class EbookViewer(MainWindow):
 
     def back(self, x):
         pos = self.history.back(self.page_behavior.absolute_position)
-        print ("history back")
         
         if pos is not None:
+            self.page_behavior.history_offset = -1
             self.goto_page(pos)
 
     def goto_page_num(self):
@@ -493,9 +493,9 @@ class EbookViewer(MainWindow):
 
     def forward(self, x):
         pos = self.history.forward(self.page_behavior.absolute_position)
-        print ("history forward")
         
         if pos is not None:
+            self.page_behavior.history_offset = 1
             self.goto_page(pos)
 
     def goto_start(self):

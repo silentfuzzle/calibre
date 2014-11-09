@@ -53,11 +53,15 @@ class TOCNetworkView (QWebView):
         
     # Update the network to show the user's new position
     # page (float) - the first page of the section the user is viewing
-    def set_curr_page(self, page):
+    # history_offset (int) - An integer representing how the user navigated to the section
+    #      0 - the user clicked a link in the e-book or a node in the network
+    #      1 - the user navigated to the next section in their history
+    #      -1 - the user navigated to the previous section in their history
+    def set_curr_page(self, page, history_offset):
         self.curr_page = page
         if (self.loaded): 
-            jScript = """changePage({page}); """
-            jScriptFormat = jScript.format(page=page)
+            jScript = """changePage({page}, {offset}); """
+            jScriptFormat = jScript.format(page=page, offset=history_offset)
             self.page().mainFrame().evaluateJavaScript(jScriptFormat)
         
     # Sets the pointer to the EbookViewer object
