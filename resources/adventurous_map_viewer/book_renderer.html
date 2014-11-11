@@ -4,12 +4,23 @@
  <style> 
 .link {
 fill: none;
-opacity: 0.6;
+opacity: 0.3;
+}
+
+/* Arrows inherit opacity from .link style */
+/* Default style of link arrows */
+#default {
+fill: #666;
+}
+
+/* Highlight style of link arrows */
+#highlight {
+fill: red;
 }
 
 .node circle { 
 stroke: #fff; 
-opacity: 0.6;
+opacity: 0.3;
 stroke-width: 1.5px; 
 }
 
@@ -60,6 +71,7 @@ var nodeDefaultColor = "#3182bd";
 var nodeHighlightColor = "#555555";
 
 var straightLinks = true;
+var staticArrows = true;
 var linkDefaultWidth = 1.5;
 var linkMaxWidth = 5;
 var linkDefaultColor = "#666";
@@ -151,10 +163,8 @@ function dataLoaded(data, pageNum) {
     d3.selectAll("svg > *").remove();
 
     // Reset the variables for displaying links as arrows
-    // .append("path") - creates a triangle shape to place at the end of an arrow
-    // markerUnits - prevents the arrow from resizing with the stroke-width of a link
-    svg.append("defs").selectAll("marker")
-        .data(["suit"])
+    var defs = svg.append("defs").selectAll("marker")
+        .data(["default", "highlight"])
       .enter().append("marker")
         .attr("id", function(d) { return d; })
         .attr("viewBox", "0 -5 10 10")
@@ -162,9 +172,15 @@ function dataLoaded(data, pageNum) {
         .attr("refY", 0)
         .attr("markerWidth", 10)
         .attr("markerHeight", 10)
-        .attr("orient", "auto")
-        .attr("markerUnits", "userSpaceOnUse")
-      .append("path")
+        .attr("orient", "auto");
+    
+    if (staticArrows) {
+        // Prevents the arrow from resizing with the stroke-width of a link
+        defs.attr("markerUnits", "userSpaceOnUse");
+    }
+    
+    // Creates a triangle shape to place at the end of a link
+    defs.append("path")
         .attr("d", "M0,-5L10,0L0,5");
     
     // This group contains all elements of the network
@@ -179,7 +195,7 @@ function dataLoaded(data, pageNum) {
         .data(force.links())
       .enter().append("g")
         .attr("class", "link")
-        .attr("marker-end", "url(#suit)");
+        .attr("marker-end", "url(#default)");
     
     // Make path attributes accessible for animation/modification
     link.append("path")
@@ -365,6 +381,7 @@ function colorHistory(currNode) {
     link.each(function(d) {
         // Make sure all links start at their default color
         d3.select(this).select("path").style("stroke", linkDefaultColor);
+        d3.select(this).attr("marker-end", "url(#default)");
         
         // Save each possible link's SVG element
         var i = 0;
@@ -383,7 +400,9 @@ function colorHistory(currNode) {
     var end = false;
     while (e < endPoints.length && !end) {
         if (endPoints[e].linkSVG != null) {
-            d3.select(endPoints[e].linkSVG).select("path").style("stroke", linkHighlightColor);
+            var linkSVG = d3.select(endPoints[e].linkSVG);
+            linkSVG.select("path").style("stroke", linkHighlightColor);
+            linkSVG.attr("marker-end", "url(#highlight)");
         }
         else {
             end = true;
