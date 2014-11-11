@@ -51,7 +51,11 @@ class BaseAdventurousBehavior (BaseBehavior):
     # Returns whether the user can move from the current section to the passed section
     # next_sec (string) - the section to check
     def allow_page_turn(self, next_sec):
-        print ("allow_page_turn")
+        if (self.curr_sec is None):
+            # The book doesn't have a bookmark with the user's last position
+            # Allow returning to the beginning of the book 
+            return True
+        
         return False
 
     # Returns the user's position relative to the current section

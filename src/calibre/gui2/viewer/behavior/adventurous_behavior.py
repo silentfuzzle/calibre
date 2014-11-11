@@ -55,6 +55,11 @@ class AdventurousBehavior (BaseAdventurousBehavior):
     # True if the passed section is in the group of sections the user can view
     # next_sec (string) - the section to check
     def allow_page_turn(self, next_sec):
+        if (self.curr_sec is None):
+            # The book doesn't have a bookmark with the user's last position
+            # Allow returning to the beginning of the book 
+            return True
+            
         if (self.curr_sec != next_sec):
             if (next_sec in self.include_sections):
                 next_index = self.spine.index(next_sec)
