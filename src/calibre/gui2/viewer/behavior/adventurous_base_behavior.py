@@ -37,13 +37,13 @@ class BaseAdventurousBehavior (BaseBehavior):
     # curr_index (integer) - the index of the current section in the spine
     # curr_sec (SpineItem) - the current section being displayed
     def set_curr_sec(self, curr_index, curr_sec):
-        print ("AdventurousBase curr_sec set")
-        super(BaseAdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
-        self.num_pages = curr_sec.pages
-        self.toc_view.set_curr_page(curr_sec.start_page, self.history_offset)
-        self.history_offset = 0
+        if (self.curr_sec != curr_sec):
+            super(BaseAdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
+            self.num_pages = curr_sec.pages
+            self.toc_view.set_curr_page(curr_sec.start_page, self.history_offset)
+            self.history_offset = 0
         
-        # Only setup of the scrollbar and position label everytime if this object is an instance of this class
+        # Only setup the scrollbar and position label if this object is an instance of this class
         if (type(self) is BaseAdventurousBehavior):
             print ("BaseAdventurous set scrollbar")
             self.setup_vscrollbar_method()

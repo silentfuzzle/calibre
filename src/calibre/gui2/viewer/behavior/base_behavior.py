@@ -14,6 +14,7 @@ class BaseBehavior (object):
     def __init__(self, number_of_pages):
         self.absolute_position = 1.
         self.num_pages = number_of_pages
+        self.curr_sec = None
 
     # Returns the page number to display in the upper left
     # Sets the new absolute position in the book

@@ -30,26 +30,28 @@ class TOCNetworkView (QWebView):
         path = str(path)
         load_html(path, self, codec=getattr(path, 'encoding', 'utf-8'), mime_type=getattr(path,
         'mime_type', 'text/html'))
-        self.loaded = False;
+        self.loaded = False
+        self.toc_created = False
         
     # Displays the network when the Javascript code has finished loading
     def load_finished(self):
-        self.loaded = True;
+        self.loaded = True
         self.page().mainFrame().addToJavaScriptWindowObject("container", self)
-        self.create_toc_network()
+        if (self.curr_page != -1 and self.toc_created == False):
+            self.create_toc_network()
             
-    # Adds a new edge to the displayed network
+    # Stores a new edge to add to the network
     # newJSON (string) - the data defining the edges and nodes in the network
     def add_edge(self, newJSON):
         self.jsonCode = newJSON
-        if (self.loaded):
-            self.create_toc_network()
+        self.toc_created = False
         
-    # Update the network with the the current stored json code
+    # Update the network with the the current stored json code and page number
     def create_toc_network(self):
         jScript = """dataLoaded({jsonCode}, {page}); """
         jScriptFormat = jScript.format(jsonCode=str(self.jsonCode), page=self.curr_page)
         self.page().mainFrame().evaluateJavaScript(jScriptFormat)
+        self.toc_created = True
         
     # Update the network to show the user's new position
     # page (float) - the first page of the section the user is viewing
@@ -59,10 +61,16 @@ class TOCNetworkView (QWebView):
     #      -1 - the user navigated to the previous section in their history
     def set_curr_page(self, page, history_offset):
         self.curr_page = page
-        if (self.loaded): 
-            jScript = """changePage({page}, {offset}); """
-            jScriptFormat = jScript.format(page=page, offset=history_offset)
-            self.page().mainFrame().evaluateJavaScript(jScriptFormat)
+        if (self.loaded):
+            if (self.toc_created):
+                # The network doesn't need to be reloaded, change the page
+                jScript = """changePage({page}, {offset}); """
+                jScriptFormat = jScript.format(page=page, offset=history_offset)
+                self.page().mainFrame().evaluateJavaScript(jScriptFormat)
+            else:
+                # The user clicked a link or the Javascript finished
+                # loading before this method was called, reload the network data
+                self.create_toc_network()
         
     # Sets the pointer to the EbookViewer object
     # manager (EbookViewer) - the class controlling the ebook viewer interface
