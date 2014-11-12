@@ -56,19 +56,29 @@ var textOffset = 4;
 var textDefaultSize = 7;
 var textMaxSize = 17.5;
 
+var growthFactor = 2;
+
 var nodeDefaultRadius = 8;
-var nodeMaxRadius = 16;
+var nodeMaxRadius = nodeDefaultRadius * growthFactor;
 var nodeDefaultColor = "#3182bd";
 var nodeHighlightColor = "#555555";
 
-var straightLinks = true;
-var staticArrows = true;
+var straightLinks = false;
 var maxHighlightLinks = 5;
-
 var linkDefaultWidth = 1.5;
-var linkMaxWidth = 5;
+var linkMaxWidth = linkDefaultWidth * growthFactor;
 var linkDefaultColor = "#666";
 var linkHighlightColor = "red";
+
+var staticArrows = false;
+var markerSize = 4;
+if (staticArrows) {
+    markerSize = linkDefaultWidth * 6;
+}
+var markerOffset = -0.1;
+if (straightLinks) {
+    markerOffset = 0;
+}
     
 ///////////////////////////////////////////////////////////////////////////////
 //SETUP
@@ -161,11 +171,11 @@ function dataLoaded(data, pageNum) {
         .data(["default", "highlight"])
       .enter().append("marker")
         .attr("id", function(d) { return d; })
-        .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 10)
-        .attr("refY", 0)
-        .attr("markerWidth", 10)
-        .attr("markerHeight", 10)
+        .attr("viewBox", "0 -1 2 2")
+        .attr("refX", 2)
+        .attr("refY", markerOffset)
+        .attr("markerWidth", markerSize)
+        .attr("markerHeight", markerSize)
         .attr("orient", "auto");
     
     if (staticArrows) {
@@ -175,7 +185,7 @@ function dataLoaded(data, pageNum) {
     
     // Creates a triangle shape to place at the end of a link
     defs.append("path")
-        .attr("d", "M0,-5L10,0L0,5");
+        .attr("d", "M0,-1L2,0L0,1");
     
     // This group contains all elements of the network
     // Allows users to zoom and pan by manipulating the svg
