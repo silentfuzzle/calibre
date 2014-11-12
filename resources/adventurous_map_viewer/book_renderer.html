@@ -49,7 +49,9 @@ pointer-events: none;
 var width = 500,
     height = 500;
 
-var textDefaultOpacity = 0.6;
+var textDefaultOpacity = 0;
+var textVisibleOpacity = 0.6;
+var textHighlightOpacity = 1;
 var textOffset = 4;
 var textDefaultSize = 7;
 var textMaxSize = 17.5;
@@ -61,6 +63,8 @@ var nodeHighlightColor = "#555555";
 
 var straightLinks = true;
 var staticArrows = true;
+var maxHighlightLinks = 5;
+
 var linkDefaultWidth = 1.5;
 var linkMaxWidth = 5;
 var linkDefaultColor = "#666";
@@ -72,7 +76,6 @@ var linkHighlightColor = "red";
 
 var vis;
 var force;
-var currPage = -1;
 var node = 0;
 var link;
   
@@ -128,6 +131,7 @@ function dataLoaded(data, pageNum) {
             n.y = y;
             n.r = nodeDefaultRadius;
             n.fixed = nodeDictionary[n.id][2];
+            n.topacity = textDefaultOpacity;
         });
     }
     else {
@@ -135,6 +139,7 @@ function dataLoaded(data, pageNum) {
         nodes.forEach(function(n) {
             n.r = nodeDefaultRadius;
             n.fixed = false;
+            n.topacity = textDefaultOpacity;
         });
     }
 
@@ -186,6 +191,7 @@ function dataLoaded(data, pageNum) {
         .attr("class", "link")
         .attr("marker-end", "url(#default)")
         .attr("tpage", function(d) { return d.target.id; })
+        .attr("spage", function(d) { return d.source.id; })
         .attr("tx", function(d) { return d.target.x; })
         .attr("ty", function(d) { return d.target.y; })
         .on("mouseover", mouseoverLink)
@@ -222,11 +228,6 @@ function dataLoaded(data, pageNum) {
     // Wrap the text of long titles
     node.selectAll("text")
         .call(wrap, 100);
-      
-    // Set the opacity of wrapped text
-    node.selectAll("text")
-        .selectAll('tspan')
-        .style("opacity", textDefaultOpacity);
     
     // Set the color of the nodes
     changePage(pageNum, 0);
@@ -245,8 +246,6 @@ function dataLoaded(data, pageNum) {
 //      1 - the user navigated to the next section in their history
 //      -1 - the user navigated to the previous section in their history
 function changePage(pageNum, historyOffset) {
-    currPage = pageNum;
-    
     // Update the user's position in their history
     var currNode = null;
     if (historyOffset == 0) {
@@ -259,13 +258,18 @@ function changePage(pageNum, historyOffset) {
         currNode = history.prevNode();
     }
     
+    // Make sure the text of each node is set to the default opacity before coloring
+    node.each(function(n) {
+        n.topacity = textDefaultOpacity;
+    });
+    
     // Color the links and nodes
     colorHistory(currNode);
-    node.select("circle").style("fill", fillNode);
+    colorNodes(pageNum);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//DRAW NODE METHODS
+//DRAW TEXT METHODS
 ///////////////////////////////////////////////////////////////////////////////
 
 // Wraps the text labeling each node
@@ -306,16 +310,83 @@ function wrap(text, width) {
     });
 }
 
-// Color a node in the network based on whether the user is currently viewing it
-// d - node data
-function fillNode(d) {
-    if (d.id == currPage) { 
-        // Color the node of the section the user is currently viewing a different color
-        return nodeHighlightColor; 
-    } 
-    else { 
-        return nodeDefaultColor; 
+// Animates the size and visibility of the text of a node
+// nodeSVG - the node's SVG element
+// growing - true if the node and text are growing to their maximum size
+// visible - true if the node's text should be forced visible
+function animateText(nodeSVG, growing, visible) {
+    // Set the text parameters based on the desired animation
+    var xOffset = textOffset;
+    var textSize = textDefaultSize;
+    var textOpacity = textDefaultOpacity;
+    if (growing) {
+        // The text should grow in size and be fully opaque
+        xOffset += nodeMaxRadius;
+        textSize = textMaxSize;
+        textOpacity = textHighlightOpacity;
     }
+    else {
+        xOffset += nodeDefaultRadius;
+        if (visible) {
+            // Force the text to be visible
+            textOpacity = textVisibleOpacity;
+        }
+    }
+    
+    // Start the animation
+    d3.select(nodeSVG).select("text").transition()
+        .duration(750)
+        .selectAll('tspan').attr("x", xOffset)
+        .attr("y", 0.1)
+        .style("opacity", function(d) { 
+                if (visible || growing) { 
+                    return textOpacity; 
+                }
+                else {
+                    return d.topacity;
+                } 
+            })
+        .style("font", textSize + "px serif");
+}
+
+// Makes the text of a node visible 
+// nodeSVG - the node's SVG element
+function setTextVisible(nodeSVG) {
+    animateText(nodeSVG, false, true);
+}
+
+// Sets the text of a node back to its default size and opacity
+// nodeSVG - the node's SVG element
+function setTextDefault(nodeSVG) {
+    animateText(nodeSVG, false, false);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//DRAW NODE METHODS
+///////////////////////////////////////////////////////////////////////////////
+
+// Color and set the opacities of the network nodes based on the user's position and history
+// currPage - The first page of the section the user is viewing
+function colorNodes(currPage) {
+    node.each(function(n) {
+        if (n.id == currPage) {
+            d3.select(this).select("circle").style("fill", nodeHighlightColor);
+            
+            // Set the text of all connected nodes to visible
+            var nodeLinks = getUpdateLinks(n.id);
+            nodeLinks.forEach(function(l) {
+                setEndpointTextOpacity(d3.select(l));
+            });
+        } 
+        else {
+            d3.select(this).select("circle").style("fill", nodeDefaultColor);
+        }
+    });
+    
+    // Apply the set opacities to the nodes' text
+    node.selectAll("text")
+        .selectAll('tspan')
+        .style("opacity", function(d) { return d.topacity; });
 }
 
 // Grows the radius of a node to its maximum size and repositions its title
@@ -324,13 +395,8 @@ function growRadiusWrapper(nodeSVG) {
     d3.select(nodeSVG).select("circle").transition() 
         .duration(750) 
         .attrTween("r", growRadius);
-         
-    d3.select(nodeSVG).select("text").transition()
-        .duration(750)
-        .selectAll('tspan').attr("x", nodeMaxRadius + textOffset)
-        .attr("y", 0.1)
-        .style("opacity", 1)
-        .style("font", textMaxSize + "px serif");
+    
+    animateText(nodeSVG, true, false);
 }
 
 // Animates the growing of a node's radius
@@ -357,13 +423,8 @@ function shrinkRadiusWrapper(nodeSVG) {
     d3.select(nodeSVG).select("circle").transition() 
         .duration(750) 
         .attrTween("r", shrinkRadius);
-        
-    d3.select(nodeSVG).select("text").transition()
-        .duration(750)
-        .selectAll('tspan').attr("x", nodeDefaultRadius + textOffset)
-        .attr("y", 0)
-        .style("opacity", textDefaultOpacity)
-        .style("font", textDefaultSize + "px serif");
+    
+    setTextDefault(nodeSVG);
 }
 
 // Animates the shrinking of a node's radius
@@ -421,17 +482,30 @@ function colorHistory(currNode) {
     // Determine if a link should be highlighted and highlight it if so
     var e = 0;
     var end = false;
-    while (e < endPoints.length && !end) {
+    var numHighlighted = 0;
+    while (e < endPoints.length && !end && numHighlighted < maxHighlightLinks) {
         if (endPoints[e].linkSVG != null) {
             var linkSVG = d3.select(endPoints[e].linkSVG);
             linkSVG.select("path").style("stroke", linkHighlightColor);
             linkSVG.attr("marker-end", "url(#highlight)");
+            setEndpointTextOpacity(linkSVG);
+            numHighlighted++;
         }
         else {
             end = true;
         }
         e++;
     }
+}
+
+// Set the text of the nodes associated with a link to visible
+// linkSVG - the link's SVG element
+function setEndpointTextOpacity(linkSVG) {
+    linkSVG.attr("topacity", function(d) { 
+        d.target.topacity = textVisibleOpacity;
+        d.source.topacity = textVisibleOpacity;
+        return textVisibleOpacity;
+    });
 }
 
 // Grows the width of a link's stroke to its maximum size
@@ -516,6 +590,75 @@ function drawCurve(d) {
 }
     
 ///////////////////////////////////////////////////////////////////////////////
+//ANIMATION METHODS
+///////////////////////////////////////////////////////////////////////////////
+
+// When the user hovers the mouse over a node, this method animates associated elements
+// nodeSVG - the SVG element of the hovered node
+// strokeMethod - a method to apply to each associated link
+// textMethod - a method to apply to each associated node
+function animateConnections(nodeSVG, strokeMethod, textMethod) {
+    var page = d3.select(nodeSVG).attr("page");
+    var connectedNodes = [];
+    
+    // Emphasize the links connected to this node
+    var nodeLinks = getUpdateLinks(page);
+    nodeLinks.forEach(function(link) {
+        var tpage = d3.select(link).attr("tpage");
+        
+        // Save the nodes connected to this node
+        if (tpage != page) {
+            connectedNodes.push(tpage);
+        }
+        else {
+            var spage = d3.select(link).attr("spage");
+            connectedNodes.push(spage);
+        }
+        
+        strokeMethod(link);
+    });
+    
+    // Emphasize the nodes connected to this node
+    node.each(function(n) {
+        var npage = d3.select(this).attr("page");
+    
+        var i = 0;
+        var found = false;
+        while (i < connectedNodes.length && !found) {
+            if (npage == connectedNodes[i]) {
+                textMethod(this);
+                found = true;
+            }
+            else {
+                i++;
+            }
+        }
+        
+        // Remove the nodes in the list as they are found
+        if (found) {
+            connectedNodes.splice(i,1);
+        }
+    });
+}
+
+// When the user hovers the mouse over a link, this method animates the source and target node
+// linkSVG - the SVG element of the hovered link
+// radiusMethod - a method to apply to the link's target
+// textMethod - a method to apply to the link's source
+function animateSourceAndTarget(linkSVG, radiusMethod, textMethod) {
+    var tpage = d3.select(linkSVG).attr("tpage");
+    var spage = d3.select(linkSVG).attr("spage");
+    node.each(function(d) {
+        if (d.id == tpage) {
+            radiusMethod(this);
+        }
+        else if (d.id == spage) {
+            textMethod(this);
+        }
+    });
+}
+
+///////////////////////////////////////////////////////////////////////////////
 //POSITION METHODS
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -599,13 +742,8 @@ function mouseoverNode() {
     setZoomListener();
     
     growRadiusWrapper(this);
-        
-    var page = d3.select(this).attr("page");
-    var nodeLinks = getUpdateLinks(page);
-    nodeLinks.forEach(function(link) {
-        growStroke(link);
-    });
-} 
+    animateConnections(this, growStroke, setTextVisible);
+}
 
 // Deemphasize a node and its associated links on mouse out
 function mouseoutNode() {
@@ -614,12 +752,7 @@ function mouseoutNode() {
     setZoomListener();
     
     shrinkRadiusWrapper(this);
-        
-    var page = d3.select(this).attr("page");
-    var nodeLinks = getUpdateLinks(page);
-    nodeLinks.forEach(function(link) {
-        shrinkStroke(link);
-    });
+    animateConnections(this, shrinkStroke, setTextDefault);
 } 
 
 // Unfix a node's position on mouse double click
@@ -641,26 +774,14 @@ function clickLink() {
 // Emphasize a link and its target node on mouse hover
 function mouseoverLink() {
     growStroke(this);
-    
-    var page = d3.select(this).attr("tpage");
-    node.each(function(d) {
-        if (d.id == page) {
-            growRadiusWrapper(this);
-        }
-    });
+    animateSourceAndTarget(this, growRadiusWrapper, setTextVisible);
 }
 
 // Deemphasize a link and its target node on mouse out
 function mouseoutLink() {
     shrinkStroke(this);
-    
-    var page = d3.select(this).attr("tpage");
-    node.each(function(d) {
-        if (d.id == page) {
-            shrinkRadiusWrapper(this);
-        }
-    });
-} 
+    animateSourceAndTarget(this, shrinkRadiusWrapper, setTextDefault);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 //CONTROL SCHEME
