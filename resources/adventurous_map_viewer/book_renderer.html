@@ -2,6 +2,7 @@
   <meta charset="utf-8">
   <body> 
  <style> 
+
 .link {
 fill: none;
 opacity: 0.3;
@@ -29,19 +30,7 @@ opacity: 1;
 pointer-events: none; 
 }
 
-.btnText {
-font: 10px serif;
-opacity: 1;
-}
-</style> 
-
-<div id="controls">
-    <p>Position nodes: 
-        <button onclick="toggleZoomListener()"><text class="btnText">Off</text></button>
-    </p>
-</div>
-
-<div id="networkContainer"></div>
+</style>
 
 <script src=d3.v3.min.js></script>
 
@@ -88,7 +77,7 @@ var node = 0;
 var link;
   
 // Set the viewer window to fill the TOC panel
-var svg = d3.select("div#networkContainer")
+var svg = d3.select("body")
     .append("svg")
       .attr({
         "width": "100%",
@@ -103,7 +92,7 @@ var zoomListener = d3.behavior.zoom()
   .scaleExtent([0.1, 3])
   .on("zoom", redraw);
 
-  // Stores the history of positions the user has navigated to
+// Stores the history of positions the user has navigated to
 var history = new DoubleList();
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -195,7 +184,13 @@ function dataLoaded(data, pageNum) {
         .data(force.links())
       .enter().append("g")
         .attr("class", "link")
-        .attr("marker-end", "url(#default)");
+        .attr("marker-end", "url(#default)")
+        .attr("tpage", function(d) { return d.target.id; })
+        .attr("tx", function(d) { return d.target.x; })
+        .attr("ty", function(d) { return d.target.y; })
+        .on("mouseover", mouseoverLink)
+        .on("mouseout", mouseoutLink)
+        .on("click", clickLink);
     
     // Make path attributes accessible for animation/modification
     link.append("path")
@@ -208,11 +203,9 @@ function dataLoaded(data, pageNum) {
       .enter().append("g") 
         .attr("class", "node") 
         .attr("page", function(d) { return d.id; })
-        .attr("x", function(d) { return d.x; })
-        .attr("y", function(d) { return d.y; })
-        .on("mouseover", mouseover) 
-        .on("mouseout", mouseout) 
-        .on("click", click)
+        .on("mouseover", mouseoverNode) 
+        .on("mouseout", mouseoutNode) 
+        .on("click", clickNode)
         .on("dblclick", dblclick); 
 
     // Set the appearance of the node to be a circle
@@ -325,6 +318,21 @@ function fillNode(d) {
     }
 }
 
+// Grows the radius of a node to its maximum size and repositions its title
+// nodeSVG - the node's SVG element
+function growRadiusWrapper(nodeSVG) {
+    d3.select(nodeSVG).select("circle").transition() 
+        .duration(750) 
+        .attrTween("r", growRadius);
+         
+    d3.select(nodeSVG).select("text").transition()
+        .duration(750)
+        .selectAll('tspan').attr("x", nodeMaxRadius + textOffset)
+        .attr("y", 0.1)
+        .style("opacity", 1)
+        .style("font", textMaxSize + "px serif");
+}
+
 // Animates the growing of a node's radius
 // d - node data
 function growRadius(d) {
@@ -341,6 +349,21 @@ function growRadius(d) {
         
         return d.r;
     }
+}
+
+// Returns the radius of a node and its title's position to their default values
+// nodeSVG - the node's SVG element
+function shrinkRadiusWrapper(nodeSVG) {
+    d3.select(nodeSVG).select("circle").transition() 
+        .duration(750) 
+        .attrTween("r", shrinkRadius);
+        
+    d3.select(nodeSVG).select("text").transition()
+        .duration(750)
+        .selectAll('tspan').attr("x", nodeDefaultRadius + textOffset)
+        .attr("y", 0)
+        .style("opacity", textDefaultOpacity)
+        .style("font", textDefaultSize + "px serif");
 }
 
 // Animates the shrinking of a node's radius
@@ -409,6 +432,22 @@ function colorHistory(currNode) {
         }
         e++;
     }
+}
+
+// Grows the width of a link's stroke to its maximum size
+// linkSVG - the link's SVG element
+function growStroke(linkSVG) {
+    d3.select(linkSVG).select("path").transition()
+        .duration(750)
+        .style("stroke-width", linkMaxWidth + "px");
+}
+
+// Shrinks the width of a link's stroke to its default size
+// linkSVG - the link's SVG element
+function shrinkStroke(linkSVG) {
+    d3.select(linkSVG).select("path").transition()
+        .duration(750)
+        .style("stroke-width", linkDefaultWidth + "px");
 }
 
 // Animate a link so that's end points remain at the edge of an animated node
@@ -486,8 +525,8 @@ function tick() {
     node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
     
     // Update references to the node's position
-    node.attr("x", function(d) { return d.x; })
-        .attr("y", function(d) { return d.y; });
+    link.attr("tx", function(d) { return d.target.x; })
+        .attr("ty", function(d) { return d.target.y; });
 }
 
 // Scales and pans the network as specified by the user
@@ -498,11 +537,10 @@ function redraw() {
 }
 
 // Centers a node on the screen
-// source - an object containing a node svg object
-function centerNode(source) {
+// x1 - the x-position stored in the node's data
+// y1 - the y-position stored in the node's data
+function centerNode(x1, y1) {
     scale = zoomListener.scale();
-    x1 = d3.select(source).attr("x");
-    y1 = d3.select(source).attr("y");
     
     // Center the node at 0 on the svg
     x2 = (width / 2 - x1);
@@ -534,20 +572,18 @@ function getScreenCoords(x, y, translate, scale) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//EVENTS
+//NODE EVENT LISTENERS
 ///////////////////////////////////////////////////////////////////////////////
 
-// Calls Python to send the user to the section corresponding to the node clicked in the viewer
-function click() {
-    if (!zoomListening) {
-        // Freeze node position
+// Calls Python to send the user to the section corresponding to a clicked node
+function clickNode() {    
+    if (d3.event.defaultPrevented) {
+        // Freeze the node position if the user is dragging a node
         d3.select(this).attr("fixed", function(d) { d.fixed = true; return d.fixed; });
+        
+        // Disallow navigation if the user is dragging a node or panning the view
+        return;
     }
-    
-    // Disallow navigation if the user is dragging a node or panning the view
-    if (d3.event.defaultPrevented) return;
-    
-    centerNode(this);
     
     // Get the first page number of the section from the node that was clicked
     pageNum = d3.select(this).attr("page");
@@ -556,64 +592,109 @@ function click() {
     container.change_page(pageNum);
 }
 
-function mouseover() {
-    d3.select(this).select("circle").transition() 
-        .duration(750) 
-        .attrTween("r", growRadius);
+// Emphasize a node and its associated links on mouse hover
+function mouseoverNode() {
+    // Allow user to reposition the node on mouse drag
+    zoomListening = false;
+    setZoomListener();
+    
+    growRadiusWrapper(this);
         
-    d3.select(this).select("text").transition()
-        .duration(750)
-        .selectAll('tspan').attr("x", nodeMaxRadius + textOffset)
-        .attr("y", 0.1)
-        .style("opacity", 1)
-        .style("font", textMaxSize + "px serif");
-        
-    // Emphasize links pointing away from the current node
     var page = d3.select(this).attr("page");
     var nodeLinks = getUpdateLinks(page);
     nodeLinks.forEach(function(link) {
-        d3.select(link).select("path").transition()
-            .duration(750)
-            .style("stroke-width", linkMaxWidth + "px");
+        growStroke(link);
     });
 } 
 
-function mouseout() { 
-    d3.select(this).select("circle").transition() 
-        .duration(750) 
-        .attrTween("r", shrinkRadius);
+// Deemphasize a node and its associated links on mouse out
+function mouseoutNode() {
+    // Allow user to pan the view on mouse drag
+    zoomListening = true;
+    setZoomListener();
+    
+    shrinkRadiusWrapper(this);
         
-    d3.select(this).select("text").transition()
-        .duration(750)
-        .selectAll('tspan').attr("x", nodeDefaultRadius + textOffset)
-        .attr("y", 0)
-        .style("opacity", textDefaultOpacity)
-        .style("font", textDefaultSize + "px serif");
-        
-    // Demphasize links pointing away from the current node
     var page = d3.select(this).attr("page");
     var nodeLinks = getUpdateLinks(page);
     nodeLinks.forEach(function(link) {
-        d3.select(link).select("path").transition()
-            .duration(750)
-            .style("stroke-width", linkDefaultWidth + "px");
+        shrinkStroke(link);
     });
 } 
 
-// action to take on mouse double click
+// Unfix a node's position on mouse double click
 function dblclick() {
     d3.select(this).attr("fixed", function(d) { d.fixed = false; return d.fixed; });
 }
 
-// Flips the control scheme between positioning nodes and navigating nodes
-function toggleZoomListener() {
+///////////////////////////////////////////////////////////////////////////////
+//LINK EVENT LISTENERS
+///////////////////////////////////////////////////////////////////////////////
+
+// Center the user's view on a link's target node on mouse click
+function clickLink() {
+    var tx = d3.select(this).attr("tx");
+    var ty = d3.select(this).attr("ty");
+    centerNode(tx, ty);
+}
+
+// Emphasize a link and its target node on mouse hover
+function mouseoverLink() {
+    growStroke(this);
+    
+    var page = d3.select(this).attr("tpage");
+    node.each(function(d) {
+        if (d.id == page) {
+            growRadiusWrapper(this);
+        }
+    });
+}
+
+// Deemphasize a link and its target node on mouse out
+function mouseoutLink() {
+    shrinkStroke(this);
+    
+    var page = d3.select(this).attr("tpage");
+    node.each(function(d) {
+        if (d.id == page) {
+            shrinkRadiusWrapper(this);
+        }
+    });
+} 
+
+///////////////////////////////////////////////////////////////////////////////
+//CONTROL SCHEME
+///////////////////////////////////////////////////////////////////////////////
+
+// Sets the controls scheme based on the selected mode
+function setZoomListener() {
     if (zoomListening) {
-        zoomListening = false;
+        addZoomListener();
     }
     else {
-        zoomListening = true;
+        removeZoomListener();
     }
-    setZoomListener();
+}
+
+// Sets the control scheme to positioning nodes
+function removeZoomListener() {
+    svg.on("mousedown.zoom", null);
+    svg.on("mousemove.zoom", null);
+    svg.on("dblclick.zoom", null);
+    svg.on("touchstart.zoom", null);
+    svg.on("wheel.zoom", null);
+    svg.on("mousewheel.zoom", null);
+    svg.on("MozMousePixelScroll.zoom", null);
+    node.call(force.drag);
+    d3.select("div#controls button").select("text").text("On");
+}
+
+// Sets the control scheme to navigating nodes
+function addZoomListener() {
+    node.on('mousedown.drag', null);
+    node.on('touchstart.drag', null);
+    zoomListener(svg);
+    d3.select("div#controls button").select("text").text("Off");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -666,37 +747,6 @@ function getUpdateLinks(page) {
     });
     
     return nodeLinks;
-}
-
-// Sets the controls scheme based on the selected mode
-function setZoomListener() {
-    if (zoomListening) {
-        addZoomListener();
-    }
-    else {
-        removeZoomListener();
-    }
-}
-
-// Sets the control scheme to positioning nodes
-function removeZoomListener() {
-    svg.on("mousedown.zoom", null);
-    svg.on("mousemove.zoom", null);
-    svg.on("dblclick.zoom", null);
-    svg.on("touchstart.zoom", null);
-    svg.on("wheel.zoom", null);
-    svg.on("mousewheel.zoom", null);
-    svg.on("MozMousePixelScroll.zoom", null);
-    node.call(force.drag);
-    d3.select("div#controls button").select("text").text("On");
-}
-
-// Sets the control scheme to navigating nodes
-function addZoomListener() {
-    node.on('mousedown.drag', null);
-    node.on('touchstart.drag', null);
-    zoomListener(svg);
-    d3.select("div#controls button").select("text").text("Off");
 }
 
 </script>
