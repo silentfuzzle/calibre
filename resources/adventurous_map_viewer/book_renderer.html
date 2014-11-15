@@ -61,7 +61,7 @@ var growthFactor = 2;
 var nodeDefaultRadius = 8;
 var nodeMaxRadius = nodeDefaultRadius * growthFactor;
 var nodeDefaultColor = "#3182bd";
-var nodeHighlightColor = "#555555";
+var nodeHighlightColor = "#FF0000";
 
 var straightLinks = false;
 var maxHighlightLinks = 5;
@@ -88,6 +88,7 @@ var vis;
 var force;
 var node = 0;
 var link;
+var numLinks = 0;
   
 // Set the viewer window to fill the TOC panel
 var svg = d3.select("body")
@@ -118,6 +119,7 @@ var history = new DoubleList();
 function dataLoaded(data, pageNum) {
     var links = data.links;
     var nodes = data.nodes;
+    numLinks = links.length;
     
     var nodeDictionary = new Object();
     if (node != 0) {
@@ -145,11 +147,17 @@ function dataLoaded(data, pageNum) {
         });
     }
     else {
+        // The text of all nodes is visible if no links exist
+        var defaultOpacity = textDefaultOpacity;
+        if (numLinks == 0) {
+            defaultOpacity = textVisibleOpacity;
+        }
+        
         // Set the default value for nodes when the network is initialized for the first time
         nodes.forEach(function(n) {
             n.r = nodeDefaultRadius;
             n.fixed = false;
-            n.topacity = textDefaultOpacity;
+            n.topacity = defaultOpacity;
         });
     }
 
@@ -269,9 +277,11 @@ function changePage(pageNum, historyOffset) {
     }
     
     // Make sure the text of each node is set to the default opacity before coloring
-    node.each(function(n) {
-        n.topacity = textDefaultOpacity;
-    });
+    if (numLinks > 0) {
+        node.each(function(n) {
+            n.topacity = textDefaultOpacity;
+        });
+    }
     
     // Color the links and nodes
     colorHistory(currNode);
