@@ -43,7 +43,7 @@ class Plugin(object):  # {{{
         * :meth:`load_resources`
 
     '''
-    #: List of platforms this plugin works on
+    #: List of platforms this plugin works on.
     #: For example: ``['windows', 'osx', 'linux']``
     supported_platforms = []
 
@@ -213,7 +213,7 @@ class Plugin(object):  # {{{
 
         :param names: List of paths to resources in the zip file using / as separator
 
-        :return: A dictionary of the form ``{name : file_contents}``. Any names
+        :return: A dictionary of the form ``{name: file_contents}``. Any names
                  that were not found in the zip file will not be present in the
                  dictionary.
 
@@ -316,9 +316,9 @@ class FileTypePlugin(Plugin):  # {{{
     A plugin that is associated with a particular set of file types.
     '''
 
-    #: Set of file types for which this plugin should be run
-    #: For example: ``set(['lit', 'mobi', 'prc'])``
-    file_types     = set([])
+    #: Set of file types for which this plugin should be run.
+    #: For example: ``{'lit', 'mobi', 'prc'}``
+    file_types     = set()
 
     #: If True, this plugin is run when books are added
     #: to the database
@@ -363,7 +363,7 @@ class FileTypePlugin(Plugin):  # {{{
 
         :param book_id: Database id of the added book.
         :param book_format: The file type of the book that was added.
-                :param db: Library database.
+        :param db: Library database.
         '''
         pass  # Default implementation does nothing
 

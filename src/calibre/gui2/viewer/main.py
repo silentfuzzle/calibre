@@ -293,6 +293,7 @@ class EbookViewer(MainWindow):
                 self.restoreState(state, self.STATE_VERSION)
             except:
                 pass
+        self.initialize_dock_state()
         mult = vprefs.get('multiplier', None)
         if mult:
             self.view.multiplier = mult
@@ -904,6 +905,7 @@ class EbookViewer(MainWindow):
             vprefs.set('viewer_open_history', vh[:50])
             self.build_recent_menu()
 
+            self.footnotes_dock.close()
             self.action_table_of_contents.setDisabled(not self.iterator.toc)
             self.current_book_has_toc = bool(self.iterator.toc)
             self.current_title = title
@@ -1017,6 +1019,7 @@ class EbookViewer(MainWindow):
                 reopen_at = self.current_page_bookmark
             except Exception:
                 reopen_at = None
+            self.history.clear()
             self.load_ebook(self.iterator.pathtoebook, reopen_at=reopen_at)
             return
 
@@ -1039,6 +1042,9 @@ class EbookViewer(MainWindow):
         av = desktop.availableGeometry(self).height() - 30
         if self.height() > av:
             self.resize(self.width(), av)
+
+    def show_footnote_view(self):
+        self.footnotes_dock.show()
 
 def config(defaults=None):
     desc = _('Options to control the ebook viewer')

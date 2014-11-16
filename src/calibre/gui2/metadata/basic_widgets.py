@@ -8,6 +8,7 @@ __copyright__ = '2011, Kovid Goyal <kovid@kovidgoyal.net>'
 __docformat__ = 'restructuredtext en'
 
 import textwrap, re, os, shutil, weakref
+from datetime import date
 
 from PyQt5.Qt import (
     Qt, QDateTimeEdit, pyqtSignal, QMessageBox, QIcon, QToolButton, QWidget,
@@ -17,6 +18,7 @@ from PyQt5.Qt import (
     QUndoStack)
 
 from calibre.gui2.widgets import EnLineEdit, FormatList as _FormatList, ImageView
+from calibre.gui2.widgets2 import access_key, populate_standard_spinbox_context_menu, RightClickButton
 from calibre.utils.icu import sort_key
 from calibre.utils.config import tweaks, prefs
 from calibre.ebooks.metadata import (
@@ -26,11 +28,11 @@ from calibre.gui2 import (file_icon_provider, UNDEFINED_QDATETIME,
         choose_files, error_dialog, choose_images)
 from calibre.gui2.complete2 import EditWithComplete
 from calibre.utils.date import (
-    local_tz, qt_to_dt, as_local_time, UNDEFINED_DATE, is_date_undefined)
+    local_tz, qt_to_dt, as_local_time, UNDEFINED_DATE, is_date_undefined,
+    utcfromtimestamp, parse_only_date)
 from calibre import strftime
 from calibre.ebooks import BOOK_EXTENSIONS
 from calibre.customize.ui import run_plugins_on_import
-from calibre.utils.date import utcfromtimestamp
 from calibre.gui2.comments_editor import Editor
 from calibre.library.comments import comments_to_html
 from calibre.gui2.dialogs.tag_editor import TagEditor
@@ -109,11 +111,6 @@ class ToMetadataMixin(object):
 def make_undoable(spinbox):
     'Add a proper undo/redo capability to spinbox which must be a sub-class of QAbstractSpinBox'
 
-    def access_key(k):
-        if QKeySequence.keyBindings(k):
-            return '\t' + QKeySequence(k).toString(QKeySequence.NativeText)
-        return ''
-
     class UndoCommand(QUndoCommand):
 
         def __init__(self, widget, val):
@@ -123,6 +120,8 @@ def make_undoable(spinbox):
                 self.undo_val = widget.dateTime()
             elif hasattr(widget, 'value'):
                 self.undo_val = widget.value()
+            if isinstance(val, date):
+                val = parse_only_date(val.isoformat(), assume_utc=False)
             self.redo_val = val
 
         def undo(self):
@@ -157,20 +156,13 @@ def make_undoable(spinbox):
 
         def contextMenuEvent(self, ev):
             m = QMenu(self)
+            if hasattr(self, 'setDateTime'):
+                m.addAction(_('Set date to undefined') + '\t' + QKeySequence(Qt.Key_Minus).toString(QKeySequence.NativeText),
+                            lambda : self.setDateTime(self.minimumDateTime()))
             m.addAction(_('&Undo') + access_key(QKeySequence.Undo), self.undo).setEnabled(self.undo_stack.canUndo())
             m.addAction(_('&Redo') + access_key(QKeySequence.Redo), self.redo).setEnabled(self.undo_stack.canRedo())
             m.addSeparator()
-            le = self.lineEdit()
-            m.addAction(_('Cu&t') + access_key(QKeySequence.Cut), le.cut).setEnabled(not le.isReadOnly() and le.hasSelectedText())
-            m.addAction(_('&Copy') + access_key(QKeySequence.Copy), le.copy).setEnabled(le.hasSelectedText())
-            m.addAction(_('&Paste') + access_key(QKeySequence.Paste), le.paste).setEnabled(not le.isReadOnly())
-            m.addAction(_('Delete') + access_key(QKeySequence.Delete), le.del_).setEnabled(not le.isReadOnly() and le.hasSelectedText())
-            m.addSeparator()
-            m.addAction(_('Select &All') + access_key(QKeySequence.SelectAll), self.selectAll)
-            m.addSeparator()
-            m.addAction(_('&Step up'), self.stepUp)
-            m.addAction(_('Step &down'), self.stepDown)
-            m.setAttribute(Qt.WA_DeleteOnClose)
+            populate_standard_spinbox_context_menu(self, m)
             m.popup(ev.globalPos())
 
         def set_spinbox_value(self, val):
@@ -180,12 +172,13 @@ def make_undoable(spinbox):
             else:
                 self.undo_stack.clear()
             if hasattr(self, 'setDateTime'):
+                if isinstance(val, date) and not is_date_undefined(val):
+                    val = parse_only_date(val.isoformat(), assume_utc=False)
                 self.setDateTime(val)
             elif hasattr(self, 'setValue'):
                 self.setValue(val)
 
     return UndoableSpinbox
-
 
 # Title {{{
 class TitleEdit(EnLineEdit, ToMetadataMixin):
@@ -1020,10 +1013,10 @@ class Cover(ImageView):  # {{{
         self.cdata_before_trim = None
         self.cover_changed.connect(self.set_pixmap_from_data)
 
-        class CB(QToolButton):
+        class CB(RightClickButton):
 
             def __init__(self, text, icon=None, action=None):
-                QToolButton.__init__(self, parent)
+                RightClickButton.__init__(self, parent)
                 self.setText(text)
                 if icon is not None:
                     self.setIcon(QIcon(I(icon)))
@@ -1050,7 +1043,7 @@ class Cover(ImageView):  # {{{
         self.generate_cover_button = b = CB(_('&Generate cover'), 'default_cover.png', self.generate_cover)
         b.m = m = QMenu()
         b.setMenu(m)
-        m.addAction(_('Customize the styles and colors of the generated cover'), self.custom_cover)
+        m.addAction(QIcon(I('config.png')), _('Customize the styles and colors of the generated cover'), self.custom_cover)
         b.setPopupMode(b.DelayedPopup)
         self.buttons = [self.select_cover_button, self.remove_cover_button,
                 self.trim_cover_button, self.download_cover_button,

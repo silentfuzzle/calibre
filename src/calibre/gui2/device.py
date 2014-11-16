@@ -712,7 +712,7 @@ class DeviceMenu(QMenu):  # {{{
     def __init__(self, parent=None):
         QMenu.__init__(self, parent)
         self.group = QActionGroup(self)
-        self.actions = []
+        self._actions = []
         self._memory = []
 
         self.set_default_menu = QMenu(_('Set default send to device action'))
@@ -771,7 +771,7 @@ class DeviceMenu(QMenu):  # {{{
                         self.group.addAction(action)
                     else:
                         action.a_s.connect(self.action_triggered)
-                        self.actions.append(action)
+                        self._actions.append(action)
                     mdest.addAction(action)
                 if actions is basic_actions:
                     menu.addSeparator()
@@ -822,14 +822,14 @@ class DeviceMenu(QMenu):  # {{{
 
     def trigger_default(self, *args):
         r = config['default_send_to_device_action']
-        for action in self.actions:
+        for action in self._actions:
             if repr(action) == r:
                 self.action_triggered(action)
                 break
 
     def enable_device_actions(self, enable, card_prefix=(None, None),
             device=None):
-        for action in self.actions:
+        for action in self._actions:
             if action.dest in ('main:', 'carda:0', 'cardb:0'):
                 if not enable:
                     action.setEnabled(False)
@@ -1079,6 +1079,10 @@ class DeviceMixin(object):  # {{{
             self.location_manager.update_devices()
             self.bars_manager.update_bars()
             self.library_view.set_device_connected(self.device_connected)
+            # Empty any device view information
+            self.memory_view.set_database([])
+            self.card_a_view.set_database([])
+            self.card_b_view.set_database([])
             self.refresh_ondevice()
         device_signals.device_connection_changed.emit(connected)
 
@@ -1183,7 +1187,7 @@ class DeviceMixin(object):  # {{{
             self.upload_booklists(job)
         # We need to reset the ondevice flags in the library. Use a big hammer,
         # so we don't need to worry about whether some succeeded or not.
-        self.refresh_ondevice(reset_only=False)
+        self.refresh_ondevice()
 
         try:
             if not self.current_view().currentIndex().isValid():

@@ -21,7 +21,7 @@ from calibre.gui2 import ResizableDialog, error_dialog, gprefs, pixmap_to_data
 from calibre.gui2.metadata.basic_widgets import (TitleEdit, AuthorsEdit,
     AuthorSortEdit, TitleSortEdit, SeriesEdit, SeriesIndexEdit, IdentifiersEdit,
     RatingEdit, PublisherEdit, TagsEdit, FormatsManager, Cover, CommentsEdit,
-    BuddyLabel, DateEdit, PubdateEdit, LanguagesEdit)
+    BuddyLabel, DateEdit, PubdateEdit, LanguagesEdit, RightClickButton)
 from calibre.gui2.metadata.single_download import FullFetch
 from calibre.gui2.custom_column_widgets import populate_metadata_page
 from calibre.utils.config import tweaks
@@ -128,7 +128,7 @@ class MetadataSingleDialogBase(ResizableDialog):
                 self.deduce_title_sort_button, self.languages)
         self.basic_metadata_widgets.extend([self.title, self.title_sort])
 
-        self.deduce_author_sort_button = b = QToolButton(self)
+        self.deduce_author_sort_button = b = RightClickButton(self)
         b.setToolTip('<p>' +
             _('Automatically create the author sort entry based on the current '
               'author entry. Using this button to create author sort will '
@@ -237,8 +237,9 @@ class MetadataSingleDialogBase(ResizableDialog):
         self.pubdate = PubdateEdit(self)
         self.basic_metadata_widgets.extend([self.timestamp, self.pubdate])
 
-        self.fetch_metadata_button = b = QToolButton(self)
+        self.fetch_metadata_button = b = RightClickButton(self)
         b.setText(_('&Download metadata')), b.setPopupMode(b.DelayedPopup)
+        b.setToolTip(_('Download metadata for this book [%s]') % self.download_shortcut.key().toString(QKeySequence.NativeText))
         b.setSizePolicy(QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed))
         self.fetch_metadata_button.clicked.connect(self.fetch_metadata)
         self.fetch_metadata_menu = m = QMenu(self.fetch_metadata_button)
@@ -602,6 +603,7 @@ class MetadataSingleDialogBase(ResizableDialog):
         if apply_changes:
             self.apply_changes()
         self.current_row += delta
+        self.update_window_title()
         prev = next_ = None
         if self.current_row > 0:
             prev = self.db.title(self.row_list[self.current_row-1])

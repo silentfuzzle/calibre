@@ -21,6 +21,7 @@ from calibre.gui2.search_box import SearchBox2
 from calibre.gui2.viewer.documentview import DocumentView
 from calibre.gui2.viewer.bookmarkmanager import BookmarkManager
 from calibre.gui2.viewer.toc import TOCView, TOCSearch
+from calibre.gui2.viewer.footnote import FootnotesView
 
 class DoubleSpinBox(QDoubleSpinBox):  # {{{
 
@@ -106,13 +107,14 @@ class History(list):  # {{{
         self.action_back = action_back
         self.action_forward = action_forward
         super(History, self).__init__(self)
+        self.clear()
+
+    def clear(self):
+        del self[:]
         self.insert_pos = 0
         self.back_pos = None
         self.forward_pos = None
         self.set_actions()
-
-    def clear(self):
-        del self[:]
 
     def set_actions(self):
         if self.action_back is not None:
@@ -178,6 +180,19 @@ def test_history():
     assert h == [0, 9]
 # }}}
 
+class ToolBar(QToolBar):  # {{{
+
+    def contextMenuEvent(self, ev):
+        ac = self.actionAt(ev.pos())
+        if ac is None:
+            return
+        ch = self.widgetForAction(ac)
+        sm = getattr(ch, 'showMenu', None)
+        if callable(sm):
+            ev.accept()
+            sm()
+# }}}
+
 class Main(MainWindow):
 
     def __init__(self, debug_javascript):
@@ -209,14 +224,14 @@ class Main(MainWindow):
         hs.setOrientation(Qt.Vertical), hs.setObjectName("horizontal_scrollbar")
         cl.addWidget(hs, 1, 0, 1, 1)
 
-        self.tool_bar = tb = QToolBar(self)
+        self.tool_bar = tb = ToolBar(self)
         tb.setObjectName('tool_bar'), tb.setIconSize(QSize(32, 32))
         self.addToolBar(Qt.LeftToolBarArea, tb)
 
         self.tool_bar2 = tb2 = QToolBar(self)
         tb2.setObjectName('tool_bar2')
         self.addToolBar(Qt.TopToolBarArea, tb2)
-        self.tool_bar.setContextMenuPolicy(Qt.PreventContextMenu)
+        self.tool_bar.setContextMenuPolicy(Qt.DefaultContextMenu)
         self.tool_bar2.setContextMenuPolicy(Qt.PreventContextMenu)
 
         self.pos = DoubleSpinBox()
@@ -236,6 +251,7 @@ class Main(MainWindow):
         self.tool_bar2.addWidget(self.search)
 
         self.toc_dock = d = QDockWidget(_('Table of Contents'), self)
+        d.setContextMenuPolicy(Qt.CustomContextMenu)
         self.toc_container = w = QWidget(self)
         w.l = QVBoxLayout(w)
         self.toc = TOCView(w)
@@ -248,12 +264,25 @@ class Main(MainWindow):
         d.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
         self.bookmarks_dock = d = QDockWidget(_('Bookmarks'), self)
+        d.setContextMenuPolicy(Qt.CustomContextMenu)
         self.bookmarks = BookmarkManager(self)
         d.setObjectName('bookmarks-dock')
         d.setWidget(self.bookmarks)
         d.close()  # starts out hidden
         self.addDockWidget(Qt.RightDockWidgetArea, d)
         d.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+
+        self.footnotes_dock = d = QDockWidget(_('Footnotes'), self)
+        d.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.footnotes_view = FootnotesView(self)
+        self.footnotes_view.follow_link.connect(self.view.follow_footnote_link)
+        self.footnotes_view.close_view.connect(d.close)
+        self.view.footnotes.set_footnotes_view(self.footnotes_view)
+        d.setObjectName('footnotes-dock')
+        d.setWidget(self.footnotes_view)
+        d.close()  # starts out hidden
+        self.addDockWidget(Qt.BottomDockWidgetArea, d)
+        d.setAllowedAreas(Qt.BottomDockWidgetArea | Qt.TopDockWidgetArea | Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
         self.create_actions()
 
@@ -317,6 +346,13 @@ class Main(MainWindow):
         if self.metadata.isVisible():
             self.metadata.update_layout()
         return MainWindow.resizeEvent(self, ev)
+
+    def initialize_dock_state(self):
+        self.setCorner(Qt.TopLeftCorner, Qt.LeftDockWidgetArea)
+        self.setCorner(Qt.BottomLeftCorner, Qt.LeftDockWidgetArea)
+        self.setCorner(Qt.TopRightCorner, Qt.RightDockWidgetArea)
+        self.setCorner(Qt.BottomRightCorner, Qt.RightDockWidgetArea)
+        self.footnotes_dock.close()
 
     def create_actions(self):
         def a(name, text, icon, tb=None, sc_name=None, menu_name=None, popup_mode=QToolButton.MenuButtonPopup):

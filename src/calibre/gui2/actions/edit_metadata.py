@@ -159,14 +159,15 @@ class EditMetadataAction(InterfaceAction):
                 failed_ids.union(failed_covers))
         review_apply = partial(self.apply_downloaded_metadata, True)
         normal_apply = partial(self.apply_downloaded_metadata, False)
-        self.gui.proceed_question(normal_apply, payload,
-                log_file, _('Download log'), _('Download complete'), msg,
-                det_msg=det_msg, show_copy_button=show_copy_button,
-                cancel_callback=partial(self.cleanup_bulk_download, tdir),
-                log_is_file=True, checkbox_msg=checkbox_msg,
-                checkbox_checked=False, action_callback=review_apply,
-                action_label=_('Review downloaded metadata'),
-                action_icon=QIcon(I('auto_author_sort.png')))
+        self.gui.proceed_question(
+            normal_apply, payload, log_file, _('Download log'),
+            _('Metadata download complete'), msg, icon='download-metadata.png',
+            det_msg=det_msg, show_copy_button=show_copy_button,
+            cancel_callback=partial(self.cleanup_bulk_download, tdir),
+            log_is_file=True, checkbox_msg=checkbox_msg,
+            checkbox_checked=False, action_callback=review_apply,
+            action_label=_('Revie&w downloaded metadata'),
+            action_icon=QIcon(I('auto_author_sort.png')))
 
     def apply_downloaded_metadata(self, review, payload, *args):
         good_ids, tdir, log_file, lm_map, failed_ids = payload
@@ -240,6 +241,7 @@ class EditMetadataAction(InterfaceAction):
                             ' is on the right. If a downloaded value is blank or unknown,'
                             ' the original value is used.'),
                 action_button=(_('&View Book'), I('view.png'), self.gui.iactions['View'].view_historical),
+                db=db
             )
             if d.exec_() == d.Accepted:
                 nid_map = {}
@@ -266,7 +268,7 @@ class EditMetadataAction(InterfaceAction):
             db.data.set_marked_ids(failed_ids)
 
         self.apply_metadata_changes(
-            id_map, merge_comments=msprefs['append_comments'],
+            id_map, merge_comments=msprefs['append_comments'], icon='download-metadata.png',
             callback=partial(self.downloaded_metadata_applied, tdir, restrict_to_failed))
 
     def downloaded_metadata_applied(self, tdir, restrict_to_failed, *args):
@@ -618,7 +620,7 @@ class EditMetadataAction(InterfaceAction):
 
     # Apply bulk metadata changes {{{
     def apply_metadata_changes(self, id_map, title=None, msg='', callback=None,
-            merge_tags=True, merge_comments=False):
+            merge_tags=True, merge_comments=False, icon=None):
         '''
         Apply the metadata changes in id_map to the database synchronously
         id_map must be a mapping of ids to Metadata objects. Set any fields you
@@ -647,7 +649,7 @@ class EditMetadataAction(InterfaceAction):
             from calibre.gui2.dialogs.progress import ProgressDialog
             self.apply_pd = ProgressDialog(title, msg, min=0,
                     max=len(self.apply_id_map)-1, parent=self.gui,
-                    cancelable=False)
+                    cancelable=False, icon=icon)
             self.apply_pd.setModal(True)
             self.apply_pd.show()
         self._am_merge_tags = merge_tags

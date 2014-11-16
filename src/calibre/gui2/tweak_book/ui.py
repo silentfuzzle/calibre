@@ -19,6 +19,7 @@ from PyQt5.Qt import (
 from calibre import prints
 from calibre.constants import __appname__, get_version, isosx, DEBUG
 from calibre.gui2 import elided_text, open_url
+from calibre.gui2.dbus_export.widgets import factory
 from calibre.gui2.keyboard import Manager as KeyboardManager
 from calibre.gui2.main_window import MainWindow
 from calibre.gui2.throbber import ThrobbingButton, create_donate_widget
@@ -461,10 +462,12 @@ class Main(MainWindow):
         create_plugin_actions(actions, toolbar_actions, self.plugin_menu_actions)
 
     def create_menubar(self):
-        p, q = self.create_application_menubar()
-        q.triggered.connect(self.action_quit.trigger)
-        p.triggered.connect(self.action_preferences.trigger)
-        b = self.menuBar()
+        if isosx:
+            p, q = self.create_application_menubar()
+            q.triggered.connect(self.action_quit.trigger)
+            p.triggered.connect(self.action_preferences.trigger)
+        f = factory(app_id='com.calibre-ebook.EditBook-%d' % os.getpid())
+        b = f.create_window_menubar(self)
 
         f = b.addMenu(_('&File'))
         f.addAction(self.action_new_file)
@@ -519,7 +522,8 @@ class Main(MainWindow):
         e = b.addMenu(_('&View'))
         t = e.addMenu(_('Tool&bars'))
         e.addSeparator()
-        for name, ac in actions.iteritems():
+        for name in sorted(actions, key=lambda x:sort_key(actions[x].text())):
+            ac = actions[name]
             if name.endswith('-dock'):
                 e.addAction(ac)
             elif name.endswith('-bar'):

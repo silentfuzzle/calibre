@@ -22,7 +22,7 @@ sudo apt-get install build-essential module-assistant vim zsh vim-scripts rsync 
     htop nasm unzip libdbus-1-dev cmake libltdl-dev libudev-dev apt-file \
     libdbus-glib-1-dev libcups2-dev "^libxcb.*" libx11-xcb-dev libglu1-mesa-dev \
     libxrender-dev flex bison gperf libasound2-dev libgstreamer0.10-dev \
-    libgstreamer-plugins-base0.10-dev libpulse-dev libgtk2.0-dev libffi-dev
+    libgstreamer-plugins-base0.10-dev libpulse-dev libgtk2.0-dev libffi-dev xcb-proto python-xcbgen dh-autoreconf
 apt-file update
 
 # For recent enough version of debian (>= sid) also install libxkbcommon-dev
@@ -78,7 +78,7 @@ def binary_includes():
         'crypto.so.1.0.0', 'readline.so.6', 'chm.so.0', 'icudata.so.53',
         'icui18n.so.53', 'icuuc.so.53', 'icuio.so.53', 'python%s.so.1.0' % py_ver,
         'gcrypt.so.20', 'gpg-error.so.0', 'gobject-2.0.so.0', 'glib-2.0.so.0',
-        'gthread-2.0.so.0', 'gmodule-2.0.so.0', 'gio-2.0.so.0',
+        'gthread-2.0.so.0', 'gmodule-2.0.so.0', 'gio-2.0.so.0', 'dbus-glib-1.so.2',
     )] + [
 
     glob.glob('/lib/*/lib' + x)[-1] for x in (

@@ -99,8 +99,10 @@ class Manual(Command):
             os.makedirs(d)
         jobs = []
         languages = opts.language or list(json.load(open(self.j(base, 'locale', 'completed.json'), 'rb')))
-        for language in (['en'] + languages):
-            jobs.append((['calibre-debug', self.j(self.d(self.SRC), 'manual', 'build.py'),
+        languages = ['en'] + list(set(languages) - {'en'})
+        os.environ['ALL_USER_MANUAL_LANGUAGES'] = ' '.join(languages)
+        for language in languages:
+            jobs.append((['calibre-debug', self.j(self.d(self.SRC), 'manual', 'build.py'), '--',
                           language, self.j(tdir, language)],
                          '\n\n**************** Building translations for: %s'%language))
         self.info('Building manual for %d languages' % len(jobs))
