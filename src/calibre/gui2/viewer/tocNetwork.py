@@ -59,6 +59,7 @@ class TOCNetworkView (QWebView):
     #      0 - the user clicked a link in the e-book or a node in the network
     #      1 - the user navigated to the next section in their history
     #      -1 - the user navigated to the previous section in their history
+    #      -2 - the user navigated to another section without adding to their history
     def set_curr_page(self, page, history_offset):
         self.curr_page = page
         if (self.loaded):
@@ -82,7 +83,6 @@ class TOCNetworkView (QWebView):
     # page (float) - the page to send the user to
     @pyqtSlot(float)
     def change_page(self, page):
-        print ("changed page: " + str(page))
         if self.manager is not None:
             self.manager.internal_link_clicked(0)
             self.manager.goto_page(page)

@@ -34,6 +34,8 @@ class AdventurousBehavior (BaseAdventurousBehavior):
         
         # Make sure the current section exists in the TOC
         curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)
+        self.update_network_pos(self.corrected_curr_sec)
+        
         if (curr_sec not in self.include_sections):
             # Determine the sections to include in the group if the user moved outside the previous group
             self.include_sections, in_toc = self.find_include_sections(curr_toc)
@@ -59,14 +61,13 @@ class AdventurousBehavior (BaseAdventurousBehavior):
             # The book doesn't have a bookmark with the user's last position
             # Allow returning to the beginning of the book 
             return True
+        
+        if (next_sec in self.include_sections):
+            next_index = self.spine.index(next_sec)
             
-        if (self.curr_sec != next_sec):
-            if (next_sec in self.include_sections):
-                next_index = self.spine.index(next_sec)
-                
-                # Don't add an edge if the user skipped sections in the book using the scrollbar or position label
-                if (next_index == self.curr_index + 1 or next_index == self.curr_index - 1):
-                    self.add_network_edge(self.corrected_curr_sec, next_sec, True)
+            # Don't add an edge if the user skipped sections in the book using the scrollbar or position label
+            if (next_index == self.curr_index + 1 or next_index == self.curr_index - 1):
+                self.add_network_edge(self.corrected_curr_sec, next_sec, True)
                     
                 return True
                 
@@ -147,17 +148,14 @@ class AdventurousBehavior (BaseAdventurousBehavior):
         
         if (index not in in_toc):
             # Check if the first section in the toc has been found
-            page_in_toc = None
+            page_in_toc = self.get_in_toc(self.spine[index], self.toc)
             if (found_first_toc_entry == False):
-                page_in_toc = self.get_in_toc(self.spine[index], self.toc)
                 if (page_in_toc is not None):
                     found_first_toc_entry = True
                     
-            # Add this section if it isn't in the toc and is adjacent to a section in the tree that is
+            # Add this section if the previous section is in the included sections
+            # and this section isn't in the toc
             if (index - 1 in in_toc):
-                if (page_in_toc is None):
-                    page_in_toc = self.get_in_toc(self.spine[index], self.toc)
-                    
                 if (page_in_toc is None):
                     include_sections.add(self.spine[index])
                     in_toc.add(index)

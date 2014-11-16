@@ -45,7 +45,6 @@ class BaseBehavior (object):
     # curr_index (integer) - the index of the current section in the spine
     # curr_sec (SpineItem) - the current section being displayed
     def set_curr_sec(self, curr_index, curr_sec):
-        print ("Base curr_sec set")
         self.curr_sec = curr_sec
         self.curr_index = curr_index
     
@@ -66,5 +65,14 @@ class BaseBehavior (object):
     # When a link to another page of the ebook is clicked, perform any processing required by the behavior
     # path (string) - the path in the ebook the link pointed to
     def link_clicked(self, path):
+        return
+    
+    # Perform any required actions after the history is modified
+    # history_offset (int) - An integer representing how the user navigated to the section
+    #      0 - the user clicked a link in the e-book or a node in the network
+    #      1 - the user navigated to the next section in their history
+    #      -1 - the user navigated to the previous section in their history
+    #      -2 - the user navigated to another section without adding to their history
+    def update_history(self):
         return
         

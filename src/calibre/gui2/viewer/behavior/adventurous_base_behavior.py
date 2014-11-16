@@ -30,7 +30,7 @@ class BaseAdventurousBehavior (BaseBehavior):
         self.toc_view = toc_view
         self.ebook_network = EBookNetwork(spine, toc, title, pathtoebook)
         self.toc_view.load_network(self.ebook_network.data)
-        self.history_offset = 0
+        self.history_offset = -2
         
     # Sets the current section of the book the user is viewing
     # and the number of pages in that section
@@ -40,13 +40,11 @@ class BaseAdventurousBehavior (BaseBehavior):
         if (self.curr_sec != curr_sec):
             super(BaseAdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
             self.num_pages = curr_sec.pages
-            self.toc_view.set_curr_page(curr_sec.start_page, self.history_offset)
-            self.history_offset = 0
         
         # Only setup the scrollbar and position label if this object is an instance of this class
         if (type(self) is BaseAdventurousBehavior):
-            print ("BaseAdventurous set scrollbar")
             self.setup_vscrollbar_method()
+            self.update_network_pos(curr_sec)
         
     # Returns whether the user can move from the current section to the passed section
     # next_sec (string) - the section to check
@@ -108,6 +106,16 @@ class BaseAdventurousBehavior (BaseBehavior):
             # Add the new edge to the network display
             if (edge_added):
                 self.toc_view.add_edge(self.ebook_network.data)
+                
+    # Update the user's position and history in the network view
+    # curr_sec (SpineItem) - the current section the user is viewing
+    def update_network_pos(self, curr_sec):
+        self.toc_view.set_curr_page(curr_sec.start_page, self.history_offset)
+        self.history_offset = -2
+        
+    # Perform any required actions after the history is modified
+    def update_history(self):
+        self.update_network_pos(self.curr_sec)
     
     # Return a section's TOC and SpineItem entries if it exists in the TOC
     # Return the section's parent's TOC and SpineItem entries if it doesn't exist in the TOC

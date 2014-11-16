@@ -263,7 +263,8 @@ function dataLoaded(data, pageNum) {
 //      0 - the user clicked a link in the e-book or a node in the network
 //      1 - the user navigated to the next section in their history
 //      -1 - the user navigated to the previous section in their history
-function changePage(pageNum, historyOffset) {
+//      -2 - the user navigated to another section without adding to their history
+function changePage(pageNum, historyOffset) {    
     // Update the user's position in their history
     var currNode = null;
     if (historyOffset == 0) {
@@ -272,8 +273,16 @@ function changePage(pageNum, historyOffset) {
     else if (historyOffset == 1) {
         currNode = history.nextNode();
     }
-    else {
+    else if (historyOffset == -1) {
         currNode = history.prevNode();
+    }
+    else {
+        currNode = history.replaceNode(pageNum);
+    }
+    
+    // Handle the event that the history gets off between Calibre and the network
+    if (currNode == null) {
+        currNode = history.makeNode(pageNum);
     }
     
     // Make sure the text of each node is set to the default opacity before coloring
@@ -857,6 +866,12 @@ function DoubleList() {
         this.currNode = this.currNode.prev;
         return this.currNode;
     };
+    
+    // Replace the position of the current node with the user's current position
+    this.replaceNode = function(newPosition) {
+            this.currNode.pos = newPosition;
+            return this.currNode;
+        };
     
     // Create a new position in history
     this.makeNode = function(position) {

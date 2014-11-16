@@ -520,6 +520,7 @@ class EbookViewer(MainWindow):
                         frac = 0
                     if page == self.current_page:
                         self.view.scroll_to(frac)
+                        self.page_behavior.update_history()
                     else:
                         if (allow_page_turn == False):
                             allow_page_turn = self.page_behavior.allow_page_turn(page)
@@ -596,6 +597,7 @@ class EbookViewer(MainWindow):
 
     def internal_link_clicked(self, prev_pos):
         self.history.add(self.page_behavior.absolute_position)
+        self.page_behavior.history_offset = 0
 
     def link_clicked(self, url):
         path = os.path.abspath(unicode(url.toLocalFile()))
@@ -603,6 +605,7 @@ class EbookViewer(MainWindow):
         if path in self.iterator.spine:
             self.update_page_number()  # Ensure page number is accurate as it is used for history
             self.history.add(self.page_behavior.absolute_position)
+            self.page_behavior.history_offset = 0
             path = self.iterator.spine[self.iterator.spine.index(path)]
             if url.hasFragment():
                 frag = unicode(url.fragment())
