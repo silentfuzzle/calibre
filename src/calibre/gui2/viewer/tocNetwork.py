@@ -20,7 +20,7 @@ class TOCNetworkView (QWebView):
         self.manager = None
         self.setMinimumWidth(80)
         self.loadFinished.connect(self.load_finished)
-        self.curr_page = -1;
+        self.curr_page = -1
         
     # Update the network displayed in the Javascript application
     # jsonCode (string) - the data defining the edges and nodes in the network
@@ -47,9 +47,14 @@ class TOCNetworkView (QWebView):
         self.toc_created = False
         
     # Update the network with the the current stored json code and page number
-    def create_toc_network(self):
-        jScript = """dataLoaded({jsonCode}, {page}); """
-        jScriptFormat = jScript.format(jsonCode=str(self.jsonCode), page=self.curr_page)
+    # history_offset (int) - An integer representing how the user navigated to the section
+    #      0 - the user clicked a link in the e-book or a node in the network
+    #      1 - the user navigated to the next section in their history
+    #      -1 - the user navigated to the previous section in their history
+    #      -2 - the user navigated to another section without adding to their history
+    def create_toc_network(self, history_offset):
+        jScript = """dataLoaded({jsonCode}, {page}, {offset}); """
+        jScriptFormat = jScript.format(jsonCode=str(self.jsonCode), page=self.curr_page, offset=history_offset)
         self.page().mainFrame().evaluateJavaScript(jScriptFormat)
         self.toc_created = True
         
@@ -71,7 +76,7 @@ class TOCNetworkView (QWebView):
             else:
                 # The user clicked a link or the Javascript finished
                 # loading before this method was called, reload the network data
-                self.create_toc_network()
+                self.create_toc_network(history_offset)
         
     # Sets the pointer to the EbookViewer object
     # manager (EbookViewer) - the class controlling the ebook viewer interface

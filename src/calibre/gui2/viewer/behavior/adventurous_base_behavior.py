@@ -30,7 +30,7 @@ class BaseAdventurousBehavior (BaseBehavior):
         self.toc_view = toc_view
         self.ebook_network = EBookNetwork(spine, toc, title, pathtoebook)
         self.toc_view.load_network(self.ebook_network.data)
-        self.history_offset = -2
+        self.history_offset = 0
         
     # Sets the current section of the book the user is viewing
     # and the number of pages in that section

@@ -116,7 +116,12 @@ var history = new DoubleList();
 // Display a network from passed JSON data
 // data (string) - json code
 // pageNum (float) - the number of the first page of the section the user is currently viewing
-function dataLoaded(data, pageNum) {
+// historyOffset (int) - An integer representing how the user navigated to the section
+//      0 - the user clicked a link in the e-book or a node in the network
+//      1 - the user navigated to the next section in their history
+//      -1 - the user navigated to the previous section in their history
+//      -2 - the user navigated to another section without adding to their history
+function dataLoaded(data, pageNum, historyOffset) {
     var links = data.links;
     var nodes = data.nodes;
     numLinks = links.length;
@@ -248,7 +253,7 @@ function dataLoaded(data, pageNum) {
         .call(wrap, 100);
     
     // Set the color of the nodes
-    changePage(pageNum, 0);
+    changePage(pageNum, historyOffset);
     
     // Make sure the display is set to the current scale and location
     zoomListener.scale(zoomListener.scale());
@@ -882,28 +887,28 @@ function DoubleList() {
     
     // Replace the position of the current node with the user's current position
     this.replaceNode = function(newPosition) {
-            this.currNode.pos = newPosition;
-            return this.currNode;
-        };
+        this.currNode.pos = newPosition;
+        return this.currNode;
+    };
     
     // Create a position in history
     this.makeNode = function(position) {
-            var node = { pos: position, next: null, prev: null };
-            return node;
-        };
+        var node = { pos: position, next: null, prev: null };
+        return node;
+    };
         
     // Add a new position in history, replacing the position after the current position
     this.addNode = function(position) {
-            var node = this.makeNode(position);
-            if (this.currNode != null) {
-                this.currNode.next = node;
-                node.prev = this.currNode;
-            }
-            
-            // If a current position doesn't exist, set it to the new position
-            this.currNode = node;
-            return node;
-        };
+        var node = this.makeNode(position);
+        if (this.currNode != null) {
+            this.currNode.next = node;
+            node.prev = this.currNode;
+        }
+        
+        // If a current position doesn't exist, set it to the new position
+        this.currNode = node;
+        return node;
+    };
 }
 
 // Returns a list of link svg elements associated with a node with id page
