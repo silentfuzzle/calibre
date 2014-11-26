@@ -36,14 +36,14 @@ class AdventurousBehavior (BaseAdventurousBehavior):
         curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)
         self.update_network_pos(self.corrected_curr_sec)
         
-        if (curr_sec not in self.include_sections):
+        if (curr_index not in self.include_sections):
             # Determine the sections to include in the group if the user moved outside the previous group
-            self.include_sections, in_toc = self.find_include_sections(curr_toc)
+            self.include_sections = self.find_include_sections(curr_toc)
             
             # Determine the part of the spine included in the sections
             self.start_spine = -1
             self.end_spine = -1
-            for i in in_toc:
+            for i in self.include_sections:
                 if (self.start_spine == -1 or self.start_spine > i):
                     self.start_spine = i
                 if (self.end_spine == -1 or self.end_spine < i):
@@ -62,9 +62,8 @@ class AdventurousBehavior (BaseAdventurousBehavior):
             # Allow returning to the beginning of the book 
             return True
         
-        if (next_sec in self.include_sections):
-            next_index = self.spine.index(next_sec)
-            
+        next_index = self.spine.index(next_sec)
+        if (next_index in self.include_sections):            
             # Don't add an edge if the user skipped sections in the book using the scrollbar or position label
             if (next_index == self.curr_index + 1 or next_index == self.curr_index - 1):
                 self.add_network_edge(self.corrected_curr_sec, next_sec, True)
@@ -98,10 +97,10 @@ class AdventurousBehavior (BaseAdventurousBehavior):
         end = False
         num_sections = len(self.include_sections)
         while (num_found < num_sections and end == False):
-            curr_path = self.spine[spine_index]
-            if (curr_path in self.include_sections):
+            if (spine_index in self.include_sections):
                 start = True
                 num_found = num_found + 1
+                curr_path = self.spine[spine_index]
                 num_pages = num_pages + curr_path.pages
             else:
                 if (start == True):
@@ -134,16 +133,15 @@ class AdventurousBehavior (BaseAdventurousBehavior):
             in_toc.add(spine_index)
         
         # Include adjacent sections that aren't in the toc
-        include_sections, in_toc = self.search_in_toc(0, 0, in_toc, include_sections)
-        return include_sections, in_toc
+        in_toc = self.search_in_toc(0, 0, in_toc)
+        return in_toc
         
     # Find adjacent sections in the spine that aren't in the TOC that should be included in the section group
     # index (integer) - the index to search from
     # num_found (integer) - the number of entries in the section group that were found in this recursive search
     # in_toc (List(integer)) - the indicies of the sections included in the section group
-    # include_sections (List(string)) - the list of sections to include in the section group
     # found_first_toc_entry (boolean) - whether the first section in the TOC has been found yet
-    def search_in_toc(self, index, num_found, in_toc, include_sections, found_first_toc_entry=False):
+    def search_in_toc(self, index, num_found, in_toc, found_first_toc_entry=False):
         next_index = index + 1
         
         if (index not in in_toc):
@@ -157,19 +155,17 @@ class AdventurousBehavior (BaseAdventurousBehavior):
             # and this section isn't in the toc
             if (index - 1 in in_toc):
                 if (page_in_toc is None):
-                    include_sections.add(self.spine[index])
                     in_toc.add(index)
                 
             # Only check the next section if not all the sections included in the toc have been found
             if (next_index < len(self.spine) and num_found < len(in_toc)):
-                include_sections, in_toc = self.search_in_toc(next_index, num_found, in_toc, include_sections, found_first_toc_entry)
+                in_toc = self.search_in_toc(next_index, num_found, in_toc, found_first_toc_entry)
         else:
             # Include all sections not included in the toc at the beginning of the book
             if (found_first_toc_entry == False):
                 found_first_toc_entry = True
                 i = index - 1
                 while (i >= 0):
-                    include_sections.add(self.spine[i])
                     in_toc.add(i)
                     
                     i = i - 1
@@ -178,6 +174,6 @@ class AdventurousBehavior (BaseAdventurousBehavior):
             
             # Always check the section after the last included in the toc
             if (next_index < len(self.spine)):
-                include_sections, in_toc = self.search_in_toc(next_index, num_found, in_toc, include_sections, found_first_toc_entry)
+                in_toc = self.search_in_toc(next_index, num_found, in_toc, found_first_toc_entry)
             
-        return include_sections, in_toc         
+        return in_toc         
