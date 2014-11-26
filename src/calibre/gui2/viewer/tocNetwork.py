@@ -38,7 +38,7 @@ class TOCNetworkView (QWebView):
         self.loaded = True
         self.page().mainFrame().addToJavaScriptWindowObject("container", self)
         if (self.curr_page != -1 and self.toc_created == False):
-            self.create_toc_network()
+            self.create_toc_network(0)
             
     # Stores a new edge to add to the network
     # newJSON (string) - the data defining the edges and nodes in the network

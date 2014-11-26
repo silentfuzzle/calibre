@@ -46,8 +46,8 @@ pointer-events: none;
 //LAYOUT AND BEHAVIOR VARIABLES
 ///////////////////////////////////////////////////////////////////////////////
 
-var width = 500,
-    height = 500;
+var svgWidth = 500,
+    svgHeight = 500;
 
 var textDefaultOpacity = 0;
 var textVisibleOpacity = 0.6;
@@ -170,7 +170,7 @@ function dataLoaded(data, pageNum, historyOffset) {
     force = d3.layout.force() 
         .nodes(nodes) 
         .links(links) 
-        .size([width, height]) 
+        .size([svgWidth, svgHeight]) 
         .linkDistance(50)
         .charge(-100)
         .on("tick", tick)
@@ -400,6 +400,7 @@ function colorNodes(currPage) {
     node.each(function(n) {
         if (n.id == currPage) {
             d3.select(this).select("circle").style("fill", nodeHighlightColor);
+            n.topacity = textVisibleOpacity;
             
             // Set the text of all connected nodes to visible
             var nodeLinks = getUpdateLinks(n.id);
@@ -712,18 +713,24 @@ function redraw() {
 // x1 - the x-position stored in the node's data
 // y1 - the y-position stored in the node's data
 function centerNode(x1, y1) {
+    // Get the width and height of the document
+    var bodyWidth = d3.select("body").style("width");
+    var bodyHeight = d3.select("body").style("height");
+    bodyWidth = parseInt(bodyWidth.substring(0, bodyWidth.length - 2));
+    bodyHeight = parseInt(bodyHeight.substring(0, bodyHeight.length - 2));
+    
     scale = zoomListener.scale();
     
     // Center the node at 0 on the svg
-    x2 = (width / 2 - x1);
-    y2 = (height / 2 - y1);
+    x2 = (bodyWidth / 2 - x1);
+    y2 = (bodyHeight / 2 - y1);
     
     // Get the screen position of the node at the center of the svg
     var sPos = getScreenCoords(x1, y1, [x2, y2], scale);
     
     // Center the node on the display
-    x2 = x2 + (width / 2 - sPos[0]);
-    y2 = y2 + (height / 2 - sPos[1]);
+    x2 = x2 + (bodyWidth / 2 - sPos[0]);
+    y2 = y2 + (bodyHeight / 2 - sPos[1]);
     
     // Apply the transformation to the display
     zoomListener.scale(scale);
@@ -836,7 +843,6 @@ function removeZoomListener() {
     svg.on("mousewheel.zoom", null);
     svg.on("MozMousePixelScroll.zoom", null);
     node.call(force.drag);
-    d3.select("div#controls button").select("text").text("On");
 }
 
 // Sets the control scheme to navigating nodes
@@ -844,7 +850,6 @@ function addZoomListener() {
     node.on('mousedown.drag', null);
     node.on('touchstart.drag', null);
     zoomListener(svg);
-    d3.select("div#controls button").select("text").text("Off");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
