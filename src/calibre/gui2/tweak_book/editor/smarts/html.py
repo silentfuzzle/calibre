@@ -10,13 +10,17 @@ import sys, re
 from operator import itemgetter
 
 from cssutils import parseStyle
-from PyQt5.Qt import QTextEdit
+from PyQt5.Qt import QTextEdit, Qt
 
-from calibre import prepare_string_for_xml
+from calibre import prepare_string_for_xml, xml_entity_to_unicode
 from calibre.gui2 import error_dialog
 from calibre.gui2.tweak_book.editor.syntax.html import ATTR_NAME, ATTR_END, ATTR_START, ATTR_VALUE
 from calibre.utils.icu import utf16_length
-from calibre.gui2.tweak_book.editor.smart import NullSmarts
+from calibre.gui2.tweak_book import tprefs
+from calibre.gui2.tweak_book.editor.smarts import NullSmarts
+from calibre.gui2.tweak_book.editor.smarts.utils import (
+    no_modifiers, get_leading_whitespace_on_block, get_text_before_cursor,
+    get_text_after_cursor, smart_home, smart_backspace, smart_tab, expand_tabs)
 
 get_offset = itemgetter(0)
 PARAGRAPH_SEPARATOR = '\u2029'
@@ -31,6 +35,11 @@ class Tag(object):
             tag = tag_start.prefix + ':' + tag
         self.name = tag
         self.self_closing = self_closing
+
+    def __repr__(self):
+        return '<%s start_block=%s start_offset=%s end_block=%s end_offset=%s self_closing=%s>' % (
+            self.name, self.start_block.blockNumber(), self.start_offset, self.end_block.blockNumber(), self.end_offset, self.self_closing)
+    __str__ = __repr__
 
 def next_tag_boundary(block, offset, forward=True):
     while block.isValid():
@@ -268,9 +277,17 @@ def set_style_property(tag, property_name, value, editor):
         d.setProperty(property_name, value)
         c.insertText('"%s"' % css(d))
 
-class HTMLSmarts(NullSmarts):
+entity_pat = re.compile(r'&(#{0,1}[a-zA-Z0-9]{1,8});$')
+
+class Smarts(NullSmarts):
 
     def __init__(self, *args, **kwargs):
+        if not hasattr(Smarts, 'regexps_compiled'):
+            Smarts.regexps_compiled = True
+            Smarts.tag_pat = re.compile(r'<[^>]+>')
+            Smarts.closing_tag_pat = re.compile(r'<\s*/[^>]+>')
+            Smarts.closing_pat = re.compile(r'<\s*/')
+            Smarts.self_closing_pat = re.compile(r'/\s*>')
         NullSmarts.__init__(self, *args, **kwargs)
         self.last_matched_tag = None
 
@@ -451,8 +468,10 @@ class HTMLSmarts(NullSmarts):
         ''' Move the cursor to the tag identified by sourceline and tags (a
         list of tags names on the specified line). If attribute is specified
         the cursor will be placed at the start of the attribute value. '''
-        block = editor.document().findBlockByNumber(sourceline - 1)  # blockNumber() is zero based
         found_tag = False
+        if sourceline is None:
+            return found_tag
+        block = editor.document().findBlockByNumber(sourceline - 1)  # blockNumber() is zero based
         if not block.isValid():
             return found_tag
         c = editor.textCursor()
@@ -527,3 +546,114 @@ class HTMLSmarts(NullSmarts):
         for tag in reversed(tags):
             set_style_property(tag, 'text-align', value, editor)
 
+    def handle_key_press(self, ev, editor):
+        ev_text = ev.text()
+        key = ev.key()
+        is_xml = editor.syntax == 'xml'
+
+        if tprefs['replace_entities_as_typed'] and (key == Qt.Key_Semicolon or ';' in ev_text):
+            self.replace_possible_entity(editor)
+            return True
+
+        if key in (Qt.Key_Enter, Qt.Key_Return) and no_modifiers(ev, Qt.ControlModifier, Qt.AltModifier):
+            ls = get_leading_whitespace_on_block(editor)
+            if ls == ' ':
+                ls = ''  # Do not consider a single leading space as indentation
+            if is_xml:
+                count = 0
+                for m in self.tag_pat.finditer(get_text_before_cursor(editor)[1]):
+                    text = m.group()
+                    if self.closing_pat.search(text) is not None:
+                        count -= 1
+                    elif self.self_closing_pat.search(text) is None:
+                        count += 1
+                if self.closing_tag_pat.match(get_text_after_cursor(editor)[1].lstrip()):
+                    count -= 1
+                if count > 0:
+                    ls += editor.tw * ' '
+            editor.textCursor().insertText('\n' + ls)
+            return True
+
+        if key == Qt.Key_Slash:
+            cursor, text = get_text_before_cursor(editor)
+            if not text.rstrip().endswith('<'):
+                return False
+            text = expand_tabs(text.rstrip()[:-1], editor.tw)
+            pls = get_leading_whitespace_on_block(editor, previous=True)
+            if is_xml and not text.lstrip() and len(text) > 1 and len(text) >= len(pls):
+                # Auto-dedent
+                text = text[:-editor.tw] + '</'
+                cursor.insertText(text)
+                editor.setTextCursor(cursor)
+                self.auto_close_tag(editor)
+                return True
+            if self.auto_close_tag(editor):
+                return True
+
+        if key == Qt.Key_Home and smart_home(editor, ev):
+            return True
+
+        if key == Qt.Key_Tab and smart_tab(editor, ev):
+            return True
+
+        if key == Qt.Key_Backspace and smart_backspace(editor, ev):
+            return True
+
+        return False
+
+    def replace_possible_entity(self, editor):
+        c = editor.textCursor()
+        c.insertText(';')
+        c.setPosition(c.position() - min(c.positionInBlock(), 10), c.KeepAnchor)
+        text = editor.selected_text_from_cursor(c)
+        m = entity_pat.search(text)
+        if m is not None:
+            ent = m.group()
+            repl = xml_entity_to_unicode(m)
+            if repl != ent:
+                c.setPosition(c.position() + m.start(), c.KeepAnchor)
+                c.insertText(repl)
+                editor.setTextCursor(c)
+
+    def auto_close_tag(self, editor):
+        c = editor.textCursor()
+        block, offset = c.block(), c.positionInBlock()
+        tag = find_closest_containing_tag(block, offset - 1, max_tags=4000)
+        if tag is None:
+            return False
+        c.insertText('/%s>' % tag.name)
+        editor.setTextCursor(c)
+        return True
+
+if __name__ == '__main__':
+    from calibre.gui2.tweak_book.editor.widget import launch_editor
+    launch_editor('''\
+<!DOCTYPE html>
+<html xml:lang="en" lang="en">
+<!--
+-->
+    <head>
+        <meta charset="utf-8" />
+        <title>A title with a tag <span> in it, the tag is treated as normal text</title>
+        <style type="text/css">
+            body {
+                  color: green;
+                  font-size: 12pt;
+            }
+        </style>
+        <style type="text/css">p.small { font-size: x-small; color:gray }</style>
+    </head id="invalid attribute on closing tag">
+    <body lang="en_IN"><p:
+        <!-- The start of the actual body text -->
+        <h1 lang="en_US">A heading that should appear in bold, with an <i>italic</i> word</h1>
+        <p>Some text with inline formatting, that is syntax highlighted. A <b>bold</b> word, and an <em>italic</em> word. \
+<i>Some italic text with a <b>bold-italic</b> word in </i>the middle.</p>
+        <!-- Let's see what exotic constructs like namespace prefixes and empty attributes look like -->
+        <svg:svg xmlns:svg="http://whatever" />
+        <input disabled><input disabled /><span attr=<></span>
+        <!-- Non-breaking spaces are rendered differently from normal spaces, so that they stand out -->
+        <p>Some\xa0words\xa0separated\xa0by\xa0non\u2011breaking\xa0spaces and non\u2011breaking hyphens.</p>
+        <p>Some non-BMP unicode text:\U0001f431\U0001f431\U0001f431</p>
+    </body>
+</html>
+''', path_is_raw=True, syntax='xml')

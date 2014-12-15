@@ -415,18 +415,17 @@ class CcCommentsDelegate(QStyledItemDelegate):  # {{{
         style = QApplication.style() if option.widget is None \
                                                 else option.widget.style()
         self.document.setHtml(option.text)
-        option.text = u''
-        if hasattr(QStyle, 'CE_ItemViewItem'):
-            style.drawControl(QStyle.CE_ItemViewItem, option, painter)
+        style.drawPrimitive(QStyle.PE_PanelItemViewItem, option, painter, widget=option.widget)
         ctx = QAbstractTextDocumentLayout.PaintContext()
-        ctx.palette = option.palette  # .setColor(QPalette.Text, QColor("red"));
-        if hasattr(QStyle, 'SE_ItemViewItemText'):
-            textRect = style.subElementRect(QStyle.SE_ItemViewItemText, option)
-            painter.save()
-            painter.translate(textRect.topLeft())
-            painter.setClipRect(textRect.translated(-textRect.topLeft()))
-            self.document.documentLayout().draw(painter, ctx)
-            painter.restore()
+        ctx.palette = option.palette
+        if option.state & QStyle.State_Selected:
+            ctx.palette.setColor(ctx.palette.Text, ctx.palette.color(ctx.palette.HighlightedText))
+        textRect = style.subElementRect(QStyle.SE_ItemViewItemText, option)
+        painter.save()
+        painter.translate(textRect.topLeft())
+        painter.setClipRect(textRect.translated(-textRect.topLeft()))
+        self.document.documentLayout().draw(painter, ctx)
+        painter.restore()
 
     def createEditor(self, parent, option, index):
         m = index.model()

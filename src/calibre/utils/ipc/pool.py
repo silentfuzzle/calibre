@@ -12,7 +12,7 @@ from collections import namedtuple
 from Queue import Queue
 
 from calibre import detect_ncpus, as_unicode, prints
-from calibre.constants import iswindows
+from calibre.constants import iswindows, DEBUG
 from calibre.ptempfile import PersistentTemporaryFile
 from calibre.utils import join_with_timeout
 from calibre.utils.ipc import eintr_retry_call
@@ -26,9 +26,54 @@ File = namedtuple('File', 'name')
 MAX_SIZE = 30 * 1024 * 1024  # max size of data to send over the connection (old versions of windows cannot handle arbitrary data lengths)
 
 worker_kwargs = {'stdout':None}
-if iswindows and getattr(sys, 'gui_app', False):
-    from calibre.utils.ipc.launch import windows_null_file
-    worker_kwargs['stdout'] = worker_kwargs['stderr'] = windows_null_file
+get_stdout_from_child = False
+
+if iswindows:
+    # The windows console cannot show output from child processes
+    # created with CREATE_NO_WINDOW, so the stdout/stderr file handles
+    # the child process inherits will be broken. Similarly, windows GUI apps
+    # have no usable stdout/stderr file handles. In both these cases, redirect
+    # the child's stdout/stderr to NUL. If we are running in calibre-debug -g,
+    # then redirect to PIPE and read from PIPE and print to our stdout.
+    # Note that when running via the "Restart in debug mode" action, stdout is
+    # not a console (its already redirected to a log file), so no redirection
+    # is required.
+    if getattr(sys, 'gui_app', False) or getattr(sys.stdout, 'isatty', lambda : False)():
+        if DEBUG:
+            # We are running in a windows console with calibre-debug -g
+            import subprocess
+            get_stdout_from_child = True
+            worker_kwargs['stdout'] = subprocess.PIPE
+            worker_kwargs['stderr'] = subprocess.STDOUT
+        else:
+            from calibre.utils.ipc.launch import windows_null_file
+            worker_kwargs['stdout'] = worker_kwargs['stderr'] = windows_null_file
+
+def get_stdout(process):
+    import time
+    while process.poll() is None:
+        try:
+            raw = process.stdout.read(1)
+            if raw:
+                try:
+                    sys.stdout.write(raw)
+                except EnvironmentError:
+                    pass
+            else:
+                time.sleep(0.1)
+        except (EOFError, EnvironmentError):
+            break
+
+def start_worker(code, name=''):
+    from calibre.utils.ipc.simple_worker import start_pipe_worker
+    if name:
+        name = '-' + name
+    p = start_pipe_worker(code, **worker_kwargs)
+    if get_stdout_from_child:
+        t = Thread(target=get_stdout, name='PoolWorkerGetStdout' + name, args=(p,))
+        t.daemon = True
+        t.start()
+    return p
 
 class Failure(Exception):
 
@@ -65,6 +110,7 @@ class Worker(object):
 
     def set_common_data(self, data):
         eintr_retry_call(self.conn.send_bytes, data)
+
 
 class Pool(Thread):
 
@@ -136,9 +182,7 @@ class Pool(Thread):
         self.shutdown_workers(wait_time=wait_time)
 
     def create_worker(self):
-        from calibre.utils.ipc.simple_worker import start_pipe_worker
-        p = start_pipe_worker(
-            'from {0} import run_main, {1}; run_main({1})'.format(self.__class__.__module__, 'worker_main'), **worker_kwargs)
+        p = start_worker('from {0} import run_main, {1}; run_main({1})'.format(self.__class__.__module__, 'worker_main'))
         sys.stdout.flush()
         eintr_retry_call(p.stdin.write, self.worker_data)
         p.stdin.flush(), p.stdin.close()
@@ -338,6 +382,9 @@ def run_main(func):
     address, key = cPickle.loads(eintr_retry_call(sys.stdin.read))
     with closing(Client(address, authkey=key)) as conn:
         raise SystemExit(func(conn))
+
+def test_write():
+    print ('Printing to stdout in worker')
 
 def test():
     def get_results(pool, ignore_fail=False):

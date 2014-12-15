@@ -440,20 +440,20 @@ class libiMobileDevice():
     def load_library(self):
         if islinux:
             env = "linux"
-            self.lib = cdll.LoadLibrary('libimobiledevice.so.4')
-            self.plist_lib = cdll.LoadLibrary('libplist.so.2')
+            self.lib = cdll.LoadLibrary('libimobiledevice.so.5')
+            self.plist_lib = cdll.LoadLibrary('libplist.so.3')
         elif isosx:
             env = "OS X"
 
             # Load libiMobileDevice
-            path = 'libimobiledevice.4.dylib'
+            path = 'libimobiledevice.5.dylib'
             if hasattr(sys, 'frameworks_dir'):
                 self.lib = cdll.LoadLibrary(os.path.join(getattr(sys, 'frameworks_dir'), path))
             else:
                 self.lib = cdll.LoadLibrary(path)
 
             # Load libplist
-            path = 'libplist.2.dylib'
+            path = 'libplist.3.dylib'
             if hasattr(sys, 'frameworks_dir'):
                 self.plist_lib = cdll.LoadLibrary(os.path.join(getattr(sys, 'frameworks_dir'), path))
             else:
@@ -978,7 +978,7 @@ class libiMobileDevice():
             if error:
                 self._log_error(" ERROR: {0} handle:{1}".format(self._afc_error(error), handle.value))
                 return False
-            elif bytes_written.value == 0:
+            elif bytes_written.value <= 0:
                 self._log_error(" ERROR: writing {0:,} bytes, 0 bytes written, handle:{1}".format(bytes_remaining, handle.value))
                 return False
             else:

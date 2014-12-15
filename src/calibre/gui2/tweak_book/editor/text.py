@@ -6,7 +6,7 @@ from __future__ import (unicode_literals, division, absolute_import,
 __license__ = 'GPL v3'
 __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 
-import re
+import re, importlib
 import textwrap, unicodedata
 from future_builtins import map
 
@@ -16,27 +16,35 @@ from PyQt5.Qt import (
     QTextEdit, QTextFormat, QWidget, QSize, QPainter, Qt, QRect, pyqtSlot,
     QApplication, QMimeData, QColor, QColorDialog, QTimer, pyqtSignal, QT_VERSION)
 
-from calibre import prepare_string_for_xml, xml_entity_to_unicode
+from calibre import prepare_string_for_xml
 from calibre.constants import isosx
 from calibre.gui2.tweak_book import tprefs, TOP
 from calibre.gui2.tweak_book.editor import (
     SYNTAX_PROPERTY, SPELL_PROPERTY, SPELL_LOCALE_PROPERTY, store_locale, LINK_PROPERTY)
 from calibre.gui2.tweak_book.editor.themes import get_theme, theme_color, theme_format
 from calibre.gui2.tweak_book.editor.syntax.base import SyntaxHighlighter
-from calibre.gui2.tweak_book.editor.syntax.html import HTMLHighlighter, XMLHighlighter
-from calibre.gui2.tweak_book.editor.syntax.css import CSSHighlighter
-from calibre.gui2.tweak_book.editor.smart import NullSmarts
-from calibre.gui2.tweak_book.editor.smart.html import HTMLSmarts
-from calibre.gui2.tweak_book.editor.smart.css import CSSSmarts
+from calibre.gui2.tweak_book.editor.smarts import NullSmarts
 from calibre.spell.break_iterator import index_of
 from calibre.utils.icu import safe_chr, string_length, capitalize, upper, lower, swapcase
 from calibre.utils.titlecase import titlecase
 
 PARAGRAPH_SEPARATOR = '\u2029'
-entity_pat = re.compile(r'&(#{0,1}[a-zA-Z0-9]{1,8});')
 
 def get_highlighter(syntax):
-    return {'html':HTMLHighlighter, 'css':CSSHighlighter, 'xml':XMLHighlighter}.get(syntax, SyntaxHighlighter)
+    if syntax:
+        try:
+            return importlib.import_module('calibre.gui2.tweak_book.editor.syntax.' + syntax).Highlighter
+        except (ImportError, AttributeError):
+            pass
+    return SyntaxHighlighter
+
+def get_smarts(syntax):
+    if syntax:
+        smartsname = {'xml':'html'}.get(syntax, syntax)
+        try:
+            return importlib.import_module('calibre.gui2.tweak_book.editor.smarts.' + smartsname).Smarts
+        except (ImportError, AttributeError):
+            pass
 
 _dff = None
 def default_font_family():
@@ -131,8 +139,10 @@ class TextEdit(PlainTextEdit):
     def __init__(self, parent=None, expected_geometry=(100, 50)):
         PlainTextEdit.__init__(self, parent)
         self.gutter_width = 0
+        self.tw = 2
         self.expected_geometry = expected_geometry
         self.saved_matches = {}
+        self.syntax = None
         self.smarts = NullSmarts(self)
         self.current_cursor_line = None
         self.current_search_mark = None
@@ -145,7 +155,6 @@ class TextEdit(PlainTextEdit):
         self.cursorPositionChanged.connect(self.highlight_cursor_line)
         self.blockCountChanged[int].connect(self.update_line_number_area_width)
         self.updateRequest.connect(self.update_line_number_area)
-        self.syntax = None
 
     @dynamic_property
     def is_modified(self):
@@ -167,7 +176,8 @@ class TextEdit(PlainTextEdit):
         self.apply_theme(theme)
         w = self.fontMetrics()
         self.space_width = w.width(' ')
-        self.setTabStopWidth(prefs['editor_tab_stop_width'] * self.space_width)
+        self.tw = self.smarts.override_tab_stop_width if self.smarts.override_tab_stop_width is not None else prefs['editor_tab_stop_width']
+        self.setTabStopWidth(self.tw * self.space_width)
         if dictionaries_changed:
             self.highlighter.rehighlight()
 
@@ -210,10 +220,13 @@ class TextEdit(PlainTextEdit):
         self.highlighter = get_highlighter(syntax)()
         self.highlighter.apply_theme(self.theme)
         self.highlighter.set_document(self.document(), doc_name=doc_name)
-        sclass = {'html':HTMLSmarts, 'xml':HTMLSmarts, 'css':CSSSmarts}.get(syntax, None)
+        sclass = get_smarts(syntax)
         if sclass is not None:
             self.smarts = sclass(self)
-        self.setPlainText(unicodedata.normalize('NFC', text))
+            if self.smarts.override_tab_stop_width is not None:
+                self.tw = self.smarts.override_tab_stop_width
+                self.setTabStopWidth(self.tw * self.space_width)
+        self.setPlainText(unicodedata.normalize('NFC', unicode(text)))
         if process_template and QPlainTextEdit.find(self, '%CURSOR%'):
             c = self.textCursor()
             c.insertText('')
@@ -234,8 +247,8 @@ class TextEdit(PlainTextEdit):
         self.setTextCursor(c)
         self.ensureCursorVisible()
 
-    def simple_replace(self, text):
-        c = self.textCursor()
+    def simple_replace(self, text, cursor=None):
+        c = cursor or self.textCursor()
         c.insertText(unicodedata.normalize('NFC', text))
         self.setTextCursor(c)
 
@@ -268,7 +281,7 @@ class TextEdit(PlainTextEdit):
             sel.append(self.current_cursor_line)
         if self.current_search_mark is not None:
             sel.append(self.current_search_mark)
-        if instant and not self.highlighter.has_requests:
+        if instant and not self.highlighter.has_requests and self.smarts is not None:
             sel.extend(self.smarts.get_extra_selections(self))
             self.smart_highlighting_updated.emit()
         else:
@@ -343,7 +356,15 @@ class TextEdit(PlainTextEdit):
         if template is None:
             count = len(pat.findall(raw))
         else:
+            from calibre.gui2.tweak_book.function_replace import Function
+            repl_is_func = isinstance(template, Function)
+            if repl_is_func:
+                template.init_env()
             raw, count = pat.subn(template, raw)
+            if repl_is_func:
+                from calibre.gui2.tweak_book.search import show_function_debug_output
+                template.end()
+                show_function_debug_output(template)
             if count > 0:
                 start_pos = min(c.anchor(), c.position())
                 c.insertText(raw)
@@ -456,7 +477,10 @@ class TextEdit(PlainTextEdit):
                     m = saved
         if m is None:
             return False
-        text = m.expand(template)
+        if callable(template):
+            text = template(m)
+        else:
+            text = m.expand(template)
         c.insertText(text)
         return True
 
@@ -744,9 +768,9 @@ class TextEdit(PlainTextEdit):
             # https://bugreports.qt-project.org/browse/QTBUG-36281
             ev.setAccepted(False)
             return
+        if self.smarts.handle_key_press(ev, self):
+            return
         QPlainTextEdit.keyPressEvent(self, ev)
-        if (ev.key() == Qt.Key_Semicolon or ';' in unicode(ev.text())) and tprefs['replace_entities_as_typed'] and self.syntax == 'html':
-            self.replace_possible_entity()
 
     def replace_possible_unicode_sequence(self):
         c = self.textCursor()
@@ -771,19 +795,6 @@ class TextEdit(PlainTextEdit):
         c.insertText(safe_chr(num))
         return True
 
-    def replace_possible_entity(self):
-        c = self.textCursor()
-        c.setPosition(c.position() - min(c.positionInBlock(), 10), c.KeepAnchor)
-        text = unicode(c.selectedText()).rstrip('\0')
-        m = entity_pat.search(text)
-        if m is None:
-            return
-        ent = m.group()
-        repl = xml_entity_to_unicode(m)
-        if repl != ent:
-            c.setPosition(c.position() + m.start(), c.KeepAnchor)
-            c.insertText(repl)
-
     def select_all(self):
         c = self.textCursor()
         c.clearSelection()
@@ -807,7 +818,7 @@ class TextEdit(PlainTextEdit):
             return self.selected_text_from_cursor(c)
 
     def goto_css_rule(self, rule_address, sourceline_address=None):
-        from calibre.gui2.tweak_book.editor.smart.css import find_rule
+        from calibre.gui2.tweak_book.editor.smarts.css import find_rule
         block = None
         if self.syntax == 'css':
             raw = unicode(self.toPlainText())

@@ -344,18 +344,20 @@ def run_gui(opts, args, listener, app, gui_debug=None):
         wizard().exec_()
     if getattr(runner.main, 'restart_after_quit', False):
         e = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
-        if getattr(runner.main, 'debug_on_restart', False):
+        if getattr(runner.main, 'debug_on_restart', False) or gui_debug is not None:
             run_in_debug_mode()
         else:
             import subprocess
-            print 'Restarting with:', e, sys.argv
             if hasattr(sys, 'frameworks_dir'):
                 app = os.path.dirname(os.path.dirname(os.path.realpath(sys.frameworks_dir)))
+                prints('Restarting with:', app)
                 subprocess.Popen('sleep 3s; open ' + shellquote(app), shell=True)
             else:
                 if iswindows and hasattr(winutil, 'prepare_for_restart'):
                     winutil.prepare_for_restart()
-                subprocess.Popen([e] + sys.argv[1:])
+                args = ['-g'] if os.path.splitext(e)[0].endswith('-debug') else []
+                prints('Restarting with:', ' '.join([e] + args))
+                subprocess.Popen([e] + args)
     else:
         if iswindows:
             try:

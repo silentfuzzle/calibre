@@ -9,7 +9,7 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 import re, os
 from bisect import bisect
 
-from calibre import guess_type as _guess_type
+from calibre import guess_type as _guess_type, prepare_string_for_xml, replace_entities
 
 def guess_type(x):
     return _guess_type(x)[0] or 'application/octet-stream'
@@ -171,4 +171,30 @@ def parse_css(data, fname='<string>', is_declaration=False, decode=None, log_lev
     else:
         data = parser.parseString(data, href=fname, validate=False)
     return data
+
+def handle_entities(text, func):
+    return prepare_string_for_xml(func(replace_entities(text)))
+
+def apply_func_to_match_groups(match, func=icu_upper, handle_entities=handle_entities):
+    '''Apply the specified function to individual groups in the match object (the result of re.search() or
+    the whole match if no groups were defined. Returns the replaced string.'''
+    found_groups = False
+    i = 0
+    parts, pos = [], match.start()
+    f = lambda text:handle_entities(text, func)
+    while True:
+        i += 1
+        try:
+            start, end = match.span(i)
+        except IndexError:
+            break
+        found_groups = True
+        if start > -1:
+            parts.append(match.string[pos:start])
+            parts.append(f(match.string[start:end]))
+            pos = end
+    if not found_groups:
+        return f(match.group())
+    parts.append(match.string[pos:match.end()])
+    return ''.join(parts)
 
