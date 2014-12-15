@@ -40,8 +40,6 @@ pointer-events: none;
  * License: GNU GPL v3
  */
 
-//d3.json("eBookGraph.json", dataLoaded)
-
 ///////////////////////////////////////////////////////////////////////////////
 //LAYOUT AND BEHAVIOR VARIABLES
 ///////////////////////////////////////////////////////////////////////////////
@@ -89,6 +87,7 @@ var force;
 var node = 0;
 var link;
 var numLinks = 0;
+var allVisible = false;
   
 // Set the viewer window to fill the TOC panel
 var svg = d3.select("body")
@@ -132,6 +131,7 @@ function dataLoaded(data, pageNum, historyOffset) {
         force.stop();
         
         // Save the current node positions in a dictionary
+        var defaultOpacity = getDefaultTextOpacity();
         node.each(function(d) {
             var nodeInfo = [];
             nodeInfo[0] = d.x;
@@ -155,16 +155,10 @@ function dataLoaded(data, pageNum, historyOffset) {
                 n.fixed = false;
             }
             n.r = nodeDefaultRadius;
-            n.topacity = textDefaultOpacity;
+            n.topacity = defaultOpacity;
         });
     }
     else {
-        // The text of all nodes is visible if no links exist
-        var defaultOpacity = textDefaultOpacity;
-        if (numLinks == 0) {
-            defaultOpacity = textVisibleOpacity;
-        }
-        
         // Set the default value for nodes when the network is initialized for the first time
         nodes.forEach(function(n) {
             n.r = nodeDefaultRadius;
@@ -292,16 +286,28 @@ function changePage(pageNum, historyOffset) {
         currNode = history.replaceNode(pageNum);
     }
     
-    // Make sure the text of each node is set to the default opacity before coloring
-    if (numLinks > 0) {
-        node.each(function(n) {
-            n.topacity = textDefaultOpacity;
-        });
-    }
-    
-    // Color the links and nodes
+    // Color the links, titles, and nodes
+    resetTextOpacities();
     colorHistory(currNode);
     colorNodes(pageNum);
+}
+
+// Toggle the visibility of all node labels on and off
+// True (1) if all labels should be visible, false (0) if not
+function toggleLabels(makeVisible) {
+    allVisible = makeVisible;
+    
+    resetTextOpacities();
+    if (allVisible) {
+        // Set all text visible
+        applyTextOpacities();
+    }
+    else {
+        // Set the text opacities from the user's position
+        var currNode = history.currNode;
+        colorHistory(currNode);
+        colorNodes(currNode.pos);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -397,6 +403,32 @@ function setTextDefault(nodeSVG) {
     animateText(nodeSVG, false, false);
 }
 
+// Returns the default opacity to set all node labels to
+function getDefaultTextOpacity() {
+    if (numLinks == 0 || allVisible) {
+        // All labels are visible if selected by the user or no links exist
+        return textVisibleOpacity;
+    }
+    else {
+        return textDefaultOpacity;
+    }
+}
+
+// Set the opacities of all nodes back to the default before coloring
+function resetTextOpacities() {
+    var defaultOpacity = getDefaultTextOpacity();
+    node.each(function(n) {
+        n.topacity = defaultOpacity;
+    });
+}
+
+// Apply the set opacities to the network interface
+function applyTextOpacities() {
+    node.selectAll("text")
+        .selectAll('tspan')
+        .style("opacity", function(d) { return d.topacity; });
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //DRAW NODE METHODS
 ///////////////////////////////////////////////////////////////////////////////
@@ -420,10 +452,7 @@ function colorNodes(currPage) {
         }
     });
     
-    // Apply the set opacities to the nodes' text
-    node.selectAll("text")
-        .selectAll('tspan')
-        .style("opacity", function(d) { return d.topacity; });
+    applyTextOpacities();
 }
 
 // Grows the radius of a node to its maximum size and repositions its title

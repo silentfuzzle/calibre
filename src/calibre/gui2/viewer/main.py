@@ -8,12 +8,12 @@ from threading import Thread
 
 from PyQt5.Qt import (
     QApplication, Qt, QIcon, QTimer, QByteArray, QSize, QTime,
-    QPropertyAnimation, QUrl, QInputDialog, QAction, QModelIndex)
+    QPropertyAnimation, QUrl, QInputDialog, QAction, QModelIndex, QVBoxLayout, QWidget)
 
 from calibre.gui2.viewer.ui import Main as MainWindow
 from calibre.gui2.viewer.printing import Printing
 from calibre.gui2.viewer.toc import TOC
-from calibre.gui2.viewer.tocNetwork import TOCNetworkView
+from calibre.gui2.viewer.tocNetwork import TOCNetworkView, TOCNetworkSearch, TOCNetworkTools
 from calibre.gui2.viewer.behavior.adventurous_behavior import AdventurousBehavior
 from calibre.gui2.viewer.behavior.adventurous_base_behavior import BaseAdventurousBehavior
 from calibre.gui2.viewer.behavior.calibre_behavior import CalibreBehavior
@@ -142,10 +142,9 @@ class EbookViewer(MainWindow):
                 x:self.scrollbar_goto_page(x/BaseBehavior.PAGE_STEP))
         if (self.viewer_mode == self.CALIBRE_MODE):
             self.toc.pressed[QModelIndex].connect(self.toc_clicked)
+            self.toc.searched.connect(partial(self.toc_clicked, force=True))
         self.search.search.connect(self.find)
         self.search.focus_to_library.connect(lambda: self.view.setFocus(Qt.OtherFocusReason))
-        self.toc.pressed[QModelIndex].connect(self.toc_clicked)
-        self.toc.searched.connect(partial(self.toc_clicked, force=True))
         self.reference.goto.connect(self.goto)
         self.bookmarks.edited.connect(self.bookmarks_edited)
         self.bookmarks.activated.connect(self.goto_bookmark)
@@ -885,13 +884,28 @@ class EbookViewer(MainWindow):
                 # Use default Calibre behavior if the book doesn't have a toc
                 self.toc.setModel(self.toc_model)
                 self.page_behavior = CalibreBehavior(total_num_pages)
-            else:
+            else:                
+                self.toc_container = w = QWidget(self)
+                
+                # Build the network interface
                 ebook_network = EBookNetwork(self.iterator.spine, self.iterator.toc, title, pathtoebook)
-                self.toc = TOCNetworkView(self)
+                self.toc = TOCNetworkView(w)
                 self.toc.set_manager(self)
                 self.toc.set_ebook_network(ebook_network)
-                self.toc_dock.setWidget(self.toc)
                 
+                # Build the network interface tools
+                all_titles = TOCNetworkTools(self.toc, parent=w)                
+                self.toc_search = TOCNetworkSearch(self.toc, parent=w)
+                
+                # Layout the interface
+                w.l = QVBoxLayout(w)
+                w.l.addWidget(self.toc)
+                w.l.addWidget(all_titles)
+                w.l.addWidget(self.toc_search)
+                w.l.setContentsMargins(0, 0, 0, 0)
+                self.toc_dock.setWidget(w)
+                
+                # Determine the behavior of the e-book viewer to use
                 if (self.viewer_mode == self.ADVENTUROUS_MODE):
                     self.page_behavior = AdventurousBehavior(self.iterator.toc, self.iterator.spine, total_num_pages, self.toc, self.setup_vscrollbar)
                 else:

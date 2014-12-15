@@ -7,9 +7,31 @@ __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
 import os
-from PyQt5.Qt import (Qt, QWebView, pyqtSlot)
+from PyQt5.Qt import (Qt, QWebView, QWidget, QToolButton, QHBoxLayout, QSizePolicy, pyqtSlot)
 from calibre.ebooks.oeb.display.webview import load_html
 from calibre.gui2.viewer.toc import TOCSearch
+
+# The class stores controls that allow users to modify the network interface
+class TOCNetworkTools(QWidget):
+
+    # Constructor
+    # toc_view (TOCNetworkView) - the panel containing the network interface
+    # parent (QWidget) - the object containing the network interface and tools
+    def __init__(self, toc_view, parent=None):
+        QWidget.__init__(self, parent)
+        
+        # Create a button that makes all labels visible
+        all_titles = QToolButton(self)
+        all_titles.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        all_titles.setCheckable(True)
+        all_titles.setText("Show Titles")
+        all_titles.toggled[bool].connect(toc_view.toggle_labels)
+        all_titles.setToolTip(_('Toggle all labels visible'))
+        
+        # Layout controls
+        self.l = QHBoxLayout(self)
+        self.l.setContentsMargins(0, 0, 0, 0)
+        self.l.addWidget(all_titles)
        
 # This class controls the widget that allows users to search through node titles.
 class TOCNetworkSearch(TOCSearch):
@@ -30,6 +52,8 @@ class TOCNetworkView (QWebView):
     # Constructor
     def __init__(self, *args):
         QWebView.__init__(self, *args)
+        # Allow the network panel to grow as large as desired
+        self.setSizePolicy(QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding))
         
         self.manager = None
         self.setMinimumWidth(80)
@@ -61,6 +85,30 @@ class TOCNetworkView (QWebView):
         # Add the new edge to the network display
         if (edge_added):
             self.toc_created = False
+                
+    # Searches through the titles of the nodes in the network for the given search term
+    # text (string) - the text to search for
+    def search(self, text):
+        found_page = self.ebook_network.search(text)
+        if (found_page != -1):
+            self.set_curr_page(found_page, -2)
+            
+        return found_page
+    
+    # Sets the object containing the json data to display in the network interface
+    # ebook_network (EBookNetwork) - the object
+    def set_ebook_network(self, ebook_network):
+        self.ebook_network = ebook_network
+        self.load_network()
+        
+    # Sets the pointer to the EbookViewer object
+    # manager (EbookViewer) - the class controlling the ebook viewer interface
+    def set_manager(self, manager):
+        self.manager = manager
+        
+    ###########################################################################
+    #JAVASCRIPT INTERACTION
+    ###########################################################################
         
     # Update the network with the the current stored json code and page number
     # history_offset (int) - An integer representing how the user navigated to the section
@@ -93,26 +141,19 @@ class TOCNetworkView (QWebView):
                 # The user clicked a link or the Javascript finished
                 # loading before this method was called, reload the network data
                 self.create_toc_network(history_offset)
-                
-    # Searches through the titles of the nodes in the network for the given search term
-    # text (string) - the text to search for
-    def search(self, text):
-        found_page = self.ebook_network.search(text)
-        if (found_page != -1):
-            self.set_curr_page(found_page, -2)
-            
-        return found_page
     
-    # Sets the object containing the json data to display in the network interface
-    # ebook_network (EBookNetwork) - the object
-    def set_ebook_network(self, ebook_network):
-        self.ebook_network = ebook_network
-        self.load_network()
-        
-    # Sets the pointer to the EbookViewer object
-    # manager (EbookViewer) - the class controlling the ebook viewer interface
-    def set_manager(self, manager):
-        self.manager = manager
+    # Toggle add the node labels visible or invisible by default
+    # checked (bool) - True if the labels should be visible by default
+    def toggle_labels(self, checked):
+        if (self.loaded):
+            # Convert the bool to an integer for Javascript
+            makeVis = 0
+            if (checked):
+                makeVis = 1
+                
+            jScript = """toggleLabels({makeVisible}); """
+            jScriptFormat = jScript.format(makeVisible=makeVis)
+            self.page().mainFrame().evaluateJavaScript(jScriptFormat)
         
     # Called from the Javascript application when the user clicks a node
     # Changes the user's position in the book to the node/section that was clicked
