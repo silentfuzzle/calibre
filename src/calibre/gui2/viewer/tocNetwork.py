@@ -10,6 +10,7 @@ import os
 from PyQt5.Qt import (Qt, QWebView, QWidget, QToolButton, QHBoxLayout, QSizePolicy, pyqtSlot)
 from calibre.ebooks.oeb.display.webview import load_html
 from calibre.gui2.viewer.toc import TOCSearch
+from calibre.gui2 import error_dialog
 
 # The class stores controls that allow users to modify the network interface
 class TOCNetworkTools(QWidget):
@@ -41,7 +42,7 @@ class TOCNetworkSearch(TOCSearch):
         if not text or not text.strip():
             return
         index = self.toc_view.search(text)
-        if index != -1:
+        if index == -1:
             error_dialog(self.toc_view, _('No matches found'), _(
                 'There are no Table of Contents entries matching: %s') % text, show=True)
         self.search.search_done(True)
@@ -91,7 +92,7 @@ class TOCNetworkView (QWebView):
     def search(self, text):
         found_page = self.ebook_network.search(text)
         if (found_page != -1):
-            self.set_curr_page(found_page, -2)
+            self.change_page(found_page)
             
         return found_page
     

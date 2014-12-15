@@ -66,7 +66,7 @@ class EBookNetwork (object):
                     self.bookGraph.node[t]['title'].lower().find(self.prev_search) != -1):
                 # Note the index to begin the next search on if the user searches for the same term again
                 self.start_search = curr_search + 1
-                return t
+                return float(t)
                 
             curr_search = curr_search + 1
         
