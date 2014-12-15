@@ -19,14 +19,18 @@ class EBookNetwork (object):
         self.toc = toc
         self.spine = spine
         if os.path.exists(self.savePath):
-            # Read the existing ebook's network file
-            json_data = open(self.savePath).read()
-            self.data = json.loads(json_data)
-            self.bookGraph = node_link.node_link_graph(self.data)
-            self.data = json.dumps(self.data)
+            try:
+                # Read the existing ebook's network file
+                json_data = open(self.savePath).read()
+                self.data = json.loads(json_data)
+                self.bookGraph = node_link.node_link_graph(self.data)
+                self.data = json.dumps(self.data)
+            except Exception:
+                # The JSON is unreadable, regenerate it
+                self.generate_network()
+                self.save_graph()
         else:
             # Create a new file to store the ebook's network in
-            # Include all sections with a TOC entry in the network
             self.generate_network()
             self.save_graph()
             
