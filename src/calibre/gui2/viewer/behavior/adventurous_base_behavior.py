@@ -3,7 +3,6 @@ __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
 from calibre.gui2.viewer.behavior.base_behavior import BaseBehavior
-from calibre.gui2.viewer.book_network import EBookNetwork
 
 # This class defines an Adventurous Reader behavior where users can only view one section of the ebook at a time.
 class BaseAdventurousBehavior (BaseBehavior):
@@ -16,11 +15,9 @@ class BaseAdventurousBehavior (BaseBehavior):
     # toc - (calibre.ebooks.metadata.toc.TOC) the current ebook's TOC
     # spine - (List(SpineItem)) the current ebook's ordering of sections
     # default_number_of_pages (number) - the total number of pages in the ebook
-    # title (string) - the title of the ebook
-    # pathtoebook (string) - the full path to the ebook on the user's file system
     # toc_view (TOCNetworkView) - the interface displaying the ebook's network of sections
     # setup_vscrollbar_method (method) - the method setting up the scrollbar and the position displayed in the upper left
-    def __init__(self, toc, spine, default_number_of_pages, title, pathtoebook, toc_view, setup_vscrollbar_method):
+    def __init__(self, toc, spine, default_number_of_pages, toc_view, setup_vscrollbar_method):
         BaseBehavior.__init__(self, default_number_of_pages)
         self.toc = toc
         self.spine = spine
@@ -28,8 +25,6 @@ class BaseAdventurousBehavior (BaseBehavior):
         
         # Setup the interface view of the TOC
         self.toc_view = toc_view
-        self.ebook_network = EBookNetwork(spine, toc, title, pathtoebook)
-        self.toc_view.load_network(self.ebook_network.data)
         self.history_offset = 0
         
     # Sets the current section of the book the user is viewing
@@ -90,7 +85,7 @@ class BaseAdventurousBehavior (BaseBehavior):
     # Adds an edge to the ebook network
     # start_sec (SpineItem) - the node/section to start the edge from
     # end_sec (string) - the node/section to end the edge at
-    # start_sec_checked (boolean) - true if the passed start section was already check for existence in the ebook's TOC
+    # start_sec_checked (boolean) - true if the passed start section was already checked for existence in the ebook's TOC
     def add_network_edge(self, start_sec, end_sec, start_sec_checked=False):
         # Get the TOC and SpineItem entries for the passed end section
         end_toc, corrected_end_sec = self.check_and_get_toc(end_sec)
@@ -101,11 +96,7 @@ class BaseAdventurousBehavior (BaseBehavior):
         
         # Add an edge to the network
         if (corrected_end_sec != start_sec):
-            edge_added = self.ebook_network.add_edge(start_sec.start_page, corrected_end_sec.start_page)
-        
-            # Add the new edge to the network display
-            if (edge_added):
-                self.toc_view.add_edge(self.ebook_network.data)
+            self.toc_view.add_edge(start_sec, corrected_end_sec)
                 
     # Update the user's position and history in the network view
     # curr_sec (SpineItem) - the current section the user is viewing

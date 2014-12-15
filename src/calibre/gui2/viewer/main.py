@@ -18,6 +18,7 @@ from calibre.gui2.viewer.behavior.adventurous_behavior import AdventurousBehavio
 from calibre.gui2.viewer.behavior.adventurous_base_behavior import BaseAdventurousBehavior
 from calibre.gui2.viewer.behavior.calibre_behavior import CalibreBehavior
 from calibre.gui2.viewer.behavior.base_behavior import BaseBehavior
+from calibre.gui2.viewer.book_network import EBookNetwork
 from calibre.gui2.widgets import ProgressIndicator
 from calibre.gui2 import (
     Application, ORG_NAME, APP_UID, choose_files, info_dialog, error_dialog,
@@ -881,18 +882,21 @@ class EbookViewer(MainWindow):
             
             total_num_pages = sum(self.iterator.pages)
             if (self.viewer_mode == self.CALIBRE_MODE or not self.iterator.toc):
-                # Always use default Calibre behavior if the book doesn't have a toc
+                # Use default Calibre behavior if the book doesn't have a toc
                 self.toc.setModel(self.toc_model)
                 self.page_behavior = CalibreBehavior(total_num_pages)
             else:
+                ebook_network = EBookNetwork(self.iterator.spine, self.iterator.toc, title, pathtoebook)
                 self.toc = TOCNetworkView(self)
                 self.toc.set_manager(self)
+                self.toc.set_ebook_network(ebook_network)
                 self.toc_dock.setWidget(self.toc)
+                
                 if (self.viewer_mode == self.ADVENTUROUS_MODE):
-                    self.page_behavior = AdventurousBehavior(self.iterator.toc, self.iterator.spine, total_num_pages, title, pathtoebook, self.toc, self.setup_vscrollbar)
+                    self.page_behavior = AdventurousBehavior(self.iterator.toc, self.iterator.spine, total_num_pages, self.toc, self.setup_vscrollbar)
                 else:
                     if (self.viewer_mode == self.BASE_ADVENTUROUS_MODE):
-                        self.page_behavior = BaseAdventurousBehavior(self.iterator.toc, self.iterator.spine, total_num_pages, title, pathtoebook, self.toc, self.setup_vscrollbar)
+                        self.page_behavior = BaseAdventurousBehavior(self.iterator.toc, self.iterator.spine, total_num_pages, self.toc, self.setup_vscrollbar)
 
             if isbytestring(pathtoebook):
                 pathtoebook = force_unicode(pathtoebook, filesystem_encoding)

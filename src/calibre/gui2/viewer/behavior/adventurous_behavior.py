@@ -17,12 +17,10 @@ class AdventurousBehavior (BaseAdventurousBehavior):
     # toc - (calibre.ebooks.metadata.toc.TOC) the current ebook's TOC
     # spine - (List(SpineItem)) the current ebook's order of sections
     # default_number_of_pages (number) - the total number of pages in the ebook
-    # title (string) - the title of the ebook
-    # pathtoebook (string) - the full path to the ebook on the user's file system
     # toc_view (TOCNetworkView) - the interface displaying the ebook's network of sections
     # setup_vscrollbar_method (method) - the method setting up the scrollbar and the position displayed in the upper left
-    def __init__(self, toc, spine, default_number_of_pages, title, pathtoebook, toc_view, setup_scrollbar_method):
-        BaseAdventurousBehavior.__init__(self, toc, spine, default_number_of_pages, title, pathtoebook, toc_view, setup_scrollbar_method)
+    def __init__(self, toc, spine, default_number_of_pages, toc_view, setup_scrollbar_method):
+        BaseAdventurousBehavior.__init__(self, toc, spine, default_number_of_pages, toc_view, setup_scrollbar_method)
         self.include_sections = Set()
         
     # Sets the current section of the book the user is viewing, the sections the user can view from that section,
