@@ -16,6 +16,8 @@ class EBookNetwork (object):
     # basedir (string) - the full path to the ebook's location
     def __init__(self, spine, toc, title, basedir):
         self.savePath = str(os.path.dirname(basedir)) + "/" + str(title) + "Network.json"
+        self.toc = toc
+        self.spine = spine
         if os.path.exists(self.savePath):
             # Read the existing ebook's network file
             json_data = open(self.savePath).read()
@@ -25,14 +27,7 @@ class EBookNetwork (object):
         else:
             # Create a new file to store the ebook's network in
             # Include all sections with a TOC entry in the network
-            self.bookGraph = digraph.DiGraph()
-            self.testCount = 0
-            for t in toc.flat():
-                if (t.parent is not None):
-                    self.testCount = self.testCount + 1
-                    spine_index = spine.index(t.abspath)
-                    self.bookGraph.add_node(str(spine[spine_index].start_page),label=str(spine[spine_index].start_page),title=t.text)
-            
+            self.generate_network()
             self.save_graph()
             
     # Add an edge from a start to an end node/section
@@ -43,9 +38,28 @@ class EBookNetwork (object):
             # Don't add an edge if it already exists
             return False
         else:
+            if (str(end_page) not in self.bookGraph.node or str(start_page) not in self.bookGraph.node):
+                # The JSON or e-book has been modified, regenerate the graph of nodes
+                old_edges = self.bookGraph.edges()
+                self.generate_network()
+                
+                # Add the edges the user created to the new network
+                self.bookGraph.add_edges_from(old_edges)
+                
+            # Add an edge from the start to the end node
             self.bookGraph.add_edge(str(start_page), str(end_page))
             self.save_graph()
             return True
+                
+    # Generate a new network of nodes from sections in the TOC
+    def generate_network(self):
+        self.bookGraph = digraph.DiGraph()
+        for t in self.toc.flat():
+            if (t.parent is not None):
+                spine_index = self.spine.index(t.abspath)
+                self.bookGraph.add_node(str(self.spine[spine_index].start_page),
+                        label=str(self.spine[spine_index].start_page),
+                        title=t.text)
             
     # Reloads the network display
     def save_graph(self):

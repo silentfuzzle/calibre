@@ -142,12 +142,19 @@ function dataLoaded(data, pageNum, historyOffset) {
         
         // Set the initial node positions to the saved positions
         nodes.forEach(function(n) {
-            var x = nodeDictionary[n.id][0];
-            var y = nodeDictionary[n.id][1];
-            n.x = x;
-            n.y = y;
+            // Make sure this node existed in the previous graph
+            if (nodeDictionary.hasOwnProperty(n.id)) {
+                var x = nodeDictionary[n.id][0];
+                var y = nodeDictionary[n.id][1];
+                n.x = x;
+                n.y = y;
+                n.fixed = nodeDictionary[n.id][2];
+            }
+            else {
+                // Set non-existent nodes to default values
+                n.fixed = false;
+            }
             n.r = nodeDefaultRadius;
-            n.fixed = nodeDictionary[n.id][2];
             n.topacity = textDefaultOpacity;
         });
     }
