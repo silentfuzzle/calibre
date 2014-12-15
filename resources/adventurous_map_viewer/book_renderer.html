@@ -33,6 +33,7 @@ pointer-events: none;
 </style>
 
 <script src=d3.v3.min.js></script>
+<script src=double_linked_nodes.js></script>
 
 <script> 
 /*
@@ -804,7 +805,9 @@ function clickNode() {
     pageNum = d3.select(this).attr("page");
     
     // Call the Python code to change pages
-    container.change_page(pageNum);
+    if (pageNum != history.currNode.pos) {
+        container.change_page(pageNum);
+    }
 }
 
 // Emphasize a node and its associated links on mouse hover
@@ -891,66 +894,6 @@ function addZoomListener() {
 ///////////////////////////////////////////////////////////////////////////////
 //MISCELLANEOUS
 ///////////////////////////////////////////////////////////////////////////////
-
-// Defines a Double-Linked List storage structure for storing the user's history
-function DoubleList() {
-    this.currNode = null;
-    
-    // Set the current position to the next position in history
-    this.nextNode = function(position) {
-        var tempNode = this.currNode;
-        this.currNode = this.currNode.next;
-        
-        // Handle the event that Calibre's history is off
-        if (this.currNode == null) {
-            this.currNode = this.makeNode(position);
-            tempNode.next = this.currNode;
-            this.currNode.prev = tempNode;
-        }
-        
-        return this.currNode;
-    };
-    
-    // Set the current position to the previous position in history
-    this.prevNode = function(position) {
-        var tempNode = this.currNode;
-        this.currNode = this.currNode.prev;
-        
-        // Handle the event that Calibre's history is off
-        if (this.currNode == null) {
-            this.currNode = this.makeNode(position);
-            tempNode.prev = this.currNode;
-            this.currNode.next = tempNode;
-        }
-        
-        return this.currNode;
-    };
-    
-    // Replace the position of the current node with the user's current position
-    this.replaceNode = function(newPosition) {
-        this.currNode.pos = newPosition;
-        return this.currNode;
-    };
-    
-    // Create a position in history
-    this.makeNode = function(position) {
-        var node = { pos: position, next: null, prev: null };
-        return node;
-    };
-        
-    // Add a new position in history, replacing the position after the current position
-    this.addNode = function(position) {
-        var node = this.makeNode(position);
-        if (this.currNode != null) {
-            this.currNode.next = node;
-            node.prev = this.currNode;
-        }
-        
-        // If a current position doesn't exist, set it to the new position
-        this.currNode = node;
-        return node;
-    };
-}
 
 // Returns a list of link svg elements associated with a node with id page
 // page - the id of a node
