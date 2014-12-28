@@ -605,8 +605,7 @@ class EbookViewer(MainWindow):
         frag = None
         if path in self.iterator.spine:
             self.update_page_number()  # Ensure page number is accurate as it is used for history
-            self.history.add(self.page_behavior.absolute_position)
-            self.page_behavior.history_offset = 0
+            self.internal_link_clicked(0)
             path = self.iterator.spine[self.iterator.spine.index(path)]
             if url.hasFragment():
                 frag = unicode(url.fragment())

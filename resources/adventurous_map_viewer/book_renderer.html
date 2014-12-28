@@ -805,9 +805,7 @@ function clickNode() {
     pageNum = d3.select(this).attr("page");
     
     // Call the Python code to change pages
-    if (pageNum != history.currNode.pos) {
-        container.change_page(pageNum);
-    }
+    container.change_page(pageNum);
 }
 
 // Emphasize a node and its associated links on mouse hover

@@ -21,18 +21,32 @@ class TOCNetworkTools(QWidget):
     def __init__(self, toc_view, parent=None):
         QWidget.__init__(self, parent)
         
-        # Create a button that makes all labels visible
-        all_titles = QToolButton(self)
-        all_titles.setToolButtonStyle(Qt.ToolButtonTextOnly)
-        all_titles.setCheckable(True)
-        all_titles.setText("Show Titles")
-        all_titles.toggled[bool].connect(toc_view.toggle_labels)
-        all_titles.setToolTip(_('Toggle all labels visible'))
+        self.toc_view = toc_view
         
         # Layout controls
         self.l = QHBoxLayout(self)
         self.l.setContentsMargins(0, 0, 0, 0)
-        self.l.addWidget(all_titles)
+        
+        # Create a button that makes all labels visible
+        btn = QToolButton(self)
+        btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        btn.setCheckable(True)
+        btn.setText("Show All Labels")
+        btn.toggled[bool].connect(toc_view.toggle_labels)
+        btn.setToolTip(_('Toggle all labels visible'))
+        self.l.addWidget(btn)
+        
+        # Create a button that sends the user to the first page of the book
+        btn = QToolButton(self)
+        btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        btn.setText("Go to Cover")
+        btn.clicked.connect(self.go_to_cover)
+        btn.setToolTip(_('Go to the first page'))
+        self.l.addWidget(btn)
+        
+    # Goes to the first page of the book
+    def go_to_cover(self):
+        self.toc_view.change_page(1.)
        
 # This class controls the widget that allows users to search through node titles.
 class TOCNetworkSearch(TOCSearch):
@@ -162,6 +176,8 @@ class TOCNetworkView (QWebView):
     @pyqtSlot(float)
     def change_page(self, page):
         if self.manager is not None:
-            self.manager.internal_link_clicked(0)
-            self.manager.goto_page(page)
+            # Don't navigate or add to history if the next page is the current one
+            if (self.manager.current_page.start_page != page):
+                self.manager.internal_link_clicked(0)
+                self.manager.goto_page(page)
             
