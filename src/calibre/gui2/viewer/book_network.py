@@ -32,12 +32,10 @@ class EBookNetwork (object):
                 self.data = json.dumps(self.data)
             except Exception:
                 # The JSON is unreadable, regenerate it
-                self.generate_network()
-                self.save_graph()
+                self.refresh_network()
         else:
             # Create a new file to store the ebook's network in
-            self.generate_network()
-            self.save_graph()
+            self.refresh_network()
             
     # Search the titles of the nodes in the network by a user query
     # text (string) - the text the user has searched for
@@ -81,7 +79,8 @@ class EBookNetwork (object):
             # Don't add an edge if it already exists
             return False
         else:
-            if (str(end_page) not in self.bookGraph.node or str(start_page) not in self.bookGraph.node):
+            if (str(end_page) not in self.bookGraph.node or 
+                    str(start_page) not in self.bookGraph.node):
                 # The JSON or e-book has been modified, regenerate the graph of nodes
                 old_edges = self.bookGraph.edges()
                 self.generate_network()
@@ -93,6 +92,11 @@ class EBookNetwork (object):
             self.bookGraph.add_edge(str(start_page), str(end_page))
             self.save_graph()
             return True
+            
+    # Generate a new network of nodes and save it to a file
+    def refresh_network(self):
+        self.generate_network()
+        self.save_graph()
                 
     # Generate a new network of nodes from sections in the TOC
     def generate_network(self):

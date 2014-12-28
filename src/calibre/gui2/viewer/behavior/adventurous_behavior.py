@@ -22,6 +22,7 @@ class AdventurousBehavior (BaseAdventurousBehavior):
     def __init__(self, toc, spine, default_number_of_pages, toc_view, setup_scrollbar_method):
         BaseAdventurousBehavior.__init__(self, toc, spine, default_number_of_pages, toc_view, setup_scrollbar_method)
         self.include_sections = Set()
+        self.start_spine = 1
         
     # Sets the current section of the book the user is viewing, the sections the user can view from that section,
     # and the total pages in those sections
@@ -75,7 +76,8 @@ class AdventurousBehavior (BaseAdventurousBehavior):
     # frac (number) - the scrollbar's position in relation to the current displayed section of the book
     def get_page_label(self, frac):
         section_position = super(AdventurousBehavior, self).get_page_label(frac)
-        return (self.curr_sec.start_page + section_position) - self.spine[self.start_spine].start_page
+        return ((self.curr_sec.start_page + section_position) 
+                - self.spine[self.start_spine].start_page)
             
     # Returns the user's absolute position in the ebook given a position set by the scrollbar or position label
     # new_page (number) - the page to move the user to as set by the scrollbar or position label

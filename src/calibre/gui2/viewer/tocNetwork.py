@@ -44,6 +44,14 @@ class TOCNetworkTools(QWidget):
         btn.setToolTip(_('Go to the first page'))
         self.l.addWidget(btn)
         
+        # Create a button that clears all links in the network
+        btn = QToolButton(self)
+        btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        btn.setText("Clear All Links")
+        btn.clicked.connect(toc_view.clear_network)
+        btn.setToolTip(_('Clear all links in the network'))
+        self.l.addWidget(btn)
+        
     # Goes to the first page of the book
     def go_to_cover(self):
         self.toc_view.change_page(1.)
@@ -79,8 +87,8 @@ class TOCNetworkView (QWebView):
     def load_network(self):
         path = P(u'adventurous_map_viewer/book_renderer.html').replace(os.sep, '/')
         path = str(path)
-        load_html(path, self, codec=getattr(path, 'encoding', 'utf-8'), mime_type=getattr(path,
-        'mime_type', 'text/html'))
+        load_html(path, self, codec=getattr(path, 'encoding', 'utf-8'), 
+                mime_type=getattr(path, 'mime_type', 'text/html'))
         self.loaded = False
         self.toc_created = False
         
@@ -100,6 +108,11 @@ class TOCNetworkView (QWebView):
         # Add the new edge to the network display
         if (edge_added):
             self.toc_created = False
+        
+    # Clears all the links from the network
+    def clear_network(self):
+        self.ebook_network.refresh_network()
+        self.create_toc_network(-2)
                 
     # Searches through the titles of the nodes in the network for the given search term
     # text (string) - the text to search for
@@ -133,7 +146,8 @@ class TOCNetworkView (QWebView):
     #      -2 - the user navigated to another section without adding to their history
     def create_toc_network(self, history_offset):
         jScript = """dataLoaded({jsonCode}, {page}, {offset}); """
-        jScriptFormat = jScript.format(jsonCode=str(self.ebook_network.data), page=self.curr_page, offset=history_offset)
+        jScriptFormat = jScript.format(jsonCode=str(self.ebook_network.data), 
+                page=self.curr_page, offset=history_offset)
         self.page().mainFrame().evaluateJavaScript(jScriptFormat)
         self.toc_created = True
         
