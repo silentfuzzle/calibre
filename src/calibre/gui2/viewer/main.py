@@ -91,7 +91,6 @@ class EbookViewer(MainWindow):
         MainWindow.__init__(self, debug_javascript)
         self.viewer_mode = self.ADVENTUROUS_MODE
         self.page_behavior = None
-        self.view.initialize_view(debug_javascript)
         self.view.magnification_changed.connect(self.magnification_changed)
         self.show_toc_on_open = False
         self.current_book_has_toc = False

@@ -1327,7 +1327,6 @@ class DocumentView(QWebView):  # {{{
                 return
         opos = self.document.ypos
         if self.manager is not None:
-            print("mouseReleaseEvent")
             prev_pos = self.manager.update_page_number()
         ret = QWebView.mouseReleaseEvent(self, ev)
         if self.manager is not None and opos != self.document.ypos:
