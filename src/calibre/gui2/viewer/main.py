@@ -77,6 +77,11 @@ class EbookViewer(MainWindow):
             'into pages like a paper book')
     PAGED_MODE_TT = _('Switch to flow mode - where the text is not broken up '
             'into pages')
+            
+    ADVENTUROUS_MODE_TT = _('Switch to Calibre mode - where the text is displayed in '
+            'a continuous document')
+    CALIBRE_MODE_TT = _('Switch to Adventurous mode - where the text is broken up '
+            'into separate documents like a website')
 
     def __init__(self, pathtoebook=None, debug_javascript=False, open_at=None,
                  start_in_fullscreen=False):
@@ -207,6 +212,9 @@ class EbookViewer(MainWindow):
         else:
             self.set_toc_view(self.adventurous_toc_container)
             self.page_behavior.set_current_behavior(True)
+        self.action_toggle_adventurous_mode.setToolTip(
+                self.ADVENTUROUS_MODE_TT if
+                in_adventurous_mode else self.CALIBRE_MODE_TT)
 
     def toggle_paged_mode(self, checked, at_start=False):
         in_paged_mode = not self.action_toggle_paged_mode.isChecked()
@@ -284,6 +292,7 @@ class EbookViewer(MainWindow):
             vprefs.set('viewer_toc_isvisible', self.show_toc_on_open or bool(self.toc_dock.isVisible()))
         vprefs['multiplier'] = self.view.multiplier
         vprefs['in_paged_mode'] = not self.action_toggle_paged_mode.isChecked()
+        vprefs['in_adventurous_mode'] = self.action_toggle_adventurous_mode.isChecked()
 
     def restore_state(self):
         state = vprefs.get('main_window_state', None)
@@ -306,6 +315,8 @@ class EbookViewer(MainWindow):
             True))
         self.toggle_paged_mode(self.action_toggle_paged_mode.isChecked(),
                 at_start=True)
+        self.action_toggle_adventurous_mode.setChecked(vprefs.get(
+                'in_adventurous_mode', False))
 
     def lookup(self, word):
         from urllib import quote
