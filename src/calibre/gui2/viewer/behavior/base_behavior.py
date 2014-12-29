@@ -16,13 +16,21 @@ class BaseBehavior (object):
         self.num_pages = number_of_pages
         self.curr_sec = None
         self.history_offset = 0
+        self.last_label = 1.
 
     # Returns the page number to display in the upper left
     # Sets the new absolute position in the book
     # frac (number) - the scrollbar's position in relation to the current displayed section of the book
-    @abc.abstractmethod
     def get_page_label(self, frac):
-        return
+        self.last_label = self.calculate_page_label(frac)
+        return self.last_label
+
+    # Calculate the page number to display in the upper left and update the absolute position
+    # Sets the new absolute position in the book
+    # frac (number) - the scrollbar's position in relation to the current displayed section of the book        
+    @abc.abstractmethod
+    def calculate_page_label(self, frac):
+        return self.last_label
     
     # Returns whether the user can move from the current section to the passed section
     # next_sec (string) - the section to check

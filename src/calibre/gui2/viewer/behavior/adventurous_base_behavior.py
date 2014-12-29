@@ -34,10 +34,10 @@ class BaseAdventurousBehavior (BaseBehavior):
     def set_curr_sec(self, curr_index, curr_sec):
         if (self.curr_sec != curr_sec):
             super(BaseAdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
-            self.num_pages = curr_sec.pages
         
         # Only setup the scrollbar and position label if this object is an instance of this class
         if (type(self) is BaseAdventurousBehavior):
+            self.num_pages = curr_sec.pages
             self.setup_vscrollbar_method()
             self.update_network_pos(curr_sec)
         
@@ -51,10 +51,10 @@ class BaseAdventurousBehavior (BaseBehavior):
         
         return False
 
-    # Returns the user's position relative to the current section
+    # Returns the user's position relative to the section  and update the absolute position
     # Sets the new absolute position in the book
     # frac (number) - the scrollbar's position in relation to the current displayed section of the book
-    def get_page_label(self, frac):
+    def calculate_page_label(self, frac):
         section_position = frac*float(self.get_section_pages(self.curr_sec))
         self.absolute_position = self.curr_sec.start_page + section_position
         print (self.absolute_position)

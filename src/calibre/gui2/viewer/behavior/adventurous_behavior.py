@@ -71,11 +71,11 @@ class AdventurousBehavior (BaseAdventurousBehavior):
                 
         return False
          
-    # Returns the user's position relative to the number of pages in the section group
+    # Returns the user's position relative to the section and update the absolute position
     # Sets the new absolute position in the book
     # frac (number) - the scrollbar's position in relation to the current displayed section of the book
-    def get_page_label(self, frac):
-        section_position = super(AdventurousBehavior, self).get_page_label(frac)
+    def calculate_page_label(self, frac):
+        section_position = super(AdventurousBehavior, self).calculate_page_label(frac)
         return ((self.curr_sec.start_page + section_position) 
                 - self.spine[self.start_spine].start_page)
             

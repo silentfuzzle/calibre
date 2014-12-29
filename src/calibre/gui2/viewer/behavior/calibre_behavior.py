@@ -7,10 +7,10 @@ from calibre.gui2.viewer.behavior.base_behavior import BaseBehavior
 # This class defines the default Calibre page behavior.
 class CalibreBehavior (BaseBehavior):
         
-    # Returns the page number to display in the upper left
+    # Calculate the page number to display in the upper left and update the absolute position
     # Sets the new absolute position in the book
     # frac (number) - the scrollbar's position in relation to the current displayed section of the book
-    def get_page_label(self, frac):
+    def calculate_page_label(self, frac):
         self.absolute_position = self.curr_sec.start_page + frac*float(self.curr_sec.pages-1)
         return self.absolute_position
         

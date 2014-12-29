@@ -951,6 +951,7 @@ class EbookViewer(MainWindow):
         self.vertical_scrollbar.blockSignals(False)
         
     def set_vscrollbar_value(self, pagenum):
+        self.pos.set_value(pagenum)
         self.vertical_scrollbar.blockSignals(True)
         self.vertical_scrollbar.setValue(int(pagenum*BaseBehavior.PAGE_STEP))
         self.vertical_scrollbar.blockSignals(False)
@@ -959,7 +960,6 @@ class EbookViewer(MainWindow):
         if getattr(self, 'current_page', None) is not None:
             page = self.page_behavior.get_page_label(frac)
             self.set_vscrollbar_value(page)
-            self.pos.set_value(page)
 
     def scrolled(self, frac, onload=False):
         self.set_page_number(frac)

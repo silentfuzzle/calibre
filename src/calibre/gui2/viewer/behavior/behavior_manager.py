@@ -34,9 +34,8 @@ class BehaviorManager (BaseBehavior):
             self.current_behavior = self.calibre_behavior
         
         # Set the vertical scrollbar position
-        #self.current_behavior.goto_page(
-        #    self.current_behavior.absolute_position, self.manager.goto_page)
         self.manager.setup_vscrollbar()
+        self.manager.set_vscrollbar_value(self.current_behavior.last_label)
             
     # Sets the history offset for the correct behavior
     # offset (int) - the new value of the history offset
