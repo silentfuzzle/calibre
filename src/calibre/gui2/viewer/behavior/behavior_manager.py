@@ -6,6 +6,7 @@ from calibre.gui2.viewer.behavior.base_behavior import BaseBehavior
 from calibre.gui2.viewer.behavior.adventurous_behavior import AdventurousBehavior
 from calibre.gui2.viewer.behavior.adventurous_base_behavior import BaseAdventurousBehavior
 from calibre.gui2.viewer.behavior.calibre_behavior import CalibreBehavior
+from calibre.gui2.viewer.toc_sections import TOCSections
 
 # This class allows users to switch between the Calibre and Adventurous Reader behaviors.
 class BehaviorManager (BaseBehavior):
@@ -18,8 +19,9 @@ class BehaviorManager (BaseBehavior):
         self.calibre_behavior = CalibreBehavior(number_of_pages)
         self.adventurous_behavior = None
         if (manager.iterator.toc):
+            toc_sections = TOCSections(manager.iterator.toc, manager.iterator.spine)
             self.adventurous_behavior = AdventurousBehavior(
-                    manager.iterator.toc, manager.iterator.spine, 
+                    toc_sections, manager.iterator.spine, 
                     number_of_pages, manager.adventurous_toc_container.toc, 
                     manager.setup_vscrollbar)
         self.current_behavior = self.calibre_behavior

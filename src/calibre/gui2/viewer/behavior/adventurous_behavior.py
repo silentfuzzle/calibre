@@ -14,14 +14,17 @@ class AdventurousBehavior (BaseAdventurousBehavior):
     ###########################################################################
 
     # Constructor
-    # toc - (calibre.ebooks.metadata.toc.TOC) the current ebook's TOC
+    # toc_sections (TOCSections) - a object that determines how the sections of the ebook are separated
     # spine - (List(SpineItem)) the current ebook's order of sections
     # default_number_of_pages (number) - the total number of pages in the ebook
     # toc_view (TOCNetworkView) - the interface displaying the ebook's network of sections
     # setup_vscrollbar_method (method) - the method setting up the scrollbar and the position displayed in the upper left
-    def __init__(self, toc, spine, default_number_of_pages, toc_view, setup_scrollbar_method):
-        BaseAdventurousBehavior.__init__(self, toc, spine, default_number_of_pages, toc_view, setup_scrollbar_method)
+    def __init__(self, toc_sections, spine, default_number_of_pages, toc_view, 
+            setup_scrollbar_method):
+        BaseAdventurousBehavior.__init__(self, toc_sections, 
+                default_number_of_pages, toc_view, setup_scrollbar_method)
         self.include_sections = Set()
+        self.spine = spine
         self.start_spine = 1
         
     # Sets the current section of the book the user is viewing, the sections the user can view from that section,
@@ -32,7 +35,7 @@ class AdventurousBehavior (BaseAdventurousBehavior):
         super(AdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
         
         # Make sure the current section exists in the TOC
-        curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)
+        curr_toc, self.corrected_curr_sec = self.toc_sections.check_and_get_toc(curr_sec)
         self.update_network_pos(self.corrected_curr_sec)
         
         if (curr_index not in self.include_sections):
@@ -146,7 +149,7 @@ class AdventurousBehavior (BaseAdventurousBehavior):
         
         if (index not in in_toc):
             # Check if the first section in the toc has been found
-            page_in_toc = self.get_in_toc(self.spine[index], self.toc)
+            page_in_toc = self.toc_sections.get_in_toc(self.spine[index])
             if (found_first_toc_entry == False):
                 if (page_in_toc is not None):
                     found_first_toc_entry = True
@@ -159,7 +162,8 @@ class AdventurousBehavior (BaseAdventurousBehavior):
                 
             # Only check the next section if not all the sections included in the toc have been found
             if (next_index < len(self.spine) and num_found < len(in_toc)):
-                in_toc = self.search_in_toc(next_index, num_found, in_toc, found_first_toc_entry)
+                in_toc = self.search_in_toc(next_index, num_found, in_toc, 
+                        found_first_toc_entry)
         else:
             # Include all sections not included in the toc at the beginning of the book
             if (found_first_toc_entry == False):
@@ -174,6 +178,7 @@ class AdventurousBehavior (BaseAdventurousBehavior):
             
             # Always check the section after the last included in the toc
             if (next_index < len(self.spine)):
-                in_toc = self.search_in_toc(next_index, num_found, in_toc, found_first_toc_entry)
+                in_toc = self.search_in_toc(next_index, num_found, in_toc, 
+                        found_first_toc_entry)
             
         return in_toc         

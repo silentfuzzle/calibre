@@ -8,7 +8,7 @@ from threading import Thread
 
 from PyQt5.Qt import (
     QApplication, Qt, QIcon, QTimer, QByteArray, QSize, QTime,
-    QPropertyAnimation, QUrl, QInputDialog, QAction, QModelIndex, QVBoxLayout, QWidget)
+    QPropertyAnimation, QUrl, QInputDialog, QAction, QVBoxLayout, QWidget)
 
 from calibre.gui2.viewer.ui import Main as MainWindow
 from calibre.gui2.viewer.printing import Printing
@@ -135,9 +135,7 @@ class EbookViewer(MainWindow):
         self.pos.editingFinished.connect(self.goto_page_num)
         self.vertical_scrollbar.valueChanged[int].connect(lambda
                 x:self.scrollbar_goto_page(x/BaseBehavior.PAGE_STEP))
-        if (not self.action_toggle_adventurous_mode.isChecked()):
-            self.toc.pressed[QModelIndex].connect(self.toc_clicked)
-            self.toc.searched.connect(partial(self.toc_clicked, force=True))
+        self.calibre_toc_container.connect_toc_actions(self.toc_clicked)
         self.search.search.connect(self.find)
         self.search.focus_to_library.connect(lambda: self.view.setFocus(Qt.OtherFocusReason))
         self.reference.goto.connect(self.goto)
@@ -701,8 +699,8 @@ class EbookViewer(MainWindow):
             items = self.toc_model.update_indexing_state(self.current_index,
                         self.view.viewport_rect, anchor_positions,
                         self.view.document.in_paged_mode)
-            if (items and not self.action_toggle_adventurous_mode.isChecked()):
-                self.toc.scrollTo(items[-1].index())
+            if (items):
+                self.calibre_toc_container.toc.scrollTo(items[-1].index())
             if pgns is not None:
                 self.pending_goto_next_section = None
                 # Check that we actually progressed

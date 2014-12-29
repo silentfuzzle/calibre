@@ -12,15 +12,14 @@ class BaseAdventurousBehavior (BaseBehavior):
     ###########################################################################
     
     # Constructor
-    # toc - (calibre.ebooks.metadata.toc.TOC) the current ebook's TOC
-    # spine - (List(SpineItem)) the current ebook's ordering of sections
+    # toc_sections (TOCSections) - a object that determines how the sections of the ebook are separated
     # default_number_of_pages (number) - the total number of pages in the ebook
     # toc_view (TOCNetworkView) - the interface displaying the ebook's network of sections
     # setup_vscrollbar_method (method) - the method setting up the scrollbar and the position displayed in the upper left
-    def __init__(self, toc, spine, default_number_of_pages, toc_view, setup_vscrollbar_method):
+    def __init__(self, toc_sections, default_number_of_pages, toc_view, 
+            setup_vscrollbar_method):
         BaseBehavior.__init__(self, default_number_of_pages)
-        self.toc = toc
-        self.spine = spine
+        self.toc_sections = toc_sections
         self.setup_vscrollbar_method = setup_vscrollbar_method
         
         # Setup the interface view of the TOC
@@ -87,11 +86,11 @@ class BaseAdventurousBehavior (BaseBehavior):
     # start_sec_checked (boolean) - true if the passed start section was already checked for existence in the ebook's TOC
     def add_network_edge(self, start_sec, end_sec, start_sec_checked=False):
         # Get the TOC and SpineItem entries for the passed end section
-        end_toc, corrected_end_sec = self.check_and_get_toc(end_sec)
+        end_toc, corrected_end_sec = self.toc_sections.check_and_get_toc(end_sec)
         
         if (start_sec_checked == False):
             # Get the TOC and SpineItem entries for the passed start section
-            start_toc, start_sec = self.check_and_get_toc(start_sec)
+            start_toc, start_sec = self.toc_sections.check_and_get_toc(start_sec)
         
         # Add an edge to the network
         if (corrected_end_sec != start_sec):
@@ -106,52 +105,5 @@ class BaseAdventurousBehavior (BaseBehavior):
     # Perform any required actions after the history is modified
     def update_history(self):
         self.update_network_pos(self.curr_sec)
-    
-    # Return a section's TOC and SpineItem entries if it exists in the TOC
-    # Return the section's parent's TOC and SpineItem entries if it doesn't exist in the TOC
-    # path_sec (string) - the section of the ebook to find the SpineItem and TOC for
-    def check_and_get_toc(self, path_sec):
-        # Attempt to get the section's TOC entry
-        path_toc = self.get_in_toc(path_sec, self.toc)
-        corrected_path_sec = path_sec
-        
-        if (path_toc is None):
-            # Get the TOC entry of the section's parent
-            path_toc = self.get_non_toced_parent(self.spine.index(path_sec))
-            
-            # Get the SpineItem of the section's parent
-            corrected_path_sec = self.spine[self.spine.index(path_toc.abspath)]
-        
-        return (path_toc, corrected_path_sec)
-            
-    # Returns the TOC entry of a section's parent
-    # A section's parent is the nearest previous section in the ebook's spine that exists in the TOC
-    # If such a section doesn't exist, it is the nearest next section in the book's spine that exists in the TOC
-    # current_index (integer) - location of the section in the spine or the previous location checked
-    # back (boolean) - true if the previous section from the current index should be checked
-    def get_non_toced_parent(self, current_index, back=True):
-        check_in_toc_index = current_index - 1
-        if (back == False):
-            check_in_toc_index = current_index + 1
-            
-        if (check_in_toc_index < 0):
-            # The beginning of the ebook was passed, check the next sections in the following recusive calls
-            back = False
-        else:
-            curr_toc = self.get_in_toc(self.spine[check_in_toc_index], self.toc)
-            if (curr_toc is not None):
-                return curr_toc
-        
-        return self.get_non_toced_parent(check_in_toc_index, back)
-        
-    # Returns the TOC entry of a section if it exists in the TOC
-    # Returns None if the passed section doesn't exist in the TOC
-    # page (string) - the full path to the section of the ebook to check
-    # toc - (calibre.ebooks.metadata.toc.TOC) the current ebook's TOC
-    def get_in_toc(self, page, toc):
-        for t in toc.flat():
-            if (page == t.abspath):
-                return t
-        return None
          
             
