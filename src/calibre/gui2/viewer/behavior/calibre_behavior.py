@@ -29,11 +29,6 @@ class CalibreBehavior (BaseBehavior):
     def update_page_label(self, new_page):
         return new_page
         
-    # Returns the maximum number of pages to display to the user
-    # Always the number of pages in the ebook
-    def get_num_pages(self):
-        return self.num_pages
-        
         
         
     # Originally defined in Calibre but don't appear to work under certain conditions

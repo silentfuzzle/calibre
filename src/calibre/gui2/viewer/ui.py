@@ -20,7 +20,7 @@ from calibre.gui2.main_window import MainWindow
 from calibre.gui2.search_box import SearchBox2
 from calibre.gui2.viewer.documentview import DocumentView
 from calibre.gui2.viewer.bookmarkmanager import BookmarkManager
-from calibre.gui2.viewer.toc import TOCView, TOCSearch
+from calibre.gui2.viewer.toc_container import CalibreTOCContainer, AdventurousTOCContainer
 from calibre.gui2.viewer.footnote import FootnotesView
 
 class DoubleSpinBox(QDoubleSpinBox):  # {{{
@@ -252,13 +252,10 @@ class Main(MainWindow):
 
         self.toc_dock = d = QDockWidget(_('Table of Contents'), self)
         d.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.toc_container = w = QWidget(self)
-        w.l = QVBoxLayout(w)
-        self.toc = TOCView(w)
-        self.toc_search = TOCSearch(self.toc, parent=w)
-        w.l.addWidget(self.toc), w.l.addWidget(self.toc_search), w.l.setContentsMargins(0, 0, 0, 0)
+        self.calibre_toc_container = CalibreTOCContainer(self)
+        self.adventurous_toc_container = AdventurousTOCContainer(self)
+        self.set_toc_view(self.calibre_toc_container)
         d.setObjectName('toc-dock')
-        d.setWidget(w)
         d.close()  # starts out hidden
         self.addDockWidget(Qt.LeftDockWidgetArea, d)
         d.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -353,6 +350,13 @@ class Main(MainWindow):
         self.setCorner(Qt.TopRightCorner, Qt.RightDockWidgetArea)
         self.setCorner(Qt.BottomRightCorner, Qt.RightDockWidgetArea)
         self.footnotes_dock.close()
+    
+    # Set the table of contents interface to use
+    def set_toc_view(self, toc_container):
+        self.toc_container = w = toc_container
+        self.toc = w.toc
+        self.toc_search = w.toc_search
+        self.toc_dock.setWidget(w)
 
     def create_actions(self):
         def a(name, text, icon, tb=None, sc_name=None, menu_name=None, popup_mode=QToolButton.MenuButtonPopup):
@@ -407,3 +411,4 @@ class Main(MainWindow):
         a('find_next', _('Find next occurrence'), 'arrow-down.png', tb=self.tool_bar2)
         a('find_previous', _('Find previous occurrence'), 'arrow-up.png', tb=self.tool_bar2)
         a('toggle_paged_mode', _('Toggle paged mode'), 'scroll.png', tb=self.tool_bar2).setCheckable(True)
+        a('toggle_adventurous_mode', _('Toggle adventurous mode'), 'plugboard.png', tb=self.tool_bar2).setCheckable(True)

@@ -15,6 +15,7 @@ class BaseBehavior (object):
         self.absolute_position = 1.
         self.num_pages = number_of_pages
         self.curr_sec = None
+        self.history_offset = 0
 
     # Returns the page number to display in the upper left
     # Sets the new absolute position in the book
@@ -27,11 +28,6 @@ class BaseBehavior (object):
     # next_sec (string) - the section to check
     @abc.abstractmethod
     def allow_page_turn(self, next_sec):
-        return
-    
-    # Returns the maximum number of pages to display to the user
-    @abc.abstractmethod
-    def get_num_pages(self):
         return
     
     # Moves the user to the passed page number as set by the scrollbar or position label, using the passed method
@@ -61,7 +57,20 @@ class BaseBehavior (object):
             return 0.8
         else:
             return sec.pages-1
+            
+    # Sets the history offset for the correct behavior
+    # offset (int) - the new value of the history offset
+    def set_history_offset(self, offset):
+        self.history_offset = offset
+       
+    # Returns the users current position in the ebook
+    def get_absolute_position(self):
+        return self.absolute_position
     
+    # Returns the total number of pages in the ebook or section
+    def get_num_pages(self):
+        return self.num_pages
+        
     # When a link to another page of the ebook is clicked, perform any processing required by the behavior
     # path (string) - the path in the ebook the link pointed to
     def link_clicked(self, path):

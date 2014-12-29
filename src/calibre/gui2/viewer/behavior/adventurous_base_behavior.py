@@ -76,7 +76,6 @@ class BaseAdventurousBehavior (BaseBehavior):
     # path (string) - the path in the ebook the link pointed to
     def link_clicked(self, path):
         self.add_network_edge(self.curr_sec, path)
-        return
         
     ###########################################################################
     #NETWORK TOC UPKEEP

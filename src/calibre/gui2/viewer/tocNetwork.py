@@ -54,7 +54,7 @@ class TOCNetworkTools(QWidget):
         
     # Goes to the first page of the book
     def go_to_cover(self):
-        self.toc_view.change_page(1.)
+        self.toc_view.change_page(1)
        
 # This class controls the widget that allows users to search through node titles.
 class TOCNetworkSearch(TOCSearch):
