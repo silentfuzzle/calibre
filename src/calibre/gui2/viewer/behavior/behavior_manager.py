@@ -14,16 +14,17 @@ class BehaviorManager (BaseBehavior):
     # Constructor
     # number_of_pages (number) - the total pages found in the ebook
     # manager (EbookViewer) - the ebook viewer interface
-    def __init__(self, number_of_pages, manager):
+    # toc_sections (TOCSections) - a object that determines how the sections of the ebook are grouped
+    def __init__(self, number_of_pages, manager, toc_sections):
         BaseBehavior.__init__(self, number_of_pages)
         self.calibre_behavior = CalibreBehavior(number_of_pages)
         self.adventurous_behavior = None
         if (manager.iterator.toc):
-            toc_sections = TOCSections(manager.iterator.toc, manager.iterator.spine)
+            if (toc_sections is None):
+                toc_sections = TOCSections(manager.iterator.toc, manager.iterator.spine)
             self.adventurous_behavior = AdventurousBehavior(
                     toc_sections, manager.iterator.spine, 
-                    number_of_pages, manager.adventurous_toc_container.toc, 
-                    manager.setup_vscrollbar)
+                    number_of_pages, manager.setup_vscrollbar)
         self.current_behavior = self.calibre_behavior
         self.manager = manager
         
@@ -42,9 +43,8 @@ class BehaviorManager (BaseBehavior):
     # Sets the history offset for the correct behavior
     # offset (int) - the new value of the history offset
     def set_history_offset(self, offset):
-        # Only the Adventurous Reader behavior uses history offset
         if (self.adventurous_behavior is not None):
-            self.adventurous_behavior.set_history_offset(offset)
+            self.manager.adventurous_toc_container.history_offset = offset
             
     # Returns the users current position in the ebook
     def get_absolute_position(self):
@@ -75,6 +75,8 @@ class BehaviorManager (BaseBehavior):
         # Add an edge to the network in the Adventurous Reader behavior if needed
         if (self.adventurous_behavior is not None):
             a_allow = self.adventurous_behavior.allow_page_turn(next_sec)
+            self.manager.adventurous_toc_container.check_add_network_edge(
+                    self.current_behavior.curr_sec, next_sec)
             
         # Return the result from the correct behavior
         if (self.current_behavior == self.adventurous_behavior):
@@ -92,22 +94,19 @@ class BehaviorManager (BaseBehavior):
     # curr_index (integer) - the index of the current section in the spine
     # curr_sec (SpineItem) - the current section being displayed
     def set_curr_sec(self, curr_index, curr_sec):
+        self.calibre_behavior.set_curr_sec(curr_index, curr_sec)
         if (self.adventurous_behavior is not None):
             self.adventurous_behavior.set_curr_sec(curr_index, curr_sec)
-        self.calibre_behavior.set_curr_sec(curr_index, curr_sec)
+            self.manager.adventurous_toc_container.update_network_pos()
     
     # Pass any clicked links to the Adventurous Reader behavior for processing
     # path (string) - the path in the ebook the link pointed to
     def link_clicked(self, path):
         if (self.adventurous_behavior is not None):
-            self.adventurous_behavior.link_clicked(path)
+            self.manager.adventurous_toc_container.add_network_edge(
+                    self.adventurous_behavior.curr_sec, path)
     
     # Pass any changes to the history to the Adventurous Reader behavior for processing
-    # history_offset (int) - An integer representing how the user navigated to the section
-    #      0 - the user clicked a link in the e-book or a node in the network
-    #      1 - the user navigated to the next section in their history
-    #      -1 - the user navigated to the previous section in their history
-    #      -2 - the user navigated to another section without adding to their history
     def update_history(self):
         if (self.adventurous_behavior is not None):
-            self.adventurous_behavior.update_history()
+            self.manager.adventurous_toc_container.update_network_pos()

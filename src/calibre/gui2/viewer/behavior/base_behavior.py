@@ -15,7 +15,6 @@ class BaseBehavior (object):
         self.absolute_position = 1.
         self.num_pages = number_of_pages
         self.curr_sec = None
-        self.history_offset = 0
         self.last_label = 1.
 
     # Returns the page number to display in the upper left
@@ -65,11 +64,6 @@ class BaseBehavior (object):
             return 0.8
         else:
             return sec.pages-1
-            
-    # Sets the history offset for the correct behavior
-    # offset (int) - the new value of the history offset
-    def set_history_offset(self, offset):
-        self.history_offset = offset
        
     # Returns the users current position in the ebook
     def get_absolute_position(self):
@@ -85,11 +79,6 @@ class BaseBehavior (object):
         return
     
     # Perform any required actions after the history is modified
-    # history_offset (int) - An integer representing how the user navigated to the section
-    #      0 - the user clicked a link in the e-book or a node in the network
-    #      1 - the user navigated to the next section in their history
-    #      -1 - the user navigated to the previous section in their history
-    #      -2 - the user navigated to another section without adding to their history
     def update_history(self):
         return
         

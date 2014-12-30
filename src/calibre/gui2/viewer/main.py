@@ -15,6 +15,7 @@ from calibre.gui2.viewer.printing import Printing
 from calibre.gui2.viewer.toc import TOC
 from calibre.gui2.viewer.behavior.behavior_manager import BehaviorManager
 from calibre.gui2.viewer.behavior.base_behavior import BaseBehavior
+from calibre.gui2.viewer.toc_sections import TOCSections
 from calibre.gui2.widgets import ProgressIndicator
 from calibre.gui2 import (
     Application, ORG_NAME, APP_UID, choose_files, info_dialog, error_dialog,
@@ -883,6 +884,7 @@ class EbookViewer(MainWindow):
                 self.toc_model = TOC(self.iterator.spine, self.iterator.toc)
                 if self.show_toc_on_open:
                     self.action_table_of_contents.setChecked(True)
+                toc_sections = TOCSections(self.iterator.toc, self.iterator.spine)
             else:
                 self.toc_model = TOC(self.iterator.spine)
                 self.action_table_of_contents.setChecked(False)
@@ -890,13 +892,13 @@ class EbookViewer(MainWindow):
             
             # Setup the page behavior for the ebook
             total_num_pages = sum(self.iterator.pages)
-            self.page_behavior = BehaviorManager(total_num_pages, self)
+            self.page_behavior = BehaviorManager(total_num_pages, self, toc_sections)
             
             # Setup the table of contents interface for the ebook
             self.calibre_toc_container.setup_ebook(self.toc_model)
             if (self.iterator.toc):
                 self.adventurous_toc_container.setup_ebook(self.iterator.spine, 
-                        self.iterator.toc, title, pathtoebook)
+                        self.iterator.toc, toc_sections, title, pathtoebook)
             self.toggle_adventurous_mode(
                     self.action_toggle_adventurous_mode.isChecked())
 
