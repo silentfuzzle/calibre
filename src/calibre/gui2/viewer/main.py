@@ -531,7 +531,7 @@ class EbookViewer(MainWindow):
                         frac = 0
                     if page == self.current_page:
                         self.view.scroll_to(frac)
-                        self.page_behavior.update_history()
+                        self.adventurous_toc_container.update_network_pos()
                     else:
                         if (allow_page_turn == False):
                             allow_page_turn = self.page_behavior.allow_page_turn(page)
@@ -620,7 +620,8 @@ class EbookViewer(MainWindow):
             if url.hasFragment():
                 frag = unicode(url.fragment())
             if path != self.current_page:
-                self.page_behavior.link_clicked(path)
+                self.adventurous_toc_container.add_network_edge(
+                    self.current_page, path)
                 self.pending_anchor = frag
                 self.load_path(path)
             else:

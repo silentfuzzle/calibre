@@ -20,7 +20,8 @@ from calibre.gui2.main_window import MainWindow
 from calibre.gui2.search_box import SearchBox2
 from calibre.gui2.viewer.documentview import DocumentView
 from calibre.gui2.viewer.bookmarkmanager import BookmarkManager
-from calibre.gui2.viewer.toc_container import CalibreTOCContainer, AdventurousTOCContainer
+from calibre.gui2.viewer.toc_container import CalibreTOCContainer
+from calibre.gui2.viewer.toc_network_container import AdventurousTOCContainer
 from calibre.gui2.viewer.footnote import FootnotesView
 
 class DoubleSpinBox(QDoubleSpinBox):  # {{{

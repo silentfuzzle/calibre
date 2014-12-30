@@ -98,15 +98,3 @@ class BehaviorManager (BaseBehavior):
         if (self.adventurous_behavior is not None):
             self.adventurous_behavior.set_curr_sec(curr_index, curr_sec)
             self.manager.adventurous_toc_container.update_network_pos()
-    
-    # Pass any clicked links to the Adventurous Reader behavior for processing
-    # path (string) - the path in the ebook the link pointed to
-    def link_clicked(self, path):
-        if (self.adventurous_behavior is not None):
-            self.manager.adventurous_toc_container.add_network_edge(
-                    self.adventurous_behavior.curr_sec, path)
-    
-    # Pass any changes to the history to the Adventurous Reader behavior for processing
-    def update_history(self):
-        if (self.adventurous_behavior is not None):
-            self.manager.adventurous_toc_container.update_network_pos()

@@ -73,12 +73,3 @@ class BaseBehavior (object):
     def get_num_pages(self):
         return self.num_pages
         
-    # When a link to another page of the ebook is clicked, perform any processing required by the behavior
-    # path (string) - the path in the ebook the link pointed to
-    def link_clicked(self, path):
-        return
-    
-    # Perform any required actions after the history is modified
-    def update_history(self):
-        return
-        
