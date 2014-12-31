@@ -10,25 +10,31 @@ import textwrap
 from math import ceil
 
 from PyQt5.Qt import (
-    QWidget, Qt, QStaticText, QTextOption, QSize, QPainter, QTimer, QPen)
+    QWidget, Qt, QStaticText, QTextOption, QSize, QPainter, QTimer, QPalette)
 
+from calibre import prints, prepare_string_for_xml
+from calibre.gui2 import error_dialog
 from calibre.gui2.tweak_book.widgets import make_highlighted_text
 from calibre.utils.icu import string_length
-from calibre.utils.matcher import Matcher
 
 
 class CompletionPopup(QWidget):
 
     TOP_MARGIN = BOTTOM_MARGIN = 2
+    SIDE_MARGIN = 4
 
     def __init__(self, parent, max_height=1000):
         QWidget.__init__(self, parent)
+        self.completion_error_shown = False
         self.setFocusPolicy(Qt.NoFocus)
         self.setFocusProxy(parent)
         self.setVisible(False)
+        self.setMouseTracking(True)
+        self.setCursor(Qt.PointingHandCursor)
 
         self.matcher = None
-        self.current_query = self.current_results = self.current_size_hint = None
+        self.current_results = self.current_size_hint = self.current_query = None
+        self.current_completion = None
         self.max_text_length = 0
         self.current_index = -1
         self.current_top_index = 0
@@ -47,25 +53,12 @@ class CompletionPopup(QWidget):
         self.rendered_text_cache.clear()
         self.current_size_hint = None
 
-    def set_items(self, items, items_are_filenames=False):
-        kw = {}
-        if not items_are_filenames:
-            kw['level1'] = ' '
-        self.matcher = Matcher(tuple(items), **kw)
-        self.descriptions = dict(items) if isinstance(items, dict) else {}
-        self.clear_caches()
-        self.set_query()
-
-    def set_query(self, query='', limit=100):
-        self.current_size_hint = None
+    def set_items(self, items, descriptions=None, query=None):
         self.current_query = query
-        if self.matcher is None:
-            self.current_results = ()
-        else:
-            if query:
-                self.current_results = tuple(self.matcher(query, limit=limit).iteritems())
-            else:
-                self.current_results = tuple((text, ()) for text in self.matcher.items[:limit])
+        self.current_results = tuple(items.iteritems())
+        self.current_size_hint = None
+        self.descriptions = descriptions or {}
+        self.clear_caches()
         self.max_text_length = 0
         self.current_index = -1
         self.current_top_index = 0
@@ -75,11 +68,13 @@ class CompletionPopup(QWidget):
     def get_static_text(self, otext, positions):
         st = self.rendered_text_cache.get(otext)
         if st is None:
-            text = (otext or '').ljust(self.max_text_length + 1, ' ')
+            text = (otext or '').ljust(self.max_text_length + 1, '\xa0')
             text = make_highlighted_text('color: magenta', text, positions)
             desc = self.descriptions.get(otext)
             if desc:
-                text += ' ' + desc
+                text += ' - <i>%s</i>' % prepare_string_for_xml(desc)
+            color = self.palette().color(QPalette.Text).name()
+            text = '<span style="color: %s">%s</span>' % (color, text)
             st = self.rendered_text_cache[otext] = QStaticText(text)
             st.setTextOption(self.text_option)
             st.setTextFormat(Qt.RichText)
@@ -88,13 +83,12 @@ class CompletionPopup(QWidget):
 
     def sizeHint(self):
         if self.current_size_hint is None:
-            max_width = 0
-            height = 0
+            max_width = height = 0
             for text, positions in self.current_results:
                 sz = self.get_static_text(text, positions).size()
-                height += int(ceil(sz.height())) + self.TOP_MARGIN + self.BOTTOM_MARGIN
+                height += int(ceil(sz.height())) + self.BOTTOM_MARGIN
                 max_width = max(max_width, int(ceil(sz.width())))
-            self.current_size_hint = QSize(max_width, height)
+            self.current_size_hint = QSize(max_width + 2 * self.SIDE_MARGIN, height + self.BOTTOM_MARGIN + self.TOP_MARGIN)
         return self.current_size_hint
 
     def iter_visible_items(self):
@@ -108,20 +102,30 @@ class CompletionPopup(QWidget):
             yield i + self.current_top_index, st, y, height
             y += height
 
+    def index_for_y(self, y):
+        for idx, st, top, height in self.iter_visible_items():
+            if top <= y < top + height:
+                return idx
+
     def paintEvent(self, ev):
         painter = QPainter(self)
         painter.setClipRect(ev.rect())
         pal = self.palette()
-        painter.fillRect(self.rect(), pal.color(pal.Base))
+        painter.fillRect(self.rect(), pal.color(pal.Text))
+        crect = self.rect().adjusted(1, 1, -1, -1)
+        painter.fillRect(crect, pal.color(pal.Base))
+        painter.setClipRect(crect)
         painter.setFont(self.parent().font())
-        painter.setPen(QPen(pal.color(pal.Text)))
         width = self.rect().width()
         for i, st, y, height in self.iter_visible_items():
             painter.save()
             if i == self.current_index:
-                painter.fillRect(0, y, width, height, pal.color(pal.Highlight))
-                painter.setPen(QPen(pal.color(pal.HighlightedText)))
-            painter.drawStaticText(0, y, st)
+                painter.fillRect(1, y, width, height, pal.color(pal.Highlight))
+                color = pal.color(QPalette.HighlightedText).name()
+                st = QStaticText(st)
+                text = st.text().partition('>')[2]
+                st.setText('<span style="color: %s">%s' % (color, text))
+            painter.drawStaticText(self.SIDE_MARGIN, y, st)
             painter.restore()
         painter.end()
         if self.current_size_hint is None:
@@ -141,6 +145,16 @@ class CompletionPopup(QWidget):
                     self.current_index += 1
             self.ensure_index_visible(self.current_index)
             self.update()
+            self.activate_current_result()
+
+    def activate_current_result(self):
+        if self.current_completion is not None:
+            c = self.current_completion
+            text = self.current_query if self.current_index == -1 else self.current_results[self.current_index][0]
+            c.insertText(text)
+            chars = string_length(text)
+            c.setPosition(c.position() - chars)
+            c.setPosition(c.position() + chars, c.KeepAnchor)
 
     def ensure_index_visible(self, index):
         if index < self.current_top_index:
@@ -156,7 +170,7 @@ class CompletionPopup(QWidget):
     def layout(self, cursor_rect=None):
         p = self.parent()
         if cursor_rect is None:
-            cursor_rect = p.cursorRect()
+            cursor_rect = p.cursorRect().adjusted(0, 0, 0, 2)
         gutter_width = p.gutter_width
         vp = p.viewport()
         above = cursor_rect.top() > vp.height() - cursor_rect.bottom()
@@ -184,10 +198,40 @@ class CompletionPopup(QWidget):
         QWidget.hide(self)
         self.relayout_timer.stop()
 
+    def abort(self):
+        self.hide()
+        self.current_completion = self.current_query = None
+
+    def mark_completion(self, editor, query):
+        self.current_completion = c = editor.textCursor()
+        chars = string_length(query or '')
+        c.setPosition(c.position() - chars), c.setPosition(c.position() + chars, c.KeepAnchor)
+        self.hide()
+
+    def handle_result(self, result):
+        if result.traceback:
+            prints(result.traceback)
+            if not self.completion_error_shown:
+                error_dialog(self, _('Completion failed'), _(
+                    'Failed to get completions, click "Show Details" for more information.'
+                    ' Future errors during completion will be suppressed.'), det_msg=result.traceback, show=True)
+                self.completion_error_shown = True
+            self.hide()
+            return
+        if result.ans is None:
+            self.hide()
+            return
+        items, descriptions = result.ans
+        if not items:
+            self.hide()
+            return
+        self.set_items(items, descriptions, result.query)
+        self.show()
+
     def handle_keypress(self, ev):
         key = ev.key()
         if key == Qt.Key_Escape:
-            self.hide(), ev.accept()
+            self.abort(), ev.accept()
             return True
         if key == Qt.Key_Tab:
             self.choose_next_result(previous=ev.modifiers() & Qt.ShiftModifier)
@@ -213,11 +257,31 @@ class CompletionPopup(QWidget):
                 self.relayout_timer.start()
         return False
 
+    def mouseMoveEvent(self, ev):
+        y = ev.pos().y()
+        idx = self.index_for_y(y)
+        if idx is not None and idx != self.current_index:
+            self.current_index = idx
+            self.update()
+            ev.accept()
+
+    def mouseReleaseEvent(self, ev):
+        y = ev.pos().y()
+        idx = self.index_for_y(y)
+        if idx is not None:
+            self.activate_current_result()
+            self.hide()
+        ev.accept()
+
+
 if __name__ == '__main__':
+    from calibre.utils.matcher import Matcher
     def test(editor):
         c = editor.__c = CompletionPopup(editor.editor, max_height=100)
-        c.set_items('one two three four five six seven eight nine ten'.split())
-        QTimer.singleShot(10, c.show)
+        items = 'a ab abc abcd abcde abcdef abcdefg abcdefgh'.split()
+        m = Matcher(items)
+        c.set_items(m('a'), descriptions={x:x for x in items})
+        QTimer.singleShot(100, c.show)
     from calibre.gui2.tweak_book.editor.widget import launch_editor
     raw = textwrap.dedent('''\
     Is the same as saying through shrinking from toil and pain. These

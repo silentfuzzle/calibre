@@ -11,7 +11,7 @@ from contextlib import closing
 
 from calibre import get_proxies
 from calibre.constants import ispy3
-has_ssl_verify = sys.version_info[:3] >= (2, 7, 9)
+has_ssl_verify = hasattr(ssl, 'PROTOCOL_TLSv1_2') and sys.version_info[:3] > (2, 7, 8)
 
 class HTTPError(ValueError):
 
@@ -162,7 +162,10 @@ def get_https_resource_securely(
     server's certificates.
     '''
     if ssl_version is None:
-        ssl_version = ssl.PROTOCOL_TLSv1
+        try:
+            ssl_version = ssl.PROTOCOL_TLSv1_2
+        except AttributeError:
+            ssl_version = ssl.PROTOCOL_TLSv1  # old python
     cacerts = P(cacerts, allow_user_override=False)
     p = urlparse(url)
     if p.scheme != 'https':

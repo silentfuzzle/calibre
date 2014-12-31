@@ -19,7 +19,7 @@ py3 = sys.version_info[0] > 2
 enc = getattr(sys.stdout, 'encoding', 'UTF-8') or 'utf-8'
 calibre_version = signature = None
 urllib = __import__('urllib.request' if py3 else 'urllib', fromlist=1)
-has_ssl_verify = sys.version_info[:3] >= (2, 7, 9)
+has_ssl_verify = hasattr(ssl, 'PROTOCOL_TLSv1_2') and sys.version_info[:3] > (2, 7, 8)
 
 if py3:
     unicode = str
@@ -546,7 +546,10 @@ def get_https_resource_securely(url, timeout=60, max_redirects=5, ssl_version=No
     server's certificates.
     '''
     if ssl_version is None:
-        ssl_version = ssl.PROTOCOL_TLSv1
+        try:
+            ssl_version = ssl.PROTOCOL_TLSv1_2
+        except AttributeError:
+            ssl_version = ssl.PROTOCOL_TLSv1  # old python
     with tempfile.NamedTemporaryFile(prefix='calibre-ca-cert-') as f:
         f.write(CACERT)
         f.flush()

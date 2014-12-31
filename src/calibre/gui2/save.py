@@ -206,17 +206,20 @@ class Saver(QObject):
             asked_formats = {x.lower().strip() for x in self.opts.formats.split(',')}
             fmts = asked_formats.intersection(fmts)
             if not fmts:
-                self.errors[book_id] = ('critical', _('Requested formats not available'))
+                self.errors[book_id].append(('critical', _('Requested formats not available')))
                 return
 
         if not fmts and not self.opts.write_opf and not self.opts.save_cover:
             return
 
-        try:
-            os.makedirs(base_dir)
-        except EnvironmentError as err:
-            if err.errno != errno.EEXIST:
-                raise
+        # On windows python incorrectly raises an access denied exception
+        # when trying to create the root of a drive, like C:\
+        if os.path.dirname(base_dir) != base_dir:
+            try:
+                os.makedirs(base_dir)
+            except EnvironmentError as err:
+                if err.errno != errno.EEXIST:
+                    raise
 
         if self.opts.update_metadata:
             d = {}
