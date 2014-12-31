@@ -8,8 +8,8 @@ from calibre.gui2.viewer.behavior.calibre_behavior import CalibreBehavior
 from calibre.gui2.viewer.toc_sections import TOCSections
 from calibre.gui2.viewer.behavior_manager.behavior_manager import BehaviorManager
 from calibre.gui2.viewer.behavior_manager.behavior_manager_switch import SwitchBehaviorManager
-from calibre.gui2.viewer.toc_hierarchy_container import TreeTOCContainer
-from calibre.gui2.viewer.toc_network_container import NetworkTOCContainer
+from calibre.gui2.viewer.toc_container.toc_hierarchy_container import TreeTOCContainer
+from calibre.gui2.viewer.toc_container.toc_network_container import NetworkTOCContainer
 
 # This class builds the TOC interface(s) and page numbering behavior(s) to use in the ebook viewer interface
 class BehaviorManagerBuilder (object):

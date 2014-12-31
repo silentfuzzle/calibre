@@ -4,8 +4,8 @@ __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
 from PyQt5.Qt import (QVBoxLayout, QWidget)
 from calibre.gui2.viewer.book_network import EBookNetwork
-from calibre.gui2.viewer.tocNetwork import TOCNetworkView, TOCNetworkSearch, TOCNetworkTools
-from calibre.gui2.viewer.toc_container import TOCContainer
+from calibre.gui2.viewer.toc_network import TOCNetworkView, TOCNetworkSearch, TOCNetworkTools
+from calibre.gui2.viewer.toc_container.toc_container import TOCContainer
 
 # This class defines a network table of contents interface and control set.
 class NetworkTOCContainer(TOCContainer):

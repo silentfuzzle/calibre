@@ -5,7 +5,7 @@ __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 from functools import partial
 from PyQt5.Qt import (QVBoxLayout, QWidget, QModelIndex)
 from calibre.gui2.viewer.toc import TOCView, TOCSearch
-from calibre.gui2.viewer.toc_container import TOCContainer
+from calibre.gui2.viewer.toc_container.toc_container import TOCContainer
 
 # This class defines a hierarchical table of contents interface and control set.
 class TreeTOCContainer(TOCContainer):
