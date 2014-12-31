@@ -20,8 +20,7 @@ from calibre.gui2.main_window import MainWindow
 from calibre.gui2.search_box import SearchBox2
 from calibre.gui2.viewer.documentview import DocumentView
 from calibre.gui2.viewer.bookmarkmanager import BookmarkManager
-from calibre.gui2.viewer.toc_container import CalibreTOCContainer
-from calibre.gui2.viewer.toc_network_container import AdventurousTOCContainer
+from calibre.gui2.viewer.behavior_manager.behavior_manager_builder import BehaviorManagerBuilder
 from calibre.gui2.viewer.footnote import FootnotesView
 
 class DoubleSpinBox(QDoubleSpinBox):  # {{{
@@ -253,9 +252,8 @@ class Main(MainWindow):
 
         self.toc_dock = d = QDockWidget(_('Table of Contents'), self)
         d.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.calibre_toc_container = CalibreTOCContainer(self)
-        self.adventurous_toc_container = AdventurousTOCContainer(self)
-        self.set_toc_view(self.calibre_toc_container)
+        self.behavior_manager_builder = BehaviorManagerBuilder(self, switch=True)
+        self.set_toc_view(self.behavior_manager_builder.default_manager.toc_interface)
         d.setObjectName('toc-dock')
         d.close()  # starts out hidden
         self.addDockWidget(Qt.LeftDockWidgetArea, d)

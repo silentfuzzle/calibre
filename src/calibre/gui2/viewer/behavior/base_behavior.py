@@ -9,13 +9,15 @@ class BaseBehavior (object):
     PAGE_STEP = 100.
     
     # Constructor
-    # Set the default absolute position and number of pages in the ebook
-    # number_of_pages (number) - the total pages found in the ebook
-    def __init__(self, number_of_pages):
+    def __init__(self):
         self.absolute_position = 1.
-        self.num_pages = number_of_pages
         self.curr_sec = None
         self.last_label = 1.
+        
+    # Set the default/total number of pages found in the ebook
+    # number_of_pages (number) - the total pages found in the ebook
+    def setup_ebook(self, number_of_pages):
+        self.num_pages = number_of_pages
 
     # Returns the page number to display in the upper left
     # Sets the new absolute position in the book
@@ -29,7 +31,7 @@ class BaseBehavior (object):
     # frac (number) - the scrollbar's position in relation to the current displayed section of the book        
     @abc.abstractmethod
     def calculate_page_label(self, frac):
-        return self.last_label
+        return
     
     # Returns whether the user can move from the current section to the passed section
     # next_sec (string) - the section to check
@@ -64,12 +66,4 @@ class BaseBehavior (object):
             return 0.8
         else:
             return sec.pages-1
-       
-    # Returns the users current position in the ebook
-    def get_absolute_position(self):
-        return self.absolute_position
-    
-    # Returns the total number of pages in the ebook or section
-    def get_num_pages(self):
-        return self.num_pages
         

@@ -2,30 +2,36 @@
 __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
-from PyQt5.Qt import (QVBoxLayout, QWidget, QModelIndex)
-from functools import partial
-from calibre.gui2.viewer.toc import TOCView, TOCSearch
+from PyQt5.Qt import QWidget
 
-# This class defines a hierarchical table of contents interface and control set.
-class CalibreTOCContainer(QWidget):
-    def __init__(self, parent):
-        QWidget.__init__(self, parent)
-        w = self
-        w.l = QVBoxLayout(w)
-        self.toc = TOCView(w)
-        self.toc_search = TOCSearch(self.toc, parent=w)
-        w.l.addWidget(self.toc)
-        w.l.addWidget(self.toc_search)
-        w.l.setContentsMargins(0, 0, 0, 0)
+# This class sets the default behaviors of all table of contents interfaces.
+class TOCContainer(QWidget):
+
+    # If the table of contents interface is a network,
+    # check if a connection should be added
+    # curr_sec (SpineItem) - the current section
+    # next_sec (SpineItem) - the section the user just navigated to
+    def check_update_connection(self, curr_sec, next_sec):
+        return
         
-    # Connects the click method of the TOC interface to a method from EBookViewer
-    # toc_clicked_method (method) - the method to connect the action to
-    def connect_toc_actions(self, toc_clicked_method):
-        self.toc.pressed[QModelIndex].connect(toc_clicked_method)
-        self.toc.searched.connect(partial(toc_clicked_method, force=True))
+    # If the table of contents interface is a network,
+    # add a connection between sections
+        # start_sec (SpineItem) - the node/section to start the edge from
+    # end_sec (string) - the node/section to end the edge at
+    # start_sec_checked (boolean) - true if the passed start section was already checked for existence in the ebook's TOC
+    def update_connection(self, start_sec, end_sec, start_sec_checked=False):
+        return
         
-    # Sets the hierarchy of information for display
-    # toc_model (calibre.gui2.viewer.TOC) - the object storing all information about the hierarchy
-    def setup_ebook(self, toc_model):
-        self.toc.setModel(toc_model)
+    # If the table of contents interface is a network,
+    # update the current section/node highlighted
+    # curr_index (int) - the position if the current section in the spine
+    # curr_sec (SpineItem) - the current section the user is viewing
+    def update_curr_sec(self, curr_index, curr_sec):
+        return
+        
+    # If the table of contents interface is a hierarchy,
+    # update the highlighted index if needed
+    # item_index (int) - the index to highlight
+    def scroll_to(self, item_index):
+        return
         

@@ -8,10 +8,9 @@ from calibre.gui2.viewer.behavior.base_behavior import BaseBehavior
 class BaseAdventurousBehavior (BaseBehavior):
     
     # Constructor
-    # default_number_of_pages (number) - the total number of pages in the ebook
     # setup_vscrollbar_method (method) - the method setting up the scrollbar and the position displayed in the upper left
-    def __init__(self, default_number_of_pages, setup_vscrollbar_method):
-        BaseBehavior.__init__(self, default_number_of_pages)
+    def __init__(self, setup_vscrollbar_method):
+        BaseBehavior.__init__(self)
         self.setup_vscrollbar_method = setup_vscrollbar_method
         
     # Sets the current section of the book the user is viewing

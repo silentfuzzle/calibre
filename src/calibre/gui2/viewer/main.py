@@ -13,9 +13,7 @@ from PyQt5.Qt import (
 from calibre.gui2.viewer.ui import Main as MainWindow
 from calibre.gui2.viewer.printing import Printing
 from calibre.gui2.viewer.toc import TOC
-from calibre.gui2.viewer.behavior.behavior_manager import BehaviorManager
 from calibre.gui2.viewer.behavior.base_behavior import BaseBehavior
-from calibre.gui2.viewer.toc_sections import TOCSections
 from calibre.gui2.widgets import ProgressIndicator
 from calibre.gui2 import (
     Application, ORG_NAME, APP_UID, choose_files, info_dialog, error_dialog,
@@ -78,7 +76,7 @@ class EbookViewer(MainWindow):
             'into pages like a paper book')
     PAGED_MODE_TT = _('Switch to flow mode - where the text is not broken up '
             'into pages')
-            
+
     ADVENTUROUS_MODE_TT = _('Switch to Calibre mode - where the text is displayed in '
             'a continuous document')
     CALIBRE_MODE_TT = _('Switch to Adventurous mode - where the text is broken up '
@@ -87,7 +85,7 @@ class EbookViewer(MainWindow):
     def __init__(self, pathtoebook=None, debug_javascript=False, open_at=None,
                  start_in_fullscreen=False):
         MainWindow.__init__(self, debug_javascript)
-        self.page_behavior = None
+        self.behavior_manager = None
         self.view.magnification_changed.connect(self.magnification_changed)
         self.show_toc_on_open = False
         self.current_book_has_toc = False
@@ -136,7 +134,6 @@ class EbookViewer(MainWindow):
         self.pos.editingFinished.connect(self.goto_page_num)
         self.vertical_scrollbar.valueChanged[int].connect(lambda
                 x:self.scrollbar_goto_page(x/BaseBehavior.PAGE_STEP))
-        self.calibre_toc_container.connect_toc_actions(self.toc_clicked)
         self.search.search.connect(self.find)
         self.search.focus_to_library.connect(lambda: self.view.setFocus(Qt.OtherFocusReason))
         self.reference.goto.connect(self.goto)
@@ -183,7 +180,6 @@ class EbookViewer(MainWindow):
         self.restore_state()
         self.settings_changed()
         self.action_toggle_paged_mode.toggled[bool].connect(self.toggle_paged_mode)
-        self.action_toggle_adventurous_mode.toggled[bool].connect(self.toggle_adventurous_mode)
         if (start_in_fullscreen or self.view.document.start_in_fullscreen):
             self.action_full_screen.trigger()
         self.hide_cursor_timer = t = QTimer(self)
@@ -203,17 +199,14 @@ class EbookViewer(MainWindow):
         self.cursor_hidden = True
         QApplication.instance().setOverrideCursor(Qt.BlankCursor)
         
-    # Toggle between using Adventurous Reader and default Calibre TOC and page modes
-    def toggle_adventurous_mode(self, in_adventurous_mode):
-        if (not in_adventurous_mode):
-            self.set_toc_view(self.calibre_toc_container)
-            self.page_behavior.set_current_behavior(False)
-        else:
-            self.set_toc_view(self.adventurous_toc_container)
-            self.page_behavior.set_current_behavior(True)
+    def set_behavior_manager(self, in_adventurous_mode, toc_view):
         self.action_toggle_adventurous_mode.setToolTip(
                 self.ADVENTUROUS_MODE_TT if
                 in_adventurous_mode else self.CALIBRE_MODE_TT)
+        self.set_toc_view(toc_view)
+        if (self.behavior_manager is not None):
+            self.setup_vscrollbar()
+            self.set_vscrollbar_value(self.behavior_manager.page_behavior.last_label)
 
     def toggle_paged_mode(self, checked, at_start=False):
         in_paged_mode = not self.action_toggle_paged_mode.isChecked()
@@ -493,20 +486,20 @@ class EbookViewer(MainWindow):
             QApplication.clipboard().setText(self.selected_text)
 
     def back(self, x):
-        pos = self.history.back(self.page_behavior.get_absolute_position())
+        pos = self.history.back(self.behavior_manager.get_absolute_position())
         
         if pos is not None:
-            self.page_behavior.set_history_offset(-1)
+            self.behavior_manager.set_history_offset(-1)
             self.goto_page(pos)
 
     def goto_page_num(self):
-        self.page_behavior.goto_page(self.pos.value(), self.goto_page)
+        self.behavior_manager.goto_page(self.pos.value(), self.goto_page)
 
     def forward(self, x):
-        pos = self.history.forward(self.page_behavior.get_absolute_position())
+        pos = self.history.forward(self.behavior_manager.get_absolute_position())
         
         if pos is not None:
-            self.page_behavior.set_history_offset(1)
+            self.behavior_manager.set_history_offset(1)
             self.goto_page(pos)
 
     def goto_start(self):
@@ -517,24 +510,23 @@ class EbookViewer(MainWindow):
         
     def scrollbar_goto_page(self, new_page):
         if self.current_page is not None:
-            self.page_behavior.goto_page(new_page, self.goto_page)
+            self.behavior_manager.goto_page(new_page, self.goto_page)
             
     def goto_page(self, new_page, loaded_check=True, allow_page_turn=True):
         if self.current_page is not None or not loaded_check:
             for page in self.iterator.spine:
-                checkPages = self.page_behavior.check_pages(new_page, page)
+                checkPages = self.behavior_manager.check_pages(new_page, page)
                     
                 if checkPages:
                     try:
-                        frac = float(new_page-page.start_page)/(self.page_behavior.get_section_pages(page))
+                        frac = float(new_page-page.start_page)/(self.behavior_manager.get_section_pages(page))
                     except ZeroDivisionError:
                         frac = 0
                     if page == self.current_page:
                         self.view.scroll_to(frac)
-                        self.adventurous_toc_container.update_network_pos()
                     else:
                         if (allow_page_turn == False):
-                            allow_page_turn = self.page_behavior.allow_page_turn(page)
+                            allow_page_turn = self.behavior_manager.allow_page_turn(page)
                             
                         if (allow_page_turn == True):
                             self.load_path(page, pos=frac)
@@ -607,8 +599,8 @@ class EbookViewer(MainWindow):
             self.scrolled(self.view.scroll_fraction)
 
     def internal_link_clicked(self, prev_pos):
-        self.history.add(self.page_behavior.get_absolute_position())
-        self.page_behavior.set_history_offset(0)
+        self.history.add(self.behavior_manager.get_absolute_position())
+        self.behavior_manager.set_history_offset(0)
 
     def link_clicked(self, url):
         path = os.path.abspath(unicode(url.toLocalFile()))
@@ -620,7 +612,7 @@ class EbookViewer(MainWindow):
             if url.hasFragment():
                 frag = unicode(url.fragment())
             if path != self.current_page:
-                self.adventurous_toc_container.add_network_edge(
+                self.behavior_manager.update_connection(
                     self.current_page, path)
                 self.pending_anchor = frag
                 self.load_path(path)
@@ -651,7 +643,7 @@ class EbookViewer(MainWindow):
             return -1
         self.current_page = self.iterator.spine[index]
         self.current_index = index
-        self.page_behavior.set_curr_sec(self.current_index, self.current_page)
+        self.behavior_manager.set_curr_sec(self.current_index, self.current_page)
         self.set_page_number(self.view.scroll_fraction)
         QTimer.singleShot(100, self.update_indexing_state)
         if self.pending_search is not None:
@@ -702,7 +694,7 @@ class EbookViewer(MainWindow):
                         self.view.viewport_rect, anchor_positions,
                         self.view.document.in_paged_mode)
             if (items):
-                self.calibre_toc_container.toc.scrollTo(items[-1].index())
+                self.behavior_manager.scroll_to(items[-1].index())
             if pgns is not None:
                 self.pending_goto_next_section = None
                 # Check that we actually progressed
@@ -755,8 +747,8 @@ class EbookViewer(MainWindow):
 
     def update_page_number(self):
         self.set_page_number(self.view.document.scroll_fraction)
-        if (self.page_behavior is not None):
-            return self.page_behavior.get_absolute_position()
+        if (self.behavior_manager is not None):
+            return self.behavior_manager.get_absolute_position()
         else:
             return self.pos.value()
 
@@ -885,7 +877,6 @@ class EbookViewer(MainWindow):
                 self.toc_model = TOC(self.iterator.spine, self.iterator.toc)
                 if self.show_toc_on_open:
                     self.action_table_of_contents.setChecked(True)
-                toc_sections = TOCSections(self.iterator.toc, self.iterator.spine)
             else:
                 self.toc_model = TOC(self.iterator.spine)
                 self.action_table_of_contents.setChecked(False)
@@ -893,16 +884,10 @@ class EbookViewer(MainWindow):
             
             # Setup the page behavior for the ebook
             total_num_pages = sum(self.iterator.pages)
-            self.page_behavior = BehaviorManager(total_num_pages, self, toc_sections)
-            
-            # Setup the table of contents interface for the ebook
-            self.calibre_toc_container.setup_ebook(self.toc_model)
-            if (self.iterator.toc):
-                self.adventurous_toc_container.setup_ebook(self.iterator.spine, 
-                        self.iterator.toc, toc_sections, title, pathtoebook)
-            self.toggle_adventurous_mode(
-                    self.action_toggle_adventurous_mode.isChecked())
-
+            self.behavior_manager = (
+                    self.behavior_manager_builder.build_behavior_manager(
+                    self, total_num_pages, title, pathtoebook))
+                    
             if isbytestring(pathtoebook):
                 pathtoebook = force_unicode(pathtoebook, filesystem_encoding)
             vh = vprefs.get('viewer_open_history', [])
@@ -940,7 +925,7 @@ class EbookViewer(MainWindow):
 
     def setup_vscrollbar(self):
         pageStep = BaseBehavior.PAGE_STEP
-        num_pages = self.page_behavior.get_num_pages()
+        num_pages = self.behavior_manager.get_num_pages()
         self.pos.setMaximum(num_pages)
         self.pos.setSuffix(' / %d'%num_pages)
         
@@ -959,7 +944,7 @@ class EbookViewer(MainWindow):
 
     def set_page_number(self, frac):
         if getattr(self, 'current_page', None) is not None:
-            page = self.page_behavior.get_page_label(frac)
+            page = self.behavior_manager.get_page_label(frac)
             self.set_vscrollbar_value(page)
 
     def scrolled(self, frac, onload=False):
@@ -971,12 +956,12 @@ class EbookViewer(MainWindow):
     def next_document(self):
         if (hasattr(self, 'current_index') and self.current_index <
                 len(self.iterator.spine) - 1):
-            if (self.page_behavior.allow_page_turn(self.iterator.spine[self.current_index+1])):
+            if (self.behavior_manager.allow_page_turn(self.iterator.spine[self.current_index+1])):
                 self.load_path(self.iterator.spine[self.current_index+1])
 
     def previous_document(self):
         if hasattr(self, 'current_index') and self.current_index > 0:
-            if (self.page_behavior.allow_page_turn(self.iterator.spine[self.current_index-1])):
+            if (self.behavior_manager.allow_page_turn(self.iterator.spine[self.current_index-1])):
                 self.load_path(self.iterator.spine[self.current_index-1], pos=1.0)
 
     def keyPressEvent(self, event):

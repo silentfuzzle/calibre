@@ -11,12 +11,9 @@ class AdventurousBehavior (BaseAdventurousBehavior):
     # Constructor
     # toc_sections (TOCSections) - a object that determines how the sections of the ebook are separated
     # spine - (List(SpineItem)) the current ebook's order of sections
-    # default_number_of_pages (number) - the total number of pages in the ebook
     # setup_vscrollbar_method (method) - the method setting up the scrollbar and the position displayed in the upper left
-    def __init__(self, toc_sections, spine, default_number_of_pages, 
-            setup_scrollbar_method):
-        BaseAdventurousBehavior.__init__(self, default_number_of_pages, 
-                setup_scrollbar_method)
+    def __init__(self, toc_sections, spine, setup_scrollbar_method):
+        BaseAdventurousBehavior.__init__(self, setup_scrollbar_method)
         self.toc_sections = toc_sections
         self.spine = spine
         self.start_spine = 1
@@ -29,9 +26,8 @@ class AdventurousBehavior (BaseAdventurousBehavior):
         super(AdventurousBehavior, self).set_curr_sec(curr_index, curr_sec)
         
         # Make sure the current section exists in the TOC
-        self.toc_sections.set_curr_sec(curr_index, curr_sec)
-        
-        if (curr_index not in self.toc_sections.include_sections):
+        updated_include_sections = self.toc_sections.set_curr_sec(curr_index, curr_sec)
+        if (updated_include_sections):
             # Determine the part of the spine included in the sections
             self.start_spine = -1
             self.end_spine = -1

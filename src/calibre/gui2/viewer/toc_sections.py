@@ -15,13 +15,16 @@ class TOCSections (object):
         self.toc = toc
         self.spine = spine
         
-    # Set the sections included in the current group
+    # Set the sections included in the current group, returns True if included sections were updated
     # curr_index (int) - the index of the current section in the spine
     # curr_sec (SpineItem) - the currect section being viewed
     def set_curr_sec(self, curr_index, curr_sec):
         curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)        
         if (curr_index not in self.include_sections):
             self.include_sections = self.find_include_sections(curr_toc)
+            
+            return True
+        return False
  
     # Returns the sections to include in this group of sections
     # curr_toc (calibre.ebooks.metadata.toc.TOC) - the TOC entry of the current section
