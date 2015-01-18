@@ -39,77 +39,53 @@ class BehaviorManagerBuilder (object):
         # Create a default TOC interface to use until the user selects an ebook
         self.default_manager = BehaviorManager(CalibreBehavior(), 
                 TreeTOCContainer(main))
+        self.network_container = NetworkTOCContainer(main)
             
     # Return a page behavior given if the current ebook should be display in a single document
     # single_document (bool) - True if the page behavior should display all the book's text in a single document
-    # toc_sections (TOCSections) - an object defining how the sections of the book in the toc are separated into groups
-    # spine (List(SpineItem)) - the list of sections in the book
     # setup_vscrollbar_method (method) - the method from EBookViewer to use when updating the scrollbar and page numbers
-    def get_page_behavior(self, single_document, toc_sections, spine, 
-            setup_vscrollbar_method):
+    def get_page_behavior(self, single_document, setup_vscrollbar_method):
         if (single_document):
             # Display the book in a single document
             page_behavior = CalibreBehavior()
         else:
             # Break the book into groups and display each group as a separate document
-            page_behavior = AdventurousBehavior(toc_sections, 
-                    spine, setup_vscrollbar_method)
+            page_behavior = AdventurousBehavior(setup_vscrollbar_method)
         return page_behavior
                 
     # Return a TOC interface given if it should be displayed as a network or a hierarchy
     # use_hierarchy (bool) - True if the TOC interface should display the TOC in a hierarchy
-    # toc_sections (TOCSections) - an object defining how the sections of the book in the toc are separated into groups
-    # title (string) - the title of the book
-    # pathtoebook (string) - the path to the ebook on the user's file system
     # main (EBookViewer) - the ebook viewer interface
-    def get_toc_interface(self, use_hierarchy, toc_sections, title, 
-            pathtoebook, main):
+    def get_toc_interface(self, use_hierarchy, main):
         if (use_hierarchy):
             # Display the ebook's TOC as a hierarchy of sections
             toc_container = TreeTOCContainer(main)
-            toc_container.setup_ebook(main.toc_model)
             toc_container.connect_toc_actions(main.toc_clicked)
         else:
             # Display the ebook's TOC as a network of sections
-            toc_container = NetworkTOCContainer(main)
-            toc_container.setup_ebook(main.iterator.spine, main.iterator.toc, 
-                    toc_sections, title, pathtoebook)
+            toc_container = self.network_container
         return toc_container
         
     # Returns a behavior manager from the given parameters
     # main (EBookViewer) - the ebook viewer interface
-    # number_of_pages (int) - the total number of pages in the ebook
-    # title (string) - the title of the ebook
-    # pathtoebook (string) - the path to the ebook on the user's file system
-    def build_behavior_manager(self, main, number_of_pages, title, pathtoebook):
-        toc = main.iterator.toc
-        spine = main.iterator.spine
-        toc_sections = TOCSections(toc, spine)
+    def build_behavior_manager(self, main):
         
-        # If there isn't a TOC, display the ebook in a single document with a
-        # hierarchical TOC interface at all times
-        if (not toc):
-            self.switch = False
-            self.b1_single_document = True
-            self.b1_use_hierarchy = True
-            
         # Create the main interface behavior
         b1_page_behavior = self.get_page_behavior(self.b1_single_document, 
-                toc_sections, spine, main.setup_vscrollbar)
+                main.setup_vscrollbar)
         b1_toc_interface = self.get_toc_interface(
-                self.b1_use_hierarchy, toc_sections, title, pathtoebook, main)
+                self.b1_use_hierarchy, main)
         
         if (self.switch):
             # Create the second interface behavior if specified
             b2_page_behavior = self.get_page_behavior(self.b2_single_document,
-                    toc_sections, spine, main.setup_vscrollbar)
+                    main.setup_vscrollbar)
             b2_toc_interface = self.get_toc_interface(
-                    self.b2_use_hierarchy, toc_sections, title, pathtoebook, 
-                    main)
+                    self.b2_use_hierarchy, main)
             
             # Create a behavior manager to switch between the main and second behavior
             behavior_manager = SwitchBehaviorManager(
-                    main.set_behavior_manager, b1_page_behavior, 
+                    main, b1_page_behavior, 
                     b1_toc_interface, b2_page_behavior, 
                     b2_toc_interface)
         else:
@@ -118,6 +94,29 @@ class BehaviorManagerBuilder (object):
             behavior_manager = BehaviorManager(b1_page_behavior, 
                     b1_toc_interface)
         
-        behavior_manager.setup_ebook(number_of_pages, main)
+        self.behavior_manager = behavior_manager
         return behavior_manager
+
+    # main (EBookViewer) - the ebook viewer interface
+    # title (string) - the title of the ebook
+    # pathtoebook (string) - the path to the ebook on the user's file system
+    def setup_behavior_manager(self, main, title, pathtoebook):
+        toc = main.iterator.toc
+        toc_sections = None
+    
+        # If there isn't a TOC, display the ebook in a single document with a
+        # hierarchical TOC interface at all times
+        if (not toc):
+            main.action_toggle_adventurous_mode.setEnabled(False)
+            behavior_manager = self.default_manager
+        else:
+            main.action_toggle_adventurous_mode.setEnabled(True)
+            behavior_manager = self.behavior_manager
+            toc_sections = TOCSections(toc, main.iterator.spine)
         
+        total_num_pages = sum(main.iterator.pages)
+        behavior_manager.setup_ebook(total_num_pages, toc_sections, main.toc_model, title, 
+                pathtoebook)
+               
+        # Return the behavior manager to use if it has changed
+        return behavior_manager

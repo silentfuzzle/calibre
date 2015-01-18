@@ -33,13 +33,12 @@ class NetworkTOCContainer(TOCContainer):
         w.l.setContentsMargins(0, 0, 0, 0)
         
     # Sets the network of information for display
-    # spine - (List(SpineItem)) the current ebook's ordering of sections
-    # toc - (calibre.ebooks.metadata.toc.TOC) the current ebook's TOC
     # toc_sections (TOCSections) - a object that determines how the sections of the ebook are grouped
+    # toc_model (calibre.gui2.viewer.TOC) - the object storing all information about the TOC hierarchy
     # title (string) - the title of the ebook
     # pathtoebook (string) - the full path to the ebook's location
-    def setup_ebook(self, spine, toc, toc_sections, title, pathtoebook):
-        ebook_network = EBookNetwork(spine, toc, title, pathtoebook)
+    def setup_ebook(self, toc_sections, toc_model, title, pathtoebook):
+        ebook_network = EBookNetwork(toc_sections.spine, toc_sections.toc, title, pathtoebook)
         self.toc.set_ebook_network(ebook_network)
         self.toc_sections = toc_sections
         self.history_offset = 0

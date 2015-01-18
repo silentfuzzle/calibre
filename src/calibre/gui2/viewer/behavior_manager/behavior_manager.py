@@ -16,10 +16,14 @@ class BehaviorManager (BaseBehavior):
         
     # Sets up the ebook for display using this behavior manager
     # number_of_pages (int) - the total number of pages in the ebook
-    # main (EBookViewer) - the ebook viewer interface
-    def setup_ebook(self, number_of_pages, main):
-        self.page_behavior.setup_ebook(number_of_pages)
-        main.set_toc_view(self.toc_interface)   # Display the TOC interface
+    # toc_sections (TOCSections) - a object that determines how the sections of the ebook are grouped
+    # toc_model (calibre.gui2.viewer.TOC) - the object storing all information about the visual TOC hierarchy
+    # title (string) - the title of the ebook
+    # pathtoebook (string) - the full path to the ebook's location
+    def setup_ebook(self, number_of_pages, toc_sections, toc_model, title, 
+            pathtoebook):
+        self.page_behavior.setup_ebook(number_of_pages, toc_sections)
+        self.toc_interface.setup_ebook(toc_sections, toc_model, title, pathtoebook)
         
     # Sets the history offset for the correct behavior
     # offset (int) - the new value of the history offset

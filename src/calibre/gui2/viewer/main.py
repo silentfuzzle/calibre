@@ -86,6 +86,8 @@ class EbookViewer(MainWindow):
                  start_in_fullscreen=False):
         MainWindow.__init__(self, debug_javascript)
         self.behavior_manager = None
+        self.behavior_manager = (
+                self.behavior_manager_builder.build_behavior_manager(self))
         self.view.magnification_changed.connect(self.magnification_changed)
         self.show_toc_on_open = False
         self.current_book_has_toc = False
@@ -883,10 +885,9 @@ class EbookViewer(MainWindow):
                 self.action_toggle_adventurous_mode.setChecked(False)
             
             # Setup the page behavior for the ebook
-            total_num_pages = sum(self.iterator.pages)
             self.behavior_manager = (
-                    self.behavior_manager_builder.build_behavior_manager(
-                    self, total_num_pages, title, pathtoebook))
+                    self.behavior_manager_builder.setup_behavior_manager(
+                    self, title, pathtoebook))
                     
             if isbytestring(pathtoebook):
                 pathtoebook = force_unicode(pathtoebook, filesystem_encoding)

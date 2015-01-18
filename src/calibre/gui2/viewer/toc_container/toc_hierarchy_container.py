@@ -29,8 +29,11 @@ class TreeTOCContainer(TOCContainer):
         self.toc.searched.connect(partial(toc_clicked_method, force=True))
         
     # Sets the hierarchy of information for display
+    # toc_sections (TOCSections) - a object that determines how the sections of the ebook are grouped
     # toc_model (calibre.gui2.viewer.TOC) - the object storing all information about the hierarchy
-    def setup_ebook(self, toc_model):
+    # title (string) - the title of the ebook
+    # pathtoebook (string) - the full path to the ebook's location
+    def setup_ebook(self, toc_sections, toc_model, title, pathtoebook):
         self.toc.setModel(toc_model)
         
     # Updates the selected item in the hierarchy

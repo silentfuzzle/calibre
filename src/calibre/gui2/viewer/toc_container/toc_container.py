@@ -3,9 +3,18 @@ __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
 from PyQt5.Qt import QWidget
+import abc
 
 # This class sets the default behaviors of all table of contents interfaces.
 class TOCContainer(QWidget):
+
+    # toc_sections (TOCSections) - a object that determines how the sections of the ebook are grouped
+    # toc_model (calibre.gui2.viewer.TOC) - the object storing all information about the TOC hierarchy
+    # title (string) - the title of the ebook
+    # pathtoebook (string) - the full path to the ebook's location
+    @abc.abstractmethod
+    def setup_ebook(self, toc_sections, toc_model, title, pathtoebook):
+        return
 
     # If the table of contents interface is a network,
     # check if a connection should be added

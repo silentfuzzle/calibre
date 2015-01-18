@@ -8,19 +8,25 @@ from calibre.gui2.viewer.behavior_manager.behavior_manager import BehaviorManage
 class SwitchBehaviorManager (BehaviorManager):
 
     # Constructor
-    # set_behavior_manager_method (method) - the method to call in EBookViewer after switching interface behaviors
+    # main (EBookViewer) - the ebook viewer interface
     # b1_page_behavior (BaseBehavior) - the main page behavior to toggle between
     # b1_toc_interface (TOCContainer) - the main TOC interface to toggle between
     # b2_page_behavior (BaseBehavior) - the second page behavior to toggle between
     # b2_toc_interface (TOCContainer) - the second TOC interface to toggle between
-    def __init__(self, set_behavior_manager_method, b1_page_behavior, 
-            b1_toc_interface, b2_page_behavior, b2_toc_interface):
+    def __init__(self, b1_page_behavior, 
+            b1_toc_interface, b2_page_behavior, b2_toc_interface, main):
         BehaviorManager.__init__(self, b1_page_behavior, b1_toc_interface)
         self.b1_page_behavior = b1_page_behavior
         self.b1_toc_interface = b1_toc_interface
         self.b2_page_behavior = b2_page_behavior
         self.b2_toc_interface = b2_toc_interface
-        self.set_behavior_manager_method = set_behavior_manager_method
+        self.set_behavior_manager_method = main.set_behavior_manager
+          
+        # Setup the interface behavior toggle button
+        main.action_toggle_adventurous_mode.toggled[bool].connect(
+                self.toggle_adventurous_mode)
+        self.toggle_adventurous_mode(
+                main.action_toggle_adventurous_mode.isChecked())
             
     # Returns the value from the current page behavior
     # b1_return (object) - the value returned by a method from the main page behavior
@@ -50,16 +56,17 @@ class SwitchBehaviorManager (BehaviorManager):
     
     # Sets up the ebook for display using this behavior manager
     # number_of_pages (int) - the total number of pages in the ebook
-    # main (EBookViewer) - the ebook viewer interface
-    def setup_ebook(self, number_of_pages, main):
-        self.b1_page_behavior.setup_ebook(number_of_pages)
-        self.b2_page_behavior.setup_ebook(number_of_pages)
-                    
-        # Setup the interface behavior toggle button and the selected interface
-        main.action_toggle_adventurous_mode.toggled[bool].connect(
-                self.toggle_adventurous_mode)
-        self.toggle_adventurous_mode(
-                main.action_toggle_adventurous_mode.isChecked())
+    # toc_sections (TOCSections) - a object that determines how the sections of the ebook are grouped
+    # toc_model (calibre.gui2.viewer.TOC) - the object storing all information about the visual TOC hierarchy
+    # title (string) - the title of the ebook
+    # pathtoebook (string) - the full path to the ebook's location
+    def setup_ebook(self, number_of_pages, toc_sections, toc_model, title, 
+            pathtoebook):
+        self.b1_page_behavior.setup_ebook(number_of_pages, toc_sections)
+        self.b2_page_behavior.setup_ebook(number_of_pages, toc_sections)
+        
+        self.b1_toc_interface.setup_ebook(toc_sections, toc_model, title, pathtoebook)
+        self.b2_toc_interface.setup_ebook(toc_sections, toc_model, title, pathtoebook)
         
     # Sets the history offset for any network TOC interfaces
     # offset (int) - the new value of the history offset

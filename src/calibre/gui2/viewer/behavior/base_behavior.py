@@ -13,10 +13,12 @@ class BaseBehavior (object):
         self.absolute_position = 1.
         self.curr_sec = None
         self.last_label = 1.
+        self.num_pages = 1
         
     # Set the default/total number of pages found in the ebook
     # number_of_pages (number) - the total pages found in the ebook
-    def setup_ebook(self, number_of_pages):
+    # toc_sections (TOCSections) - a object that determines how the sections of the ebook are separated
+    def setup_ebook(self, number_of_pages, toc_sections):
         self.num_pages = number_of_pages
 
     # Returns the page number to display in the upper left

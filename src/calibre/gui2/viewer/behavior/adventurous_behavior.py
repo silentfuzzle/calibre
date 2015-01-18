@@ -9,14 +9,18 @@ from calibre.gui2.viewer.behavior.adventurous_base_behavior import BaseAdventuro
 class AdventurousBehavior (BaseAdventurousBehavior):
 
     # Constructor
-    # toc_sections (TOCSections) - a object that determines how the sections of the ebook are separated
-    # spine - (List(SpineItem)) the current ebook's order of sections
     # setup_vscrollbar_method (method) - the method setting up the scrollbar and the position displayed in the upper left
-    def __init__(self, toc_sections, spine, setup_scrollbar_method):
+    def __init__(self, setup_scrollbar_method):
         BaseAdventurousBehavior.__init__(self, setup_scrollbar_method)
-        self.toc_sections = toc_sections
-        self.spine = spine
         self.start_spine = 1
+        
+    # Sets this page behavior to display pages for a new ebook
+    # number_of_pages (number) - the total pages found in the ebook
+    # toc_sections (TOCSections) - a object that determines how the sections of the ebook are separated
+    def setup_ebook(self, number_of_pages, toc_sections):
+        BaseAdventurousBehavior.setup_ebook(self, number_of_pages, toc_sections)
+        self.toc_sections = toc_sections
+        self.spine = toc_sections.spine
         
     # Sets the current section of the book the user is viewing, the sections the user can view from that section,
     # and the total pages in those sections
