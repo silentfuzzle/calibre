@@ -82,6 +82,7 @@ class TOCNetworkView (QWebView):
         self.setMinimumWidth(80)
         self.loadFinished.connect(self.load_finished)
         self.curr_page = -1
+        self.loaded = False
         
     # Update the network displayed in the Javascript application
     def load_network(self):
@@ -127,7 +128,10 @@ class TOCNetworkView (QWebView):
     # ebook_network (EBookNetwork) - the object
     def set_ebook_network(self, ebook_network):
         self.ebook_network = ebook_network
-        self.load_network()
+        if (self.loaded == False):
+            self.load_network()
+        else:
+            self.toc_created = False
         
     # Sets the pointer to the EbookViewer object
     # manager (EbookViewer) - the class controlling the ebook viewer interface

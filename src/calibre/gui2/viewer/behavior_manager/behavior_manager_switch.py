@@ -13,8 +13,8 @@ class SwitchBehaviorManager (BehaviorManager):
     # b1_toc_interface (TOCContainer) - the main TOC interface to toggle between
     # b2_page_behavior (BaseBehavior) - the second page behavior to toggle between
     # b2_toc_interface (TOCContainer) - the second TOC interface to toggle between
-    def __init__(self, b1_page_behavior, 
-            b1_toc_interface, b2_page_behavior, b2_toc_interface, main):
+    def __init__(self, main, b1_page_behavior, 
+            b1_toc_interface, b2_page_behavior, b2_toc_interface):
         BehaviorManager.__init__(self, b1_page_behavior, b1_toc_interface)
         self.b1_page_behavior = b1_page_behavior
         self.b1_toc_interface = b1_toc_interface
