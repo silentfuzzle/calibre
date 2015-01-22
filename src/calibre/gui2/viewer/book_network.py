@@ -90,13 +90,13 @@ class EBookNetwork (object):
                 
             # Add an edge from the start to the end node
             self.bookGraph.add_edge(str(start_page), str(end_page))
-            self.save_graph()
+            self.update_network()
             return True
             
-    # Generate a new network of nodes and save it to a file
+    # Generate a new network of nodes
     def refresh_network(self):
         self.generate_network()
-        self.save_graph()
+        self.update_network()
                 
     # Generate a new network of nodes from sections in the TOC
     def generate_network(self):
@@ -108,8 +108,12 @@ class EBookNetwork (object):
                         label=str(self.spine[spine_index].start_page),
                         title=t.text)
             
-    # Reloads the network display
-    def save_graph(self):
+    # Updates the network JSON data with newly added/removed links
+    def update_network(self):
+        self.data = node_link.node_link_data(self.bookGraph)
+        self.data = json.dumps(self.data)
+        
+    # Saves the network JSON data to a file
+    def save_network(self):
         self.data = node_link.node_link_data(self.bookGraph)
         json.dump(self.data, open(self.savePath, 'w'))
-        self.data = json.dumps(self.data)

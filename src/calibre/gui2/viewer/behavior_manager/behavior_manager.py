@@ -25,6 +25,10 @@ class BehaviorManager (BaseBehavior):
         self.page_behavior.setup_ebook(number_of_pages, toc_sections)
         self.toc_interface.setup_ebook(toc_sections, toc_model, title, pathtoebook)
         
+    # Performs any actions required before closing an ebook
+    def close_ebook(self):
+        self.toc_interface.close_ebook()
+        
     # Sets the history offset for the correct behavior
     # offset (int) - the new value of the history offset
     def set_history_offset(self, offset):

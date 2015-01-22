@@ -16,6 +16,10 @@ class TOCContainer(QWidget):
     def setup_ebook(self, toc_sections, toc_model, title, pathtoebook):
         return
 
+    # Performs any actions required before closing an ebook
+    def close_ebook(self):
+        return
+        
     # If the table of contents interface is a network,
     # check if a connection should be added
     # curr_sec (SpineItem) - the current section

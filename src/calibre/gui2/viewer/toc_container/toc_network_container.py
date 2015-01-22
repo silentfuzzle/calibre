@@ -43,6 +43,10 @@ class NetworkTOCContainer(TOCContainer):
         self.toc_sections = toc_sections
         self.history_offset = 0
 
+    # Saves the ebook network to a JSON file before closing the ebook
+    def close_ebook(self):
+        self.toc.ebook_network.save_network()
+        
     # Check if an edge should be added to the network before adding it
     # curr_sec (SpineItem) - the current section
     # next_sec (SpineItem) - the section the user just navigated to

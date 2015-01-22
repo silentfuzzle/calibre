@@ -68,6 +68,11 @@ class SwitchBehaviorManager (BehaviorManager):
         self.b1_toc_interface.setup_ebook(toc_sections, toc_model, title, pathtoebook)
         self.b2_toc_interface.setup_ebook(toc_sections, toc_model, title, pathtoebook)
         
+    # Performs any actions required before closing an ebook
+    def close_ebook(self):
+        self.b1_toc_interface.close_ebook()
+        self.b2_toc_interface.close_ebook()
+        
     # Sets the history offset for any network TOC interfaces
     # offset (int) - the new value of the history offset
     def set_history_offset(self, offset):

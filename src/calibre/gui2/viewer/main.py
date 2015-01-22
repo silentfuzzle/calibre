@@ -845,6 +845,7 @@ class EbookViewer(MainWindow):
                 self.iterator.add_bookmark(self.current_page_bookmark)
             except:
                 traceback.print_exc()
+        self.behavior_manager.close_ebook()
 
     def load_ebook(self, pathtoebook, open_at=None, reopen_at=None):
         if self.iterator is not None:
@@ -884,7 +885,7 @@ class EbookViewer(MainWindow):
                 self.action_table_of_contents.setChecked(False)
                 self.action_toggle_adventurous_mode.setChecked(False)
             
-            # Setup the page behavior for the ebook
+            # Setup the interface behavior for the ebook
             self.behavior_manager = (
                     self.behavior_manager_builder.setup_behavior_manager(
                     self, title, pathtoebook))
