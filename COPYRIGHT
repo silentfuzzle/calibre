@@ -230,11 +230,6 @@ Files: src/pyparsing.py
 Copyright: Copyright (c) 2003-2013  Paul T. McGuire
 License: MIT
 
-Files: resources/adventurous_map_viewer/book_renderer.html
-Files: src/calibre/gui2/viewer/book_network.py
-Copyright: Copyright (C) 2014 Emily Palmieri
-License: GPL-3
-
 Files: src/calibre/gui2/viewer/jquery.js
 Files: src/calibre/gui2/viewer/jquery_scrollTo.js
 Files: src/calibre/library/static/date.js
