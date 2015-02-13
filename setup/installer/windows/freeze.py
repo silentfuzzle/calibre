@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 from __future__ import with_statement, print_function
 
@@ -715,8 +715,6 @@ class Win32Freeze(Command, WixMixIn):
                 if hname in handled:
                     continue
                 handled.add(hname)
-                if os.path.basename(d).startswith('six-'):
-                    continue  # We prefer the version bundled with calibre
                 for x in os.listdir(d):
                     if x in {'EGG-INFO', 'site.py', 'site.pyc', 'site.pyo'}:
                         continue

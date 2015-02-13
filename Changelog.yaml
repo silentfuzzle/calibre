@@ -6,7 +6,7 @@
 # Also, each release can have new and improved recipes.
 
 # - version: ?.?.?
-#   date: 2014-??-??
+#   date: 2015-??-??
 #
 #   new features:
 #     - title: 
@@ -19,6 +19,179 @@
 #
 #   new recipes:
 #     - title: 
+
+- version: 2.19.0
+  date: 2015-02-06
+
+  new features:
+    - title: "Quick view window: Allow the quickview window to be docked into the main calibre window."
+      tickets: [1415714]
+
+    - title: "Add empty book: Allow setting the title as well as the author and series for the added empty book records"
+
+    - title: "Windows driver for Grammata Papyre 602."
+      tickets: [1418207]
+
+    - title: "Edit Book: Add an option to turn off auto-completion of closing tags"
+
+    - title: "Allow adding a description for custom columns."
+      tickets: [1417219]
+
+    - title: "Book Details panel: Allow any identifier of the form url+number to become a clickable link. For example: url1:http://example.com"
+
+  bug fixes:
+    - title: "Conversion: Convert entities that reference non-BMP unicode codepoints on Windows and OS X correctly. Linux was not affected by this bug."
+      tickets: [1417327]
+
+    - title: "Edit Book: Do not autocomplete the closing tag wen typing the / key inside an existing tag."
+      tickets: [1417700]
+
+    - title: "Fix Booken Lev e-book reader not being detected in OS X and Linux."
+      tickets: [1417325]
+
+    - title: "DOCX Input: Change handling of sequences of space characters to more closely follow Microsoft Word."
+
+    - title: "Edit Book: Fix Table of Contents editor not remembering its saved state across calibre sessions"
+
+    - title: "Edit book: Disallow drag and drop of documents onto the preview panel to workaround crashing bug in Qt."
+      tickets: [1416752]
+
+    - title: "E-book viewer: Fix current page not being preserved when opening and then immediately closing the footnote window."
+      tickets: [1416526]
+
+    - title: "PDF Output: Fix incorrect encoding for some chinese characters in the PDF Outline (Table of Contents)"
+      tickets: [1416222]
+
+  improved recipes:
+    - FAZ.net
+    - Indian Express
+    - CNN
+
+- version: 2.18.0
+  date: 2015-01-30
+
+  new features:
+    - title: "Edit Book: Add 'Style Classes' and 'Links' report pages to the Reports tool"
+
+    - title: "Tag browser: Allow expanding all children of a node by right clicking and choosing 'Expand All'"
+      tickets: [1414315]
+
+    - title: "Preferences: Re-arrange the controls to avoid needing to move the mouse from the top to the bottom of the dialog when closing the dialog after making some changes"
+
+  bug fixes:
+    - title: "Save to Disk: Fix a bug where when multiple books are being saved to disk, if the save to disk template results in identical filenames, the filenames were not being properly disambiguated."
+
+    - title: "Preferences: Use a dialog instead of a main window to workaround Qt's poor handling of full screen mode on OS X Yosemite."
+      tickets: [1414497]
+
+  improved recipes:
+    - Al Jazeera in English
+
+- version: 2.17.0
+  date: 2015-01-23
+
+  new features:
+    - title: "Edit Book: A new reports tool that shows a summary of files, images, words, characters and styles used in the book."
+      description: "The reports tool is a great way to get an overview of the different parts of your book. Every line in the report is hot-linked, double clicking it jumps to the places in the book where that item is used."
+      type: major
+
+    - title: "Edit Book: Allow adding the 'Manage Snippets' action to the toolbar, for easy access"
+
+  bug fixes:
+    - title: "Update Ozon.ru metadata download plugin for website changes."
+      tickets: [1407265]
+
+    - title: "E-book viewer: Fix regression in 'flow' mode that caused horizontal scrollbar to be rendered as vertical."
+      tickets: [1409916]
+
+    - title: "Fix a regression that prevented adding of books from sub-folders if the folder contained only an OPF file and no actual ebook files."
+      tickets: [1411240]
+
+  improved recipes:
+    - Salon.com
+    - The Onion
+    - Haaretz
+    - Jot Down
+    - Le Monde Diplomatique
+    - tyzden
+    - The AJC
+
+  new recipes:
+    - title: TheAtlantic.com 
+      author: ebrandon
+
+    - title: The Conversation 
+      author: Krittika Goyal
+
+    - title: Apple Daily (TW) 
+      author: Yulun Shih
+
+- version: 2.16.0
+  date: 2015-01-10
+
+  new features:
+    - title: "Edit Book: Add support for snippets -- small pieces of text that are often re-used."
+      description: "You can now create your own snippets and insert them into the text with only a few keystrokes. The snippets include support for placeholders that you can jump between. See http://manual.calibre-ebook.com/snippets.html for details."
+      type: major
+
+  bug fixes:
+    - title: "Edit Book: When importing files and the book has an orphaned entry in the manifest for that file, but the file itself is not present, rename the file instead of erroring out."
+      tickets: [1407860]
+
+    - title: "Book Details panel: Fix author links with URL schemes other than http or file preventing context menu from working."
+      tickets: [1408174]
+
+    - title: "PDF Output: Make the minimum height for headers and footers scale with the base font size"
+
+    - title: "Fix a typo that prevented the Cybook Muse from being detected on some computers."
+      tickets: [1407435]
+
+    - title: "Fix regression in 2.15 that broke calibre on OS X 10.7 and 10.8"
+      tickets: [1407102]
+
+  improved recipes:
+    - Various updated Turkish news sources
+    - tyzden
+    - Sueddeutsche Zeitung
+
+  new recipes:
+    - title: Ajans Firat and Edebiyat Haber 
+      author: asalet_r
+
+- version: 2.15.0
+  date: 2015-01-02
+
+  new features:
+    - title: "Edit Book: Add auto-completion for links."
+      description: "Now as you type the filename in href or src attributes, a popup with possible completions is displayed. See http://manual.calibre-ebook.com/edit.html#auto-complete for details."
+      type: major
+
+    - title: "Edit Book Function mode: Add builtin functions to change case of text, ignoring HTML tags in the matched text"
+
+    - title: "Edit Book - Check Book: Allow auto-fixing of file not in spine errors"
+
+    - title: "Driver for Papyre 624 ml"
+      tickets: [1405901]
+
+    - title: "Conversion: Convert images encoded as data URIs in the input document into normal images, as some ebook reader software cannot handle data URIs."
+      tickets: [1405803]
+
+  bug fixes:
+    - title: "AZW3 Input: Handle AZW3 files that contain Amazon specific CSS media queries."
+      tickets: [1406708]
+
+    - title: "Fix regression that broke the markdown-calibre command"
+
+    - title: "Edit Book - Show what changed: Fix scrollbar sometimes not visible if the differences contain a few, very long lines. Also fix the line numbers being partially obscured on some systems (depending on the font used)."
+      tickets: [1406056]
+
+    - title: "Edit Book: Fix a regression that caused the Home key to not move to the start of the line on lines containing un-indented tags"
+
+    - title: "Get Books: Update the Amazon (US) plugin for website changes."
+      tickets: [1406040]
+
+    - title: "MOBI Input: Fix incorrect conversion of MOBI files that wrap their content inside <a> anchor tags."
+      tickets: [1405858]
 
 - version: 2.14.0
   date: 2014-12-26

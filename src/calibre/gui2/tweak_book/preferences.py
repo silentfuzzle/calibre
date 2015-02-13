@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=utf-8
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -20,6 +20,7 @@ from PyQt5.Qt import (
     QFontComboBox, QPushButton, QSizePolicy, QHBoxLayout, QGroupBox,
     QToolButton, QVBoxLayout, QSpacerItem, QTimer)
 
+from calibre import prepare_string_for_xml
 from calibre.gui2.keyboard import ShortcutConfig
 from calibre.gui2.tweak_book import tprefs, toolbar_actions, editor_toolbar_actions, actions
 from calibre.gui2.tweak_book.editor.themes import default_theme, all_theme_names, ThemeEditor
@@ -152,7 +153,7 @@ class EditorSettings(BasicSettings):
 
     def __init__(self, parent=None):
         BasicSettings.__init__(self, parent)
-        self.dictionaries_changed = False
+        self.dictionaries_changed = self.snippets_changed = False
         self.l = l = QFormLayout(self)
         self.setLayout(l)
 
@@ -194,6 +195,12 @@ class EditorSettings(BasicSettings):
             ' happens only when the trailing semi-colon is typed.'))
         l.addRow(lw)
 
+        lw = self('auto_close_tags')
+        lw.setText(_('Auto &close tags when typing </'))
+        lw.setToolTip('<p>' + prepare_string_for_xml(_(
+            'With this option, every time you type </ the current HTML closing tag is auto-completed')))
+        l.addRow(lw)
+
         lw = self('editor_show_char_under_cursor')
         lw.setText(_('Show the name of the current character before the cursor along with the line and column number'))
         l.addRow(lw)
@@ -217,10 +224,21 @@ class EditorSettings(BasicSettings):
         d.clicked.connect(self.manage_dictionaries)
         l.addRow(d)
 
+        self.snippets = s = QPushButton(_('Manage sni&ppets'), self)
+        s.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        s.clicked.connect(self.manage_snippets)
+        l.addRow(s)
+
     def manage_dictionaries(self):
         d = ManageDictionaries(self)
         d.exec_()
         self.dictionaries_changed = True
+
+    def manage_snippets(self):
+        from calibre.gui2.tweak_book.editor.snippets import UserSnippets
+        d = UserSnippets(self)
+        if d.exec_() == d.Accepted:
+            self.snippets_changed = True
 
     def theme_choices(self):
         choices = {k:k for k in all_theme_names()}
@@ -663,6 +681,10 @@ class Preferences(QDialog):
     @property
     def dictionaries_changed(self):
         return self.editor_panel.dictionaries_changed
+
+    @property
+    def snippets_changed(self):
+        return self.editor_panel.snippets_changed
 
     @property
     def toolbars_changed(self):

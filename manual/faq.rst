@@ -18,9 +18,9 @@ What formats does calibre support conversion to/from?
 calibre supports the conversion of many input formats to many output formats.
 It can convert every input format in the following list, to every output format.
 
-*Input Formats:* CBZ, CBR, CBC, CHM, DJVU, DOCX, EPUB, FB2, HTML, HTMLZ, LIT, LRF, MOBI, ODT, PDF, PRC, PDB, PML, RB, RTF, SNB, TCR, TXT, TXTZ
+*Input Formats:* AZW, AZW3, AZW4, CBZ, CBR, CBC, CHM, DJVU, DOCX, EPUB, FB2, HTML, HTMLZ, LIT, LRF, MOBI, ODT, PDF, PRC, PDB, PML, RB, RTF, SNB, TCR, TXT, TXTZ
 
-*Output Formats:* AZW3, EPUB, FB2, OEB, LIT, LRF, MOBI, HTMLZ, PDB, PML, RB, PDF, RTF, SNB, TCR, TXT, TXTZ
+*Output Formats:* AZW3, EPUB, FB2, OEB, LIT, LRF, MOBI, HTMLZ, PDB, PML, PMLZ, RB, PDF, RTF, SNB, TCR, TXT, TXTZ, ZIP
 
 .. note ::
 
@@ -351,10 +351,10 @@ With the USB cable + iTunes
 
 Use the 'Connect to iTunes' method in the 'Getting started' instructions in `Calibre + Apple iDevices: Start here <http://www.mobileread.com/forums/showthread.php?t=118559>`_.
 
-This method only works on Windows Vista and higher, and OS X upto 10.8 and
-higher. Linux is not supported (iTunes is not available in linux) and OS X
-newer than 10.8 is not supported, as Apple removed the facility to use iTunes
-to manage books, replacing it with iBooks.
+This method only works on Windows Vista and higher, and OS X upto 10.8. Linux
+is not supported (iTunes is not available in linux) and OS X newer than 10.8 is
+not supported, as Apple removed the facility to use iTunes to manage books,
+replacing it with iBooks.
 
 How do I use calibre with my Android phone/tablet or Kindle Fire HD?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -629,10 +629,19 @@ If you are still not convinced, then I'm afraid calibre is not for you. Look els
 
 Why doesn't calibre have a column for foo?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-calibre is designed to have columns for the most frequently and widely used fields. In addition, you can add any columns you like. Columns can be added via :guilabel:`Preferences->Interface->Add your own columns`.
-Watch the tutorial `UI Power tips <http://calibre-ebook.com/demo#tutorials>`_ to learn how to create your own columns.
 
-You can also create "virtual columns" that contain combinations of the metadata from other columns. In the add column dialog  use the :guilabel:`Quick create` links to easily create columns to show the book ISBN, formats or the time the book was last modified. For more details, see :ref:`templatelangcalibre`.
+calibre is designed to have columns for the most frequently and widely used
+fields. In addition, you can add any columns you like. Columns can be added via
+:guilabel:`Preferences->Interface->Add your own columns`.  Watch the tutorial
+`UI Power tips <http://calibre-ebook.com/demo#tutorials>`_ to learn how to
+create your own columns, or read `this blog post
+<http://blog.calibre-ebook.com/2011/11/calibre-custom-columns.html>`_.
+
+You can also create "virtual columns" that contain combinations of the metadata
+from other columns. In the add column dialog  use the :guilabel:`Quick create`
+links to easily create columns to show the book ISBN or formats.  You can use
+the powerful calibre template language to do much more with columns. For more
+details, see :ref:`templatelangcalibre`.
 
 
 Can I have a column showing the formats or the ISBN?
@@ -681,7 +690,8 @@ There can be two reasons why calibre is showing a empty list of books:
     and so starts up with an empty library instead. To remedy this, do a
     right-click on the calibre icon in the calibre toolbar and select Switch/create
     library. Click the little blue icon to select the new location of your
-    calibre library and click OK.
+    calibre library and click OK. If you dont know the new location search your
+    computer for the file :file:`metadata.db`.
 
   * Your metadata.db file was deleted/corrupted. In this case, you can ask
     calibre to rebuild the metadata.db from its backups. Right click the calibre
@@ -958,7 +968,14 @@ Another alternative is to create a catalog in ebook form containing a listing of
 How do I get calibre to use my HTTP proxy?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-By default, calibre uses whatever proxy settings are set in your OS. Sometimes these are incorrect, for example, on windows if you don't use Internet Explorer then the proxy settings may not be up to date. You can tell calibre to use a particular proxy server by setting the http_proxy environment variable. The format of the variable is: http://username:password@servername you should ask your network admin to give you the correct value for this variable. Note that calibre only supports HTTP proxies not SOCKS proxies. You can see the current proxies used by calibre in Preferences->Miscellaneous.
+By default, calibre uses whatever proxy settings are set in your OS. Sometimes
+these are incorrect, for example, on windows if you don't use Internet Explorer
+then the proxy settings may not be up to date. You can tell calibre to use a
+particular proxy server by setting the ``http_proxy`` environment variable. The
+format of the variable is: ``http://username:password@servername`` you should
+ask your network administrator to give you the correct value for this variable.
+Note that calibre only supports HTTP proxies not SOCKS proxies. You can see the
+current proxies used by calibre in Preferences->Miscellaneous.
 
 I want some feature added to calibre. What can I do?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -977,10 +994,9 @@ For many reasons:
     turn off the update notification, on the update notification itself.
 
   * calibre downloads currently use `about 100TB of bandwidth a month
-    <http://status.calibre-ebook.com/downloads>`_. Implementing automatic
+    <http://calibre-ebook.com/dynamic/downloads>`_. Implementing automatic
     updates would greatly increase that and end up costing thousands of dollars
-    a month, which someone has to pay. And calibre is currently growing at `half
-    a million new installs a month <https://status.calibre-ebook.com>`_.
+    a month, which someone has to pay. 
 
   * If I implement a dialog that downloads the update and launches it, instead
     of going to the website as it does now, that would save the most ardent

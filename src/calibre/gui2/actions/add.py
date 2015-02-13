@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 
 __license__   = 'GPL v3'
@@ -200,10 +200,11 @@ class AddAction(InterfaceAction):
             temp_files = []
             num = dlg.qty_to_add
             series = dlg.selected_series
+            title = dlg.selected_title or _('Unknown')
             db = self.gui.library_view.model().db
             ids = []
             for x in xrange(num):
-                mi = MetaInformation(_('Unknown'), dlg.selected_authors)
+                mi = MetaInformation(title, dlg.selected_authors)
                 if series:
                     mi.series = series
                     mi.series_index = db.get_next_series_num_for(series)

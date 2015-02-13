@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=utf-8
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -129,6 +129,9 @@ class Boss(QObject):
         self.gui.manage_fonts.container_changed.connect(self.apply_container_update_to_gui)
         self.gui.manage_fonts.embed_all_fonts.connect(self.manage_fonts_embed)
         self.gui.manage_fonts.subset_all_fonts.connect(self.manage_fonts_subset)
+        self.gui.reports.edit_requested.connect(self.reports_edit_requested)
+        self.gui.reports.refresh_starting.connect(self.commit_all_editors_to_container)
+        self.gui.reports.delete_requested.connect(self.delete_requested)
 
     @property
     def currently_editing(self):
@@ -432,7 +435,7 @@ class Boss(QObject):
             c = current_container()
             for path, name in files.iteritems():
                 i = 0
-                while c.exists(name):
+                while c.exists(name) or c.manifest_has_name(name):
                     i += 1
                     name, ext = name.rpartition('.')[0::2]
                     name = '%s_%d.%s' % (name, i, ext)
@@ -1151,6 +1154,15 @@ class Boss(QObject):
         self.gui.image_browser.show()
         self.gui.image_browser.raise_()
 
+    def show_reports(self):
+        self.gui.reports.refresh()
+        self.gui.reports.show()
+        self.gui.reports.raise_()
+
+    def reports_edit_requested(self, name):
+        mt = current_container().mime_map.get(name, guess_type(name))
+        self.edit_file_requested(name, None, mt)
+
     def image_activated(self, name):
         mt = current_container().mime_map.get(name, guess_type(name))
         self.edit_file_requested(name, None, mt)
@@ -1232,10 +1244,11 @@ class Boss(QObject):
         self.gui.central.show_editor(editors[name])
         editors[name].set_focus()
 
-    def edit_file_requested(self, name, syntax, mime):
+    def edit_file_requested(self, name, syntax=None, mime=None):
         if name in editors:
             self.gui.central.show_editor(editors[name])
-            return
+            return editors[name]
+        mime = mime or current_container().mime_map.get(name, guess_type(name))
         syntax = syntax or syntax_from_mime(name, mime)
         if not syntax:
             return error_dialog(
@@ -1352,6 +1365,10 @@ class Boss(QObject):
 
     def insert_character(self):
         self.gui.insert_char.show()
+
+    def manage_snippets(self):
+        from calibre.gui2.tweak_book.editor.snippets import UserSnippets
+        UserSnippets(self.gui).exec_()
 
     # Shutdown {{{
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=utf-8
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -221,7 +221,7 @@ class Main(MainWindow):
         cl.addWidget(vs, 0, 1, 2, 1)
 
         self.horizontal_scrollbar = hs = QScrollBar(c)
-        hs.setOrientation(Qt.Vertical), hs.setObjectName("horizontal_scrollbar")
+        hs.setOrientation(Qt.Horizontal), hs.setObjectName("horizontal_scrollbar")
         cl.addWidget(hs, 1, 0, 1, 1)
 
         self.tool_bar = tb = ToolBar(self)
@@ -269,6 +269,7 @@ class Main(MainWindow):
         d.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
         self.footnotes_dock = d = QDockWidget(_('Footnotes'), self)
+        d.visibilityChanged.connect(self.footnote_visibility_changed)
         d.setContextMenuPolicy(Qt.CustomContextMenu)
         self.footnotes_view = FootnotesView(self)
         self.footnotes_view.follow_link.connect(self.view.follow_footnote_link)

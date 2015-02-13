@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:fdm=marker:ai
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -97,8 +97,9 @@ class WebView(QWebView):  # {{{
 
 class ItemEdit(QWidget):
 
-    def __init__(self, parent):
+    def __init__(self, parent, prefs=None):
         QWidget.__init__(self, parent)
+        self.prefs = prefs or gprefs
         self.setLayout(QVBoxLayout())
 
         self.la = la = QLabel('<b>'+_(
@@ -168,7 +169,7 @@ class ItemEdit(QWidget):
 
         l.addStretch()
 
-        state = gprefs.get('toc_edit_splitter_state', None)
+        state = self.prefs.get('toc_edit_splitter_state', None)
         if state is not None:
             sp.restoreState(state)
 

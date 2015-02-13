@@ -113,8 +113,8 @@ class ORIZON(CYBOOK):
 
 class MUSE(CYBOOK):
 
-    name           = 'Cybook Orizon Device Interface'
-    gui_name       = 'Orizon'
+    name           = 'Cybook Muse Device Interface'
+    gui_name       = 'Muse'
     description    = _('Communicate with the Cybook Muse eBook reader.')
     author         = 'Kovid Goyal'
 
@@ -129,3 +129,9 @@ class MUSE(CYBOOK):
 
     EBOOK_DIR_MAIN = 'Books'
     SCAN_FROM_ROOT = True
+
+    @classmethod
+    def can_handle(cls, device_info, debug=False):
+        if isunix:
+            return device_info[3] == 'Bookeen' and device_info[4] in ('Cybook', 'Lev')
+        return True

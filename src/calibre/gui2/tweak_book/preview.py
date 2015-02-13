@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=utf-8
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -364,6 +364,7 @@ class WebView(QWebView):
         self.setPage(self._page)
         self.inspector.setPage(self._page)
         self.clear()
+        self.setAcceptDrops(False)
 
     def sizeHint(self):
         return self._size_hint

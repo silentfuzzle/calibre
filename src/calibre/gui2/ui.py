@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 from __future__ import with_statement
 
@@ -722,9 +722,11 @@ class Main(MainWindow, MainWindowMixin, DeviceMixin, EmailMixin,  # {{{
         if location == 'library':
             self.virtual_library_menu.setEnabled(True)
             self.highlight_only_button.setEnabled(True)
+            self.vl_tabs.setEnabled(True)
         else:
             self.virtual_library_menu.setEnabled(False)
             self.highlight_only_button.setEnabled(False)
+            self.vl_tabs.setEnabled(False)
             # Reset the view in case something changed while it was invisible
             self.current_view().reset()
         self.set_number_of_books_shown()

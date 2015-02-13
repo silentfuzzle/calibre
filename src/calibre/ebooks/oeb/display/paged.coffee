@@ -350,6 +350,9 @@ class PagedDisplay
         else
             window.scrollTo(pos, 0)
 
+    scroll_to_column: (number) ->
+        this.scroll_to_xpos(number * this.page_width + 10)
+
     column_at: (xpos) ->
         # Return the number of the column that contains xpos
         return Math.floor(xpos/this.page_width)
@@ -527,7 +530,7 @@ class PagedDisplay
             # selection
             this.scroll_to_xpos(left+5)
 
-    jump_to_cfi: (cfi) ->
+    jump_to_cfi: (cfi, job_id=-1) ->
         # Jump to the position indicated by the specified conformal fragment
         # indicator (requires the cfi.coffee library). When in paged mode, the
         # scroll is performed so that the column containing the position
@@ -537,6 +540,8 @@ class PagedDisplay
                 this.scroll_to_xpos(x)
             else
                 window.scrollTo(0, y)
+            if window.py_bridge
+                window.py_bridge.jump_to_cfi_finished(job_id)
         )
 
     current_cfi: () ->

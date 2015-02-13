@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=utf-8
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -12,8 +12,7 @@ import ssl, socket
 from contextlib import closing
 
 is64bit = platform.architecture()[0] == '64bit'
-url = 'http://status.calibre-ebook.com/dist/linux'+('64' if is64bit else '32')
-signature_url = 'http://calibre-ebook.com/downloads/signatures/%s.sha512'
+url = 'http://code.calibre-ebook.com/dist/linux'+('64' if is64bit else '32')
 url = os.environ.get('CALIBRE_INSTALLER_LOCAL_URL', url)
 py3 = sys.version_info[0] > 2
 enc = getattr(sys.stdout, 'encoding', 'UTF-8') or 'utf-8'
@@ -472,10 +471,7 @@ if has_ssl_verify:
     class HTTPSConnection(httplib.HTTPSConnection):
 
         def __init__(self, ssl_version, *args, **kwargs):
-            context = kwargs['context'] = ssl.SSLContext(ssl_version)
-            cf = kwargs.pop('cert_file')
-            context.load_verify_locations(cf)
-            context.verify_mode = ssl.CERT_REQUIRED
+            kwargs['context'] = ssl.create_default_context(cafile=kwargs.pop('cert_file'))
             httplib.HTTPSConnection.__init__(self, *args, **kwargs)
 else:
     class HTTPSConnection(httplib.HTTPSConnection):
@@ -612,7 +608,7 @@ def extract_tarball(raw, destdir):
 def get_tarball_info():
     global signature, calibre_version
     print ('Downloading tarball signature securely...')
-    raw = get_https_resource_securely('https://status.calibre-ebook.com/tarball-info/' +
+    raw = get_https_resource_securely('https://code.calibre-ebook.com/tarball-info/' +
                                       ('x86_64' if is64bit else 'i686'))
     signature, calibre_version = raw.rpartition(b'@')[::2]
     if not signature or not calibre_version:
@@ -634,7 +630,7 @@ def download_and_extract(destdir):
 def check_version():
     global calibre_version
     if calibre_version == '%version':
-        calibre_version = urllib.urlopen('http://status.calibre-ebook.com/latest').read()
+        calibre_version = urllib.urlopen('http://code.calibre-ebook.com/latest').read()
 
 def main(install_dir=None, isolated=False, bin_dir=None, share_dir=None):
     destdir = os.path.abspath(os.path.expanduser(install_dir or '/opt'))

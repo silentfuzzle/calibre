@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=utf-8
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -13,7 +13,7 @@ from functools import partial
 
 from PyQt5.Qt import QApplication, QSplashScreen, pyqtSignal, QBrush, QColor, Qt, QPixmap
 
-from calibre.constants import iswindows, isosx
+from calibre.constants import isosx, DEBUG
 from calibre.utils.ipc import eintr_retry_call
 
 class SplashScreen(Thread):
@@ -36,13 +36,12 @@ class SplashScreen(Thread):
         self.hide = partial(self._rpc, 'hide')
 
     def launch_process(self, debug_executable):
-        kwargs = {'stdin':subprocess.PIPE}
-        if iswindows:
-            import win32process
-            kwargs['creationflags'] = win32process.CREATE_NO_WINDOW
-            kwargs['stdout'] = open(os.devnull, 'wb')
-            kwargs['stderr'] = subprocess.STDOUT
-        self.process = subprocess.Popen([debug_executable, '-c', 'from calibre.gui2.splash import main; main()'], **kwargs)
+        from calibre.utils.ipc.simple_worker import start_pipe_worker
+        if DEBUG:
+            args = {'stdout':None, 'stderr': None}
+        else:
+            args = {'stdout':open(os.devnull, 'wb'), 'stderr':subprocess.STDOUT}
+        self.process = start_pipe_worker('from calibre.gui2.splash import main; main()', **args)
 
     def _rpc(self, name, *args):
         self.queue.put(('_' + name, args))
@@ -136,13 +135,14 @@ class CalibreSplashScreen(QSplashScreen):
 
 def main():
     os.closerange(3, 256)
-    from calibre.gui2 import Application
-    app = Application([])
+    app = QApplication([])
     s = CalibreSplashScreen()
     s.show_message.connect(s.showMessage, type=Qt.QueuedConnection)
     s.shutdown.connect(app.quit, type=Qt.QueuedConnection)
     s.show()
-    Thread(target=run_loop, args=(s,)).start()
+    t = Thread(target=run_loop, args=(s,))
+    t.daemon = True
+    t.start()
     app.exec_()
 
 if isosx:

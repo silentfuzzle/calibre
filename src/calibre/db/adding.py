@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=utf-8
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -17,9 +17,7 @@ def splitext(path):
     return key, ext[1:].lower()
 
 def formats_ok(formats):
-    if formats and (len(formats) > 1 or tuple(formats.iterkeys()) != ('opf',)):
-        return True
-    return False
+    return len(formats) > 0
 
 def path_ok(path):
     return not os.path.isdir(path) and os.access(path, os.R_OK)

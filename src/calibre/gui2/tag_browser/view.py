@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -616,9 +616,20 @@ class TagsView(QTreeView):  # {{{
             da.setToolTip('*')
             pa.setToolTip('*')
 
+        if index.isValid() and self.model().rowCount(index) > 0:
+            self.context_menu.addSeparator()
+            self.context_menu.addAction(_('E&xpand all children'), partial(self.expand_node_and_descendants, index))
+
         if not self.context_menu.isEmpty():
             self.context_menu.popup(self.mapToGlobal(point))
         return True
+
+    def expand_node_and_descendants(self, index):
+        if not index.isValid():
+            return
+        self.expand(index)
+        for r in xrange(self.model().rowCount(index)):
+            self.expand_node_and_descendants(index.child(r, 0))
 
     def collapse_menu_hovered(self, action):
         tip = action.toolTip()

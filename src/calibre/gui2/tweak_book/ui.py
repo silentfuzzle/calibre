@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=utf-8
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -38,6 +38,7 @@ from calibre.gui2.tweak_book.search import SavedSearches
 from calibre.gui2.tweak_book.toc import TOCViewer
 from calibre.gui2.tweak_book.char_select import CharSelect
 from calibre.gui2.tweak_book.live_css import LiveCSS
+from calibre.gui2.tweak_book.reports import Reports
 from calibre.gui2.tweak_book.manage_fonts import ManageFonts
 from calibre.gui2.tweak_book.function_replace import DebugOutput
 from calibre.gui2.tweak_book.editor.widget import register_text_editor_actions
@@ -238,6 +239,7 @@ class Main(MainWindow):
         self.toc_view = TOCViewer(self)
         self.saved_searches = SavedSearches(self)
         self.image_browser = InsertImage(self, for_browsing=True)
+        self.reports = Reports(self)
         self.insert_char = CharSelect(self)
         self.manage_fonts = ManageFonts(self)
         self.sr_debug_output = DebugOutput(self)
@@ -368,6 +370,8 @@ class Main(MainWindow):
                                      _('Filter style information'))
         self.action_manage_fonts = treg('font.png', _('Manage &fonts'), self.boss.manage_fonts, 'manage-fonts', (), _('Manage fonts in the book'))
         self.action_add_cover = treg('default_cover.png', _('Add &cover'), self.boss.add_cover, 'add-cover', (), _('Add a cover to the book'))
+        self.action_reports = treg(
+            'reports.png', _('&Reports'), self.boss.show_reports, 'show-reports', ('Ctrl+Shift+R',), _('Show a report on various aspects of the book'))
 
         def ereg(icon, text, target, sid, keys, description):
             return reg(icon, text, partial(self.boss.editor_action, target), sid, keys, description)
@@ -449,7 +453,7 @@ class Main(MainWindow):
             'edit-clear.png', _('&Close other tabs'), self.central.close_all_but_current_editor, 'close-all-but-current-tab', 'Ctrl+Alt+W', _(
                 'Close all tabs except the current tab'))
         self.action_help = treg(
-            'help.png', _('User &Manual'), lambda : open_url(localize_user_manual_link(QUrl(
+            'help.png', _('User &Manual'), lambda : open_url(QUrl(localize_user_manual_link(
                 'http://manual.calibre-ebook.com/edit.html'))), 'user-manual', 'F1', _(
                 'Show User Manual'))
         self.action_browse_images = treg(
@@ -460,6 +464,9 @@ class Main(MainWindow):
                 'Split HTML file at multiple locations'))
         self.action_compare_book = treg('diff.png', _('&Compare to another book'), self.boss.compare_book, 'compare-book', (), _(
             'Compare to another book'))
+        self.action_manage_snippets = treg(
+            'snippets.png', _('Manage &Snippets'), self.boss.manage_snippets, 'manage-snippets', (), _(
+                'Manage user created snippets'))
 
         self.plugin_menu_actions = []
 
@@ -522,6 +529,7 @@ class Main(MainWindow):
         e.addAction(self.action_filter_css)
         e.addAction(self.action_spell_check_book)
         e.addAction(self.action_check_book)
+        e.addAction(self.action_reports)
 
         e = b.addMenu(_('&View'))
         t = e.addMenu(_('Tool&bars'))

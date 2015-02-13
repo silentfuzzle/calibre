@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -241,6 +241,14 @@ class MetadataSingleDialogBase(ResizableDialog):
         self.basic_metadata_widgets.extend([self.timestamp, self.pubdate])
 
         self.fetch_metadata_button = b = RightClickButton(self)
+        # The following rigmarole is needed so that Qt gives the button the
+        # same height as the other buttons in the dialog. There is no way to
+        # center the text in a QToolButton with an icon, so we cant just set an
+        # icon
+        b.setIcon(QIcon(I('download-metadata.png')))
+        b.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        b.setMinimumHeight(b.sizeHint().height())
+        b.setIcon(QIcon())
         b.setText(_('&Download metadata')), b.setPopupMode(b.DelayedPopup)
         b.setToolTip(_('Download metadata for this book [%s]') % self.download_shortcut.key().toString(QKeySequence.NativeText))
         b.setSizePolicy(QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed))

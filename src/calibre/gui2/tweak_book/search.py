@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=utf-8
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -14,7 +14,7 @@ from PyQt5.Qt import (
     QWidget, QToolBar, Qt, QHBoxLayout, QSize, QIcon, QGridLayout, QLabel, QTimer,
     QPushButton, pyqtSignal, QComboBox, QCheckBox, QSizePolicy, QVBoxLayout, QFont,
     QLineEdit, QToolButton, QListView, QFrame, QApplication, QStyledItemDelegate,
-    QAbstractListModel, QPlainTextEdit, QModelIndex, QMenu, QItemSelection, QStackedLayout)
+    QAbstractListModel, QModelIndex, QMenu, QItemSelection, QStackedLayout)
 
 import regex
 
@@ -26,6 +26,7 @@ from calibre.gui2.tweak_book import tprefs, editors, current_container
 from calibre.gui2.tweak_book.function_replace import (
     FunctionBox, functions as replace_functions, FunctionEditor, remove_function, Function)
 from calibre.gui2.tweak_book.widgets import BusyCursor
+from calibre.gui2.tweak_book.editor.snippets import find_matching_snip, parse_template, string_length, SnippetTextEdit, MODIFIER, KEY
 
 from calibre.utils.icu import primary_contains
 
@@ -57,6 +58,23 @@ class PushButton(AnimatablePushButton):
         AnimatablePushButton.__init__(self, text, parent)
         self.clicked.connect(lambda : parent.search_triggered.emit(action))
 
+def expand_template(line_edit):
+    pos = line_edit.cursorPosition()
+    text = line_edit.text()[:pos]
+    if text:
+        snip, trigger = find_matching_snip(text)
+        if snip is None:
+            error_dialog(line_edit, _('No snippet found'), _(
+                'No matching snippet was found'), show=True)
+            return False
+        text, tab_stops = parse_template(snip['template'])
+        ft = line_edit.text()
+        l = string_length(trigger)
+        line_edit.setText(ft[:pos - l] + text + ft[pos:])
+        line_edit.setCursorPosition(pos - l + string_length(text))
+        return True
+    return False
+
 class HistoryBox(HistoryComboBox):
 
     max_history_items = 100
@@ -67,6 +85,17 @@ class HistoryBox(HistoryComboBox):
         HistoryComboBox.__init__(self, parent)
         self.disable_popup = tprefs['disable_completion_popup_for_search']
         self.clear_msg = clear_msg
+        self.ignore_snip_expansion = False
+
+    def event(self, ev):
+        if ev.type() in (ev.ShortcutOverride, ev.KeyPress) and ev.key() == KEY and ev.modifiers() & MODIFIER:
+            if not self.ignore_snip_expansion:
+                self.ignore_snip_expansion = True
+                expand_template(self.lineEdit())
+                QTimer.singleShot(100, lambda : setattr(self, 'ignore_snip_expansion', False))
+            ev.accept()
+            return True
+        return HistoryComboBox.event(self, ev)
 
     def contextMenuEvent(self, event):
         menu = self.lineEdit().createStandardContextMenu()
@@ -551,12 +580,12 @@ class EditSearch(QFrame):  # {{{
         h.addWidget(la), h.addWidget(n)
         l.addLayout(h)
 
-        self.find = f = QPlainTextEdit('', self)
+        self.find = f = SnippetTextEdit('', self)
         self.la2 = la = QLabel(_('&Find:'))
         la.setBuddy(f)
         l.addWidget(la), l.addWidget(f)
 
-        self.replace = r = QPlainTextEdit('', self)
+        self.replace = r = SnippetTextEdit('', self)
         self.la3 = la = QLabel(_('&Replace:'))
         la.setBuddy(r)
         l.addWidget(la), l.addWidget(r)
@@ -1280,7 +1309,7 @@ def run_search(
                 'Currently selected text does not match the search query.'))
 
     def count_message(action, count, show_diff=False):
-        msg = _('%(action)s %(num)s occurrences of %(query)s' % dict(num=count, query=errfind, action=action))
+        msg = _('%(action)s %(num)s occurrences of %(query)s') % dict(num=count, query=errfind, action=action)
         if show_diff and count > 0:
             d = MessageBox(MessageBox.INFO, _('Searching done'), prepare_string_for_xml(msg), parent=gui_parent, show_copy_button=False)
             d.diffb = b = d.bb.addButton(_('See what &changed'), d.bb.ActionRole)

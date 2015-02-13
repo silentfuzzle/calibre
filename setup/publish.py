@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 from __future__ import with_statement
 
@@ -60,7 +60,8 @@ class Stage2(Command):
             for p in processes:
                 rc = p.poll()
                 if rc is not None:
-                    p.duration = int(time.time() - p.start_time)
+                    if p.duration is None:
+                        p.duration = int(time.time() - p.start_time)
                 else:
                     running = True
             return running
@@ -227,5 +228,5 @@ class TagRelease(Command):
 
     def run(self, opts):
         self.info('Tagging release')
-        subprocess.check_call('git tag -a v{0} -m "version-{0}"'.format(__version__).split())
+        subprocess.check_call('git tag -s v{0} -m "version-{0}"'.format(__version__).split())
         subprocess.check_call('git push origin v{0}'.format(__version__).split())

@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 
 __license__   = 'GPL v3'
 __copyright__ = '2009, Kovid Goyal <kovid@kovidgoyal.net>'
 __docformat__ = 'restructuredtext en'
 
-import os, subprocess, hashlib, shutil, glob, stat, sys, time
+import os, subprocess, hashlib, shutil, glob, stat, sys, time, shlex
 from subprocess import check_call
 from tempfile import NamedTemporaryFile, mkdtemp, gettempdir
 from zipfile import ZipFile
@@ -16,9 +16,7 @@ if __name__ == '__main__':
 
 from setup import Command, __version__, installer_name, __appname__
 
-PREFIX = "/var/www/calibre-ebook.com"
-DOWNLOADS = PREFIX+"/htdocs/downloads"
-BETAS = DOWNLOADS +'/betas'
+DOWNLOADS = '/srv/main/downloads'
 HTML2LRF = "calibre/ebooks/lrf/html/demo"
 TXT2LRF  = "src/calibre/ebooks/lrf/txt/demo"
 STAGING_HOST = 'download.calibre-ebook.com'
@@ -59,8 +57,8 @@ def upload_signatures():
         fname = os.path.basename(installer+'.sha512')
         with open(os.path.join(tdir, fname), 'wb') as f:
             f.write(fingerprint)
-    check_call('scp %s/*.sha512 divok:%s/signatures/' % (tdir, DOWNLOADS),
-            shell=True)
+    check_call('scp %s/*.sha512 code:/srv/code/signatures/' % tdir, shell=True)
+    check_call(shlex.split('ssh code chown -R http:http /srv/code/signatures'))
     shutil.rmtree(tdir)
 
 class ReUpload(Command):  # {{{
@@ -83,19 +81,6 @@ class ReUpload(Command):  # {{{
 # }}}
 
 # Data {{{
-def get_google_data():
-    with open(os.path.expanduser('~/work/env/private/googlecodecalibre'), 'rb') as f:
-        gc_password, ga_un, pw = f.read().strip().split('|')
-
-    return {
-        'username':ga_un, 'password':pw, 'gc_password':gc_password,
-        'path_map_server':'root@kovidgoyal.net',
-        'path_map_location':'/var/www/status.calibre-ebook.com/googlepaths',
-        # If you change this remember to change it in the
-        # status.calibre-ebook.com server as well
-        'project':'calibre-ebook'
-    }
-
 def get_github_data():
     with open(os.path.expanduser('~/work/env/private/github'), 'rb') as f:
         un, pw = f.read().strip().split(':')
@@ -109,13 +94,6 @@ def get_sourceforge_data():
 def send_data(loc):
     subprocess.check_call(['rsync', '--inplace', '--delete', '-r', '-z', '-h', '--progress', '-e', 'ssh -x',
         loc+'/', '%s@%s:%s'%(STAGING_USER, STAGING_HOST, STAGING_DIR)])
-
-def gc_cmdline(ver, gdata):
-    return [__appname__, ver, 'fmap', 'googlecode',
-                gdata['project'], gdata['username'], gdata['password'],
-                gdata['gc_password'], '--path-map-server',
-                gdata['path_map_server'], '--path-map-location',
-                gdata['path_map_location']]
 
 def gh_cmdline(ver, data):
     return [__appname__, ver, 'fmap', 'github', __appname__, data['username'], data['password']]
@@ -160,17 +138,17 @@ class UploadInstallers(Command):  # {{{
             self.upload_to_calibre()
             if opts.replace:
                 upload_signatures()
+                check_call('ssh code /apps/update-calibre-version.py'.split())
             self.upload_to_sourceforge()
             self.upload_to_dbs()
             self.upload_to_github(opts.replace)
-            # self.upload_to_google(opts.replace)
         finally:
             shutil.rmtree(tdir, ignore_errors=True)
 
     def record_sizes(self, sizes):
         print ('\nRecording dist sizes')
         args = ['%s:%s:%s' % (__version__, fname, size) for fname, size in sizes.iteritems()]
-        check_call(['ssh', 'divok', 'dist_sizes'] + args)
+        check_call(['ssh', 'code', '/usr/local/bin/dist_sizes'] + args)
 
     def upload_to_staging(self, tdir, backup, files):
         os.mkdir(tdir+'/dist')
@@ -196,13 +174,6 @@ class UploadInstallers(Command):  # {{{
                 time.sleep(60)
             else:
                 break
-
-    def upload_to_google(self, replace):
-        gdata = get_google_data()
-        args = gc_cmdline(__version__, gdata)
-        if replace:
-            args = ['--replace'] + args
-        run_remote_upload(args)
 
     def upload_to_github(self, replace):
         data = get_github_data()
@@ -243,7 +214,7 @@ class UploadUserManual(Command):  # {{{
                                 zf.write(os.path.join(x, y))
             bname = self.b(path) + '_plugin.zip'
             dest = '%s/%s'%(DOWNLOADS, bname)
-            subprocess.check_call(['scp', f.name, 'divok:'+dest])
+            subprocess.check_call(['scp', f.name, 'main:'+dest])
 
     def run(self, opts):
         path = self.j(self.SRC, '..', 'manual', 'plugin_examples')
@@ -273,7 +244,7 @@ class UploadDemo(Command):  # {{{
         check_call(
             'cd %s && zip -j /tmp/html-demo.zip * /tmp/html2lrf.lrf' % lrf, shell=True)
 
-        check_call('scp /tmp/html-demo.zip divok:%s/'%(DOWNLOADS,), shell=True)
+        check_call('scp /tmp/html-demo.zip main:%s/'%(DOWNLOADS,), shell=True)
 # }}}
 
 class UploadToServer(Command):  # {{{
@@ -281,17 +252,13 @@ class UploadToServer(Command):  # {{{
     description = 'Upload miscellaneous data to calibre server'
 
     def run(self, opts):
+        src_file = glob.glob('dist/calibre-*.tar.xz')[0]
         upload_signatures()
-        check_call('gpg --armor --detach-sign dist/calibre-*.tar.xz',
-                shell=True)
-        check_call('scp dist/calibre-*.tar.xz.asc divok:%s/signatures/'%DOWNLOADS,
-                shell=True)
-        check_call('ssh divok /usr/local/bin/update-calibre',
-                   shell=True)
-        check_call('''ssh divok echo %s \\> %s/latest_version'''
-                   %(__version__, DOWNLOADS), shell=True)
-        check_call('ssh divok /etc/init.d/apache2 graceful',
-                   shell=True)
+        check_call(['/home/kovid/work/env/private/gpg-as-kovid', '--armor', '--yes', '--detach-sign', src_file])
+        check_call(['scp', src_file + '.asc', 'code:/srv/code/signatures/'])
+        check_call('ssh code /usr/local/bin/update-calibre-code.py'.split())
+        check_call(('ssh code /apps/update-calibre-version.py ' + __version__).split())
+        check_call('ssh main /usr/local/bin/update-calibre-code.py && /apps/static/generate.py'.split())
 # }}}
 
 # Testing {{{
@@ -312,42 +279,5 @@ def setup_installers():
     os.chdir(tdir)
     return tdir, files, ver
 
-def test_google_uploader():
-    gdata = get_google_data()
-    gdata['project'] = 'calibre-hosting-uploader'
-    gdata['path_map_location'] += '-test'
-    hosting = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-        'hosting.py')
-
-    tdir, files, ver = setup_installers()
-    try:
-        os.mkdir('dist')
-        write_files(files)
-        shutil.copyfile(hosting, 'hosting.py')
-        send_data(tdir)
-        args = gc_cmdline(ver, gdata)
-
-        print ('Doing initial upload')
-        run_remote_upload(args)
-        raw_input('Press Enter to proceed:')
-
-        print ('\nDoing re-upload')
-        run_remote_upload(['--replace']+args)
-        raw_input('Press Enter to proceed:')
-
-        nv = ver + '.1'
-        files = {x.replace(__version__, nv):installer_description(x) for x in installers()}
-        write_files(files)
-        send_data(tdir)
-        args[1] = nv
-        print ('\nDoing update upload')
-        run_remote_upload(args)
-        print ('\nDont forget to delete any remaining files in the %s project'%
-                gdata['project'])
-
-    finally:
-        shutil.rmtree(tdir)
 # }}}
 
-if __name__ == '__main__':
-    test_google_uploader()

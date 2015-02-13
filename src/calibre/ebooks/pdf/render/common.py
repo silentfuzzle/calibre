@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:fdm=marker:ai
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -128,8 +128,7 @@ class String(unicode):
 class UTF16String(unicode):
 
     def pdf_serialize(self, stream):
-        s = self.replace('\\', '\\\\')
-        raw = codecs.BOM_UTF16_BE + s.encode('utf-16-be')
+        raw = codecs.BOM_UTF16_BE + self.encode('utf-16-be').replace(b'\\', b'\\\\')
         stream.write(b'('+escape_unbalanced_parantheses(raw)+b')')
 
 class Dictionary(dict):

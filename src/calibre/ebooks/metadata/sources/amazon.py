@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -240,6 +240,8 @@ class Worker(Thread):  # Get details {{{
             return
 
         oraw = raw
+        if 'amazon.com.br' in self.url:
+            raw = raw.decode('utf-8')  # amazon.com.br serves utf-8 but has an incorrect latin1 <meta> tag
         raw = xml_to_unicode(raw, strip_encoding_pats=True,
                 resolve_entities=True)[0]
         if '<title>404 - ' in raw:

@@ -1,4 +1,4 @@
-#!/usr/bin/env  python
+#!/usr/bin/env  python2
 __license__   = 'GPL v3'
 __copyright__ = '2008, Kovid Goyal kovid@kovidgoyal.net'
 __docformat__ = 'restructuredtext en'
@@ -10,7 +10,7 @@ from functools import partial
 
 from PyQt5.Qt import (QSize, QSizePolicy, QUrl, Qt, pyqtProperty,
         QPainter, QPalette, QBrush, QDialog, QColor, QPoint, QImage, QRegion,
-        QIcon, QAction, QMenu, pyqtSignal, QApplication, pyqtSlot)
+        QIcon, QAction, QMenu, pyqtSignal, QApplication, pyqtSlot, QKeySequence)
 from PyQt5.QtWebKitWidgets import QWebPage, QWebView
 from PyQt5.QtWebKit import QWebSettings, QWebElement
 
@@ -93,6 +93,7 @@ class Document(QWebPage):  # {{{
         # javascript, get/set the value as: py_bridge.value
         self.bridge_value = None
         self.first_load = True
+        self.jump_to_cfi_listeners = set()
 
         self.debug_javascript = debug_javascript
         self.anchor_positions = {}
@@ -336,6 +337,11 @@ class Document(QWebPage):  # {{{
     def debug(self, msg):
         prints(unicode(msg))
 
+    @pyqtSlot(int)
+    def jump_to_cfi_finished(self, job_id):
+        for l in self.jump_to_cfi_listeners:
+            l(job_id)
+
     def reference_mode(self, enable):
         self.javascript(('enter' if enable else 'leave')+'_reference_mode()')
 
@@ -460,6 +466,29 @@ class Document(QWebPage):  # {{{
                 self.scroll_to(x=self.xpos, y=npos)
         return property(fget=fget, fset=fset)
 
+    @dynamic_property
+    def page_number(self):
+        ' The page number is the number of the page at the left most edge of the screen (starting from 0) '
+        def fget(self):
+            if self.in_paged_mode:
+                return self.javascript(
+                    'ans = 0; if (window.paged_display) ans = window.paged_display.column_boundaries()[0]; ans;', typ='int')
+        def fset(self, val):
+            if self.in_paged_mode and self.loaded_javascript:
+                self.javascript('if (window.paged_display) window.paged_display.scroll_to_column(%d)' % int(val))
+                return True
+        return property(fget=fget, fset=fset)
+
+    @property
+    def page_dimensions(self):
+        if self.in_paged_mode:
+            return self.javascript(
+                '''
+                ans = ''
+                if (window.paged_display)
+                    ans = window.paged_display.col_width + ':' + window.paged_display.current_page_height;
+                ans;''', typ='string')
+
     @property
     def hscroll_fraction(self):
         try:
@@ -529,8 +558,9 @@ class DocumentView(QWebView):  # {{{
         self.document.selectionChanged[()].connect(self.selection_changed)
         self.document.animated_scroll_done_signal.connect(self.animated_scroll_done, type=Qt.QueuedConnection)
         self.document.page_turn.connect(self.page_turn_requested)
-        copy_action = self.pageAction(self.document.Copy)
+        copy_action = self.copy_action
         copy_action.setIcon(QIcon(I('convert.png')))
+        copy_action.triggered.connect(self.copy, Qt.QueuedConnection)
         d = self.document
         self.unimplemented_actions = list(map(self.pageAction,
             [d.DownloadImageToDisk, d.OpenLinkInNewWindow, d.DownloadLinkToDisk,
@@ -639,9 +669,16 @@ class DocumentView(QWebView):  # {{{
     def bookmark(self):
         return self.document.bookmark()
 
+    @property
+    def selected_text(self):
+        return self.document.selectedText().replace(u'\u00ad', u'').strip()
+
+    def copy(self):
+        QApplication.clipboard().setText(self.selected_text)
+
     def selection_changed(self):
         if self.manager is not None:
-            self.manager.selection_changed(unicode(self.document.selectedText()))
+            self.manager.selection_changed(self.selected_text)
 
     def _selectedText(self):
         t = unicode(self.selectedText()).strip()
@@ -1301,6 +1338,8 @@ class DocumentView(QWebView):  # {{{
         elif key == 'Forward':
             if self.manager is not None:
                 self.manager.forward(None)
+        elif event.matches(QKeySequence.Copy):
+            self.copy()
         else:
             handled = False
         return handled

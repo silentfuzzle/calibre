@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:fdm=marker:ai
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -41,7 +41,7 @@ from calibre.utils.zipfile import ZipFile
 exists, join, relpath = os.path.exists, os.path.join, os.path.relpath
 
 
-OEB_FONTS = {guess_type('a.ttf'), guess_type('b.otf'), guess_type('a.woff'), 'application/x-font-ttf', 'application/x-font-otf'}
+OEB_FONTS = {guess_type('a.ttf'), guess_type('b.otf'), guess_type('a.woff'), 'application/x-font-ttf', 'application/x-font-otf', 'application/font-sfnt'}
 OPF_NAMESPACES = {'opf':OPF2_NS, 'dc':DC11_NS}
 
 class CSSPreProcessor(cssp):
@@ -231,6 +231,12 @@ class Container(object):  # {{{
         self.insert_into_xml(manifest, item)
         self.dirty(self.opf_name)
         return item_id
+
+    def manifest_has_name(self, name):
+        ''' Return True if the manifest has an entry corresponding to name '''
+        href = self.name_to_href(name, self.opf_name)
+        all_hrefs = {x.get('href') for x in self.opf_xpath('//opf:manifest/opf:item[@href]')}
+        return href in all_hrefs
 
     def add_file(self, name, data, media_type=None, spine_index=None):
         ''' Add a file to this container. Entries for the file are

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=utf-8
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -11,7 +11,9 @@ from contextlib import closing
 
 from calibre import get_proxies
 from calibre.constants import ispy3
-has_ssl_verify = hasattr(ssl, 'PROTOCOL_TLSv1_2') and sys.version_info[:3] > (2, 7, 8)
+# On OS X PROTOCOL_TLSv1_2 is not available because the SSL library shipped
+# with OS X is too old
+has_ssl_verify = sys.version_info[:3] > (2, 7, 8)
 
 class HTTPError(ValueError):
 
@@ -33,10 +35,11 @@ if has_ssl_verify:
     class HTTPSConnection(httplib.HTTPSConnection):
 
         def __init__(self, ssl_version, *args, **kwargs):
-            context = kwargs['context'] = ssl.SSLContext(ssl_version)
-            cf = kwargs.pop('cert_file')
-            context.load_verify_locations(cf)
-            context.verify_mode = ssl.CERT_REQUIRED
+            cafile = kwargs.pop('cert_file', None)
+            if cafile is None:
+                kwargs['context'] = ssl._create_unverified_context()
+            else:
+                kwargs['context'] = ssl.create_default_context(cafile=cafile)
             httplib.HTTPSConnection.__init__(self, *args, **kwargs)
 else:
     # Check certificate hostname {{{
@@ -154,19 +157,22 @@ else:
             getattr(ssl, 'match_hostname', match_hostname)(self.sock.getpeercert(), self.host)
 
 def get_https_resource_securely(
-    url, cacerts='calibre-ebook-root-CA.crt', timeout=60, max_redirects=5, ssl_version=None):
+    url, cacerts='calibre-ebook-root-CA.crt', timeout=60, max_redirects=5, ssl_version=None, headers=None):
     '''
     Download the resource pointed to by url using https securely (verify server
     certificate).  Ensures that redirects, if any, are also downloaded
     securely. Needs a CA certificates bundle (in PEM format) to verify the
     server's certificates.
+
+    You can pass cacerts=None to download using SSL but without verifying the server certificate.
     '''
     if ssl_version is None:
         try:
             ssl_version = ssl.PROTOCOL_TLSv1_2
         except AttributeError:
             ssl_version = ssl.PROTOCOL_TLSv1  # old python
-    cacerts = P(cacerts, allow_user_override=False)
+    if cacerts is not None:
+        cacerts = P(cacerts, allow_user_override=False)
     p = urlparse(url)
     if p.scheme != 'https':
         raise ValueError('URL %s scheme must be https, not %r' % (url, p.scheme))
@@ -195,7 +201,7 @@ def get_https_resource_securely(
         path = p.path or '/'
         if p.query:
             path += '?' + p.query
-        c.request('GET', path)
+        c.request('GET', path, headers=headers or {})
         response = c.getresponse()
         if response.status in (httplib.MOVED_PERMANENTLY, httplib.FOUND, httplib.SEE_OTHER):
             if max_redirects <= 0:
@@ -210,6 +216,5 @@ def get_https_resource_securely(
         return response.read()
 
 if __name__ == '__main__':
-    # print (len(get_url_secure('https://status.calibre-ebook.com/dist/win32')))
-    print (get_https_resource_securely('https://status.calibre-ebook.com/latest'))
+    print (get_https_resource_securely('https://code.calibre-ebook.com/latest'))
 

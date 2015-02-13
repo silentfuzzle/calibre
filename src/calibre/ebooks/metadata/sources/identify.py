@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 from __future__ import (unicode_literals, division, absolute_import,
                         print_function)
@@ -7,7 +7,7 @@ __license__   = 'GPL v3'
 __copyright__ = '2011, Kovid Goyal <kovid@kovidgoyal.net>'
 __docformat__ = 'restructuredtext en'
 
-import time
+import time, re
 from datetime import datetime
 from Queue import Queue, Empty
 from threading import Thread
@@ -521,8 +521,8 @@ def urls_from_identifiers(identifiers):  # {{{
     ans = []
     for plugin in all_metadata_plugins():
         try:
-            id_type, id_val, url = plugin.get_book_url(identifiers)
-            ans.append((plugin.get_book_url_name(id_type, id_val, url), id_type, id_val, url))
+            for id_type, id_val, url in plugin.get_book_urls(identifiers):
+                ans.append((plugin.get_book_url_name(id_type, id_val, url), id_type, id_val, url))
         except:
             pass
     isbn = identifiers.get('isbn', None)
@@ -545,13 +545,12 @@ def urls_from_identifiers(identifiers):  # {{{
     if issn:
         ans.append((issn, 'issn', issn,
             'http://www.worldcat.org/issn/'+issn))
-    for x in ('uri', 'url'):
-        url = identifiers.get(x, None)
-        if url and url.startswith('http'):
+    for k, url in identifiers.iteritems():
+        if url and re.match(r'ur[il]\d*$', k) is not None and url.startswith('http'):
             url = url[:8].replace('|', ':') + url[8:].replace('|', ',')
             parts = urlparse(url)
             name = parts.netloc
-            ans.append((name, x, url, url))
+            ans.append((name, k, url, url))
     return ans
 # }}}
 
