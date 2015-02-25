@@ -79,6 +79,7 @@ class TOCNetworkView (QWebView):
         self.setSizePolicy(QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding))
         
         self.manager = None
+        self.ebook_network = None
         self.setMinimumWidth(80)
         self.loadFinished.connect(self.load_finished)
         self.curr_page = -1

@@ -45,7 +45,8 @@ class NetworkTOCContainer(TOCContainer):
 
     # Saves the ebook network to a JSON file before closing the ebook
     def close_ebook(self):
-        self.toc.ebook_network.save_network()
+        if (self.toc.ebook_network is not None):
+            self.toc.ebook_network.save_network()
         
     # Check if an edge should be added to the network before adding it
     # curr_sec (SpineItem) - the current section
