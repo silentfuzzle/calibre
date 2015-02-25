@@ -102,7 +102,7 @@ class EBookNetwork (object):
     def generate_network(self):
         self.bookGraph = digraph.DiGraph()
         for t in self.toc.flat():
-            if (t.parent is not None):
+            if (t.parent is not None and t.abspath in self.spine):
                 spine_index = self.spine.index(t.abspath)
                 self.bookGraph.add_node(str(self.spine[spine_index].start_page),
                         label=str(self.spine[spine_index].start_page),
