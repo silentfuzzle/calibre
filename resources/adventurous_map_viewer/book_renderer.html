@@ -34,6 +34,9 @@ pointer-events: none;
 
 <script src=d3.v3.min.js></script>
 <script src=double_linked_nodes.js></script>
+<script src=crumb.js></script>
+<script src=network_node.js></script>
+<script src=link_colorer.js></script>
 
 <script> 
 /*
@@ -108,6 +111,7 @@ var zoomListener = d3.behavior.zoom()
 
 // Stores the history of positions the user has navigated to
 var history = new DoubleList();
+var linkColorer = new LinkColorer();
 
 ///////////////////////////////////////////////////////////////////////////////
 //CALLED FROM PYTHON
@@ -157,6 +161,7 @@ function dataLoaded(data, pageNum, historyOffset) {
             }
             n.r = nodeDefaultRadius;
             n.topacity = defaultOpacity;
+            linkColorer.updateMinNodeID(n.id);
         });
     }
     else {
@@ -165,6 +170,7 @@ function dataLoaded(data, pageNum, historyOffset) {
             n.r = nodeDefaultRadius;
             n.fixed = false;
             n.topacity = defaultOpacity;
+            linkColorer.updateMinNodeID(n.id);
         });
     }
 
@@ -255,6 +261,7 @@ function dataLoaded(data, pageNum, historyOffset) {
         .call(wrap, 100);
     
     // Set the color of the nodes
+    linkColorer.buildLinkDictionary(link);
     changePage(pageNum, historyOffset);
     
     // Make sure the display is set to the current scale and location
@@ -289,7 +296,7 @@ function changePage(pageNum, historyOffset) {
     
     // Color the links, titles, and nodes
     resetTextOpacities();
-    colorHistory(currNode);
+    colorLinks(currNode);
     colorNodes(pageNum);
 }
 
@@ -306,7 +313,7 @@ function toggleLabels(makeVisible) {
     else {
         // Set the text opacities from the user's position
         var currNode = history.currNode;
-        colorHistory(currNode);
+        colorLinks(currNode);
         colorNodes(currNode.pos);
     }
 }
@@ -516,52 +523,21 @@ function shrinkRadius(d) {
 //DRAW LINK METHODS
 ///////////////////////////////////////////////////////////////////////////////
 
-// Highlights the most recent continuous path of links in the user's history
+// Highlights a path from the first section of the book to the user's current position if one exists
 // currNode - the user's current position in their history
-function colorHistory(currNode) {
-    // Find all possible links that could be highlighted
-    var endPoints = [];
-    var node = currNode;
-    while (node.prev != null) {
-        var linkInfo = { source: node.prev.pos, target: node.pos, linkSVG: null };
-        endPoints.push(linkInfo);
-        node = node.prev;
-    }
-    
-    // For each possible link, find it's SVG element
+function colorLinks(currNode) {
     link.each(function(d) {
         // Make sure all links start at their default color
         d3.select(this).select("path").style("stroke", linkDefaultColor);
         d3.select(this).attr("marker-end", "url(#default)");
-        
-        // Save each possible link's SVG element
-        var i = 0;
-        var found = false;
-        while (i < endPoints.length && !found) {
-            if (d.source.id == endPoints[i].source && d.target.id == endPoints[i].target) {
-                endPoints[i].linkSVG = this;
-                found = true;
-            }
-            i++;
-        }
     });
     
-    // Determine if a link should be highlighted and highlight it if so
-    var e = 0;
-    var end = false;
-    var numHighlighted = 0;
-    while (e < endPoints.length && !end && numHighlighted < maxHighlightLinks) {
-        if (endPoints[e].linkSVG != null) {
-            var linkSVG = d3.select(endPoints[e].linkSVG);
-            linkSVG.select("path").style("stroke", linkHighlightColor);
-            linkSVG.attr("marker-end", "url(#highlight)");
-            setEndpointTextOpacity(linkSVG);
-            numHighlighted++;
-        }
-        else {
-            end = true;
-        }
-        e++;
+    var endPoints = linkColorer.getPathToColor(currNode);
+    for (var i = 0; i < endPoints.length; i++) {
+        var linkSVG = d3.select(endPoints[i]);
+        linkSVG.select("path").style("stroke", linkHighlightColor);
+        linkSVG.attr("marker-end", "url(#highlight)");
+        setEndpointTextOpacity(linkSVG);
     }
 }
 
