@@ -15,6 +15,7 @@ function LinkColorer() {
     // Set the section with the smallest page number
     // nodeID - The first page/ID of the section to check
     this.updateMinNodeID = function(nodeID) {
+        nodeID = parseFloat(nodeID);
         if (this.minNodeID == -1 || nodeID < this.minNodeID) {
             this.minNodeID = nodeID;
         }
