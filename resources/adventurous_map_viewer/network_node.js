@@ -19,7 +19,6 @@ function NetworkNode(nID) {
     
     this.followInLinks = function(minNodeID, lastCrumb) {
         if (!this.visited || lastCrumb.length < this.crumb.length) {
-            //alert("visiting " + this.nodeID);
             this.visited = true;
             this.crumb = lastCrumb;
             
@@ -29,7 +28,6 @@ function NetworkNode(nID) {
                     currCrumb.link = this.inLinks[n];
                     currCrumb.length++;
                     
-                    //alert("calling " + prevNode.nodeID + " from " + this.nodeID);
                     var prevNode = this.inLinks[n].source;
                     prevNode.followInLinks(minNodeID, currCrumb);
                 }
@@ -39,7 +37,6 @@ function NetworkNode(nID) {
     
     this.followOutLinks = function(lastCrumb) {
         if (!this.visited || lastCrumb.length < this.crumb.length) {
-            //alert("visiting " + this.nodeID);
             this.visited = true;
             this.crumb = lastCrumb;
                           
@@ -48,7 +45,6 @@ function NetworkNode(nID) {
                 currCrumb.link = this.outLinks[n];
                 currCrumb.length++;
                 
-                //alert("calling " + prevNode.nodeID + " from " + this.nodeID);
                 var nextNode = this.outLinks[n].target;
                 nextNode.followOutLinks(currCrumb);
             }
