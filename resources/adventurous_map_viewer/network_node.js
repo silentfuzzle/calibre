@@ -1,3 +1,9 @@
+/*
+ * Copyright 2015 Emily Palmieri <silentfuzzle@gmail.com>
+ * License: GNU GPL v3
+ */
+ 
+ // Stores information about a node in a network for use in shortest distance searches
 function NetworkNode(nID) {
     this.nodeID = nID;
     this.visited = false;
@@ -5,6 +11,8 @@ function NetworkNode(nID) {
     this.inLinks = [];
     this.outLinks = [];
     
+    // Returns the link object from the node with the given ID to this node if it exists
+    // sourceID - The ID of the source node
     this.getLink = function(sourceID) {
         var source = null;
         var n = 0;
@@ -17,29 +25,33 @@ function NetworkNode(nID) {
         return source;
     };
     
-    this.followInLinks = function(minNodeID, lastCrumb) {
+    // Performs a shortest distance search by following the links pointing to this node
+    // lastCrumb - The pointer to the last node in the path
+    this.followInLinks = function(lastCrumb) {
         if (!this.visited || lastCrumb.length < this.crumb.length) {
             this.visited = true;
             this.crumb = lastCrumb;
-            
-            if (minNodeID != this.nodeID) {                
-                for (var n=0; n < this.inLinks.length; n++) {
-                    var currCrumb = this.crumb.copy();
-                    currCrumb.link = this.inLinks[n];
-                    currCrumb.length++;
-                    
-                    var prevNode = this.inLinks[n].source;
-                    prevNode.followInLinks(minNodeID, currCrumb);
-                }
+                          
+            // Update the distance for each link to this node
+            for (var n=0; n < this.inLinks.length; n++) {
+                var currCrumb = this.crumb.copy();
+                currCrumb.link = this.inLinks[n];
+                currCrumb.length++;
+                
+                var prevNode = this.inLinks[n].source;
+                prevNode.followInLinks(currCrumb);
             }
         }
     };
     
+    // Performs a shortest distance search by following the links points away from this node
+    // lastCrumb - The pointer to the last node in the path
     this.followOutLinks = function(lastCrumb) {
         if (!this.visited || lastCrumb.length < this.crumb.length) {
             this.visited = true;
             this.crumb = lastCrumb;
                           
+            // Update the distance for each link from this node
             for (var n=0; n < this.outLinks.length; n++) {
                 var currCrumb = this.crumb.copy();
                 currCrumb.link = this.outLinks[n];
@@ -51,6 +63,7 @@ function NetworkNode(nID) {
         }
     };
     
+    // Clears all crumbs from paths that include this node
     this.clearSearch = function() {
         if (this.visited) {
             this.visited = false;
