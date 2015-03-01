@@ -90,7 +90,9 @@ class DBPrefs(dict):  # {{{
         return json.loads(raw, object_hook=from_json)
 
     def to_raw(self, val):
-        return json.dumps(val, indent=2, default=to_json)
+        # sort_keys=True is required so that the serialization of dictionaries is
+        # not random, which is needed for the changed check in __setitem__
+        return json.dumps(val, indent=2, default=to_json, sort_keys=True)
 
     def has_setting(self, key):
         return key in self
@@ -106,11 +108,19 @@ class DBPrefs(dict):  # {{{
         self.db.execute('DELETE FROM preferences WHERE key=?', (key,))
 
     def __setitem__(self, key, val):
-        if self.disable_setting:
-            return
-        raw = self.to_raw(val)
-        self.db.execute('INSERT OR REPLACE INTO preferences (key,val) VALUES (?,?)', (key, raw))
-        dict.__setitem__(self, key, val)
+        if not self.disable_setting:
+            raw = self.to_raw(val)
+            with self.db.conn:
+                try:
+                    dbraw = self.db.execute('SELECT id,val FROM preferences WHERE key=?', (key,)).next()
+                except StopIteration:
+                    dbraw = None
+                if dbraw is None or dbraw[1] != raw:
+                    if dbraw is None:
+                        self.db.execute('INSERT INTO preferences (key,val) VALUES (?,?)', (key, raw))
+                    else:
+                        self.db.execute('UPDATE preferences SET val=? WHERE id=?', (raw, dbraw[0]))
+                    dict.__setitem__(self, key, val)
 
     def set(self, key, val):
         self.__setitem__(key, val)
@@ -734,7 +744,8 @@ class DB(object):
 
         base = max(self.FIELD_MAP.itervalues())
 
-        for label_, data in self.custom_column_label_map.iteritems():
+        for label_ in sorted(self.custom_column_label_map):
+            data = self.custom_column_label_map[label_]
             label = self.field_metadata.custom_field_prefix + label_
             metadata = self.field_metadata[label].copy()
             link_table = self.custom_table_names(data['num'])[1]
@@ -1217,6 +1228,12 @@ class DB(object):
             candidates = []
         if fmt and candidates and os.path.exists(candidates[0]):
             shutil.copyfile(candidates[0], fmt_path)
+            return fmt_path
+
+    def cover_abspath(self, book_id, path):
+        path = os.path.join(self.library_path, path)
+        fmt_path = os.path.join(path, 'cover.jpg')
+        if os.path.exists(fmt_path):
             return fmt_path
 
     def apply_to_format(self, book_id, path, fname, fmt, func, missing_value=None):

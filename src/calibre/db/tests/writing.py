@@ -692,3 +692,23 @@ class WritingTest(BaseTest):
             ae(c.field_for('tags', 3), (t.id_map[lid], t.id_map[norm]))
     # }}}
 
+    def test_preferences(self):  # {{{
+        ' Test getting and setting of preferences, especially with mutable objects '
+        cache = self.init_cache()
+        changes = []
+        cache.backend.conn.setupdatehook(lambda typ, dbname, tblname, rowid: changes.append(rowid))
+        prefs = cache.backend.prefs
+        prefs['test mutable'] =  [1, 2, 3]
+        self.assertEqual(len(changes), 1)
+        a = prefs['test mutable']
+        a.append(4)
+        self.assertIn(4, prefs['test mutable'])
+        prefs['test mutable'] = a
+        self.assertEqual(len(changes), 2)
+        prefs.load_from_db()
+        self.assertIn(4, prefs['test mutable'])
+        prefs['test mutable'] = {k:k for k in range(10)}
+        self.assertEqual(len(changes), 3)
+        prefs['test mutable'] = {k:k for k in reversed(range(10))}
+        self.assertEqual(len(changes), 3, 'The database was written to despite there being no change in value')
+    # }}}

@@ -708,20 +708,27 @@ class Cache(object):
         Instead use, :meth:`copy_format_to`.
 
         Currently used only in calibredb list, the viewer, edit book,
-        compare_format to original format and the catalogs (via
+        compare_format to original format, open with and the catalogs (via
         get_data_as_dict()).
 
-        Apart from the viewer and edit book, I don't believe any of the others
-        do any file write I/O with the results of this call.
+        Apart from the viewer, open with and edit book, I don't believe any of
+        the others do any file write I/O with the results of this call.
         '''
         fmt = (fmt or '').upper()
         try:
-            name = self.fields['formats'].format_fname(book_id, fmt)
             path = self._field_for('path', book_id).replace('/', os.sep)
         except:
             return None
-        if name and path:
-            return self.backend.format_abspath(book_id, fmt, name, path)
+        if path:
+            if fmt == '__COVER_INTERNAL__':
+                return self.backend.cover_abspath(book_id, path)
+            else:
+                try:
+                    name = self.fields['formats'].format_fname(book_id, fmt)
+                except:
+                    return None
+                if name:
+                    return self.backend.format_abspath(book_id, fmt, name, path)
 
     @read_api
     def has_format(self, book_id, fmt):
@@ -941,11 +948,13 @@ class Cache(object):
         return self._search_api(self, query, restriction, virtual_fields=virtual_fields, book_ids=book_ids)
 
     @api
-    def get_categories(self, sort='name', book_ids=None, icon_map=None, already_fixed=None):
+    def get_categories(self, sort='name', book_ids=None, icon_map=None, already_fixed=None,
+                       first_letter_sort=False):
         ' Used internally to implement the Tag Browser '
         try:
             with self.safe_read_lock:
-                return get_categories(self, sort=sort, book_ids=book_ids, icon_map=icon_map)
+                return get_categories(self, sort=sort, book_ids=book_ids, icon_map=icon_map,
+                                      first_letter_sort=first_letter_sort)
         except InvalidLinkTable as err:
             bad_field = err.field_name
             if bad_field == already_fixed:

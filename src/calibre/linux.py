@@ -347,7 +347,9 @@ class ZshCompleter(object):  # {{{
 
     def do_ebook_edit(self, f):
         from calibre.ebooks.oeb.polish.main import SUPPORTED
+        from calibre.ebooks.oeb.polish.import_book import IMPORTABLE
         from calibre.gui2.tweak_book.main import option_parser
+        tweakable_fmts = SUPPORTED | IMPORTABLE
         parser = option_parser()
         opt_lines = []
         for opt in parser.option_list:
@@ -392,7 +394,7 @@ _ebook_edit() {
 
     return 1
 }
-''' % (opt_lines, '|'.join(SUPPORTED)) + '\n\n').encode('utf-8'))
+''' % (opt_lines, '|'.join(tweakable_fmts)) + '\n\n').encode('utf-8'))
 
     def do_calibredb(self, f):
         import calibre.library.cli as cli
@@ -804,16 +806,18 @@ class PostInstall:
                 cc('xdg-icon-resource install --size 256 calibre-ebook-edit.png calibre-ebook-edit', shell=True)
                 self.icon_resources.append(('apps', 'calibre-ebook-edit', '256'))
 
-                mimetypes = set([])
+                mimetypes = set()
                 for x in all_input_formats():
                     mt = guess_type('dummy.'+x)[0]
                     if mt and 'chemical' not in mt and 'ctc-posml' not in mt:
                         mimetypes.add(mt)
+                mimetypes.discard('application/octet-stream')
 
                 def write_mimetypes(f):
                     f.write('MimeType=%s;\n'%';'.join(mimetypes))
 
                 from calibre.ebooks.oeb.polish.main import SUPPORTED
+                from calibre.ebooks.oeb.polish.import_book import IMPORTABLE
                 f = open('calibre-lrfviewer.desktop', 'wb')
                 f.write(VIEWER)
                 f.close()
@@ -822,7 +826,7 @@ class PostInstall:
                 write_mimetypes(f)
                 f = open('calibre-ebook-edit.desktop', 'wb')
                 f.write(ETWEAK)
-                mt = [guess_type('a.' + x.lower())[0] for x in SUPPORTED]
+                mt = {guess_type('a.' + x.lower())[0] for x in (SUPPORTED|IMPORTABLE)} - {None, 'application/octet-stream'}
                 f.write('MimeType=%s;\n'%';'.join(mt))
                 f.close()
                 f = open('calibre-gui.desktop', 'wb')

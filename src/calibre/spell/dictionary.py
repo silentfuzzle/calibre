@@ -14,6 +14,7 @@ from itertools import chain
 from calibre.constants import plugins, config_dir
 from calibre.spell import parse_lang_code
 from calibre.utils.config import JSONConfig
+from calibre.utils.icu import capitalize
 from calibre.utils.localization import get_lang, get_system_locale
 
 Dictionary = namedtuple('Dictionary', 'primary_locale locales dicpath affpath builtin name id')
@@ -159,6 +160,7 @@ class Dictionaries(object):
     def __init__(self):
         self.remove_hyphenation = re.compile('[\u2010-]+')
         self.negative_pat = re.compile('-[.\d+]')
+        self.fix_punctuation_pat = re.compile(r'''[:.]''')
         self.dictionaries = {}
         self.word_cache = {}
         self.ignored_words = set()
@@ -337,6 +339,10 @@ class Dictionaries(object):
         locale = locale or self.default_locale
         d = self.dictionary_for_locale(locale)
         ans = ()
+
+        def add_suggestion(w, ans):
+            return (w,) + tuple(x for x in ans if x != w)
+
         if d is not None:
             try:
                 ans = d.obj.suggest(unicode(word))
@@ -346,7 +352,18 @@ class Dictionaries(object):
                 dehyphenated_word = self.remove_hyphenation.sub('', word)
                 if len(dehyphenated_word) != len(word) and self.recognized(dehyphenated_word, locale):
                     # Ensure the de-hyphenated word is present and is the first suggestion
-                    ans = (dehyphenated_word,) + tuple(x for x in ans if x != dehyphenated_word)
+                    ans = add_suggestion(dehyphenated_word, ans)
+                else:
+                    m = self.fix_punctuation_pat.search(word)
+                    if m is not None:
+                        w1, w2 = word[:m.start()], word[m.end():]
+                        if self.recognized(w1) and self.recognized(w2):
+                            fw = w1 + m.group() + ' ' + w2
+                            ans = add_suggestion(fw, ans)
+                            if capitalize(w2) != w2:
+                                fw = w1 + m.group() + ' ' + capitalize(w2)
+                                ans = add_suggestion(fw, ans)
+
         return ans
 
 if __name__ == '__main__':
@@ -354,3 +371,4 @@ if __name__ == '__main__':
     dictionaries.initialize()
     print (dictionaries.recognized('recognized', parse_lang_code('en')))
     print (dictionaries.suggestions('ade-quately', parse_lang_code('en')))
+    print (dictionaries.suggestions('magic.wand', parse_lang_code('en')))

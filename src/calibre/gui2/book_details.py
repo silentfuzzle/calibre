@@ -6,6 +6,7 @@ __copyright__ = '2010, Kovid Goyal <kovid@kovidgoyal.net>'
 __docformat__ = 'restructuredtext en'
 
 from binascii import unhexlify
+from functools import partial
 
 from PyQt5.Qt import (QPixmap, QSize, QWidget, Qt, pyqtSignal, QUrl, QIcon,
     QPropertyAnimation, QEasingCurve, QApplication, QFontInfo, QAction,
@@ -107,6 +108,7 @@ class CoverView(QWidget):  # {{{
 
     cover_changed = pyqtSignal(object, object)
     cover_removed = pyqtSignal(object)
+    open_cover_with = pyqtSignal(object, object)
 
     def __init__(self, vertical, parent=None):
         QWidget.__init__(self, parent)
@@ -203,6 +205,7 @@ class CoverView(QWidget):  # {{{
             )
 
     def contextMenuEvent(self, ev):
+        from calibre.gui2.open_with import populate_menu, edit_programs
         cm = QMenu(self)
         paste = cm.addAction(_('Paste Cover'))
         copy = cm.addAction(_('Copy Cover'))
@@ -214,7 +217,28 @@ class CoverView(QWidget):  # {{{
         paste.triggered.connect(self.paste_from_clipboard)
         remove.triggered.connect(self.remove_cover)
         gc.triggered.connect(self.generate_cover)
+
+        m = QMenu(_('Open cover with...'))
+        populate_menu(m, self.open_with, 'cover_image')
+        if len(m.actions()) == 0:
+            cm.addAction(_('Open cover with...'), self.choose_open_with)
+        else:
+            m.addSeparator()
+            m.addAction(_('Add another application to open cover...'), self.choose_open_with)
+            m.addAction(_('Edit Open With applications...'), partial(edit_programs, 'cover_image', self))
+            cm.addMenu(m)
         cm.exec_(ev.globalPos())
+
+    def open_with(self, entry):
+        id_ = self.data.get('id', None)
+        if id_ is not None:
+            self.open_cover_with.emit(id_, entry)
+
+    def choose_open_with(self):
+        from calibre.gui2.open_with import choose_program
+        entry = choose_program('cover_image', self)
+        if entry is not None:
+            self.open_with(entry)
 
     def copy_to_clipboard(self):
         QApplication.instance().clipboard().setPixmap(self.pixmap)
@@ -286,6 +310,7 @@ class BookInfo(QWebView):
     compare_format = pyqtSignal(int, object)
     copy_link = pyqtSignal(object)
     manage_author = pyqtSignal(object)
+    open_fmt_with = pyqtSignal(int, object, object)
 
     def __init__(self, vertical, parent=None):
         QWebView.__init__(self, parent)
@@ -405,7 +430,17 @@ class BookInfo(QWebView):
                         ac.current_fmt = (book_id, fmt)
                         ac.setText(t)
                         menu.addAction(ac)
-
+                    if not fmt.upper().startswith('ORIGINAL_'):
+                        from calibre.gui2.open_with import populate_menu, edit_programs
+                        m = QMenu(_('Open %s with...') % fmt.upper())
+                        populate_menu(m, partial(self.open_with, book_id, fmt), fmt)
+                        if len(m.actions()) == 0:
+                            menu.addAction(_('Open %s with...') % fmt.upper(), partial(self.choose_open_with, book_id, fmt))
+                        else:
+                            m.addSeparator()
+                            m.addAction(_('Add other application for %s files...') % fmt.upper(), partial(self.choose_open_with, book_id, fmt))
+                            m.addAction(_('Edit Open With applications...'), partial(edit_programs, fmt, self))
+                            menu.addMenu(m)
             else:
                 el = r.linkElement()
                 author = el.toPlainText() if unicode(el.attribute('calibre-data')) == u'authors' else None
@@ -424,6 +459,15 @@ class BookInfo(QWebView):
 
         if len(menu.actions()) > 0:
             menu.exec_(ev.globalPos())
+
+    def open_with(self, book_id, fmt, entry):
+        self.open_fmt_with.emit(book_id, fmt, entry)
+
+    def choose_open_with(self, book_id, fmt):
+        from calibre.gui2.open_with import choose_program
+        entry = choose_program(fmt, self)
+        if entry is not None:
+            self.open_with(book_id, fmt, entry)
 
 
 # }}}
@@ -531,9 +575,11 @@ class BookDetails(QWidget):  # {{{
     remote_file_dropped = pyqtSignal(object, object)
     files_dropped = pyqtSignal(object, object)
     cover_changed = pyqtSignal(object, object)
+    open_cover_with = pyqtSignal(object, object)
     cover_removed = pyqtSignal(object)
     view_device_book = pyqtSignal(object)
     manage_author = pyqtSignal(object)
+    open_fmt_with = pyqtSignal(int, object, object)
 
     # Drag 'n drop {{{
     DROPABBLE_EXTENSIONS = IMAGE_EXTENSIONS+BOOK_EXTENSIONS
@@ -590,12 +636,14 @@ class BookDetails(QWidget):  # {{{
 
         self.cover_view = CoverView(vertical, self)
         self.cover_view.cover_changed.connect(self.cover_changed.emit)
+        self.cover_view.open_cover_with.connect(self.open_cover_with.emit)
         self.cover_view.cover_removed.connect(self.cover_removed.emit)
         self._layout.addWidget(self.cover_view)
         self.book_info = BookInfo(vertical, self)
         self._layout.addWidget(self.book_info)
         self.book_info.link_clicked.connect(self.handle_click)
         self.book_info.remove_format.connect(self.remove_specific_format)
+        self.book_info.open_fmt_with.connect(self.open_fmt_with)
         self.book_info.save_format.connect(self.save_specific_format)
         self.book_info.restore_format.connect(self.restore_specific_format)
         self.book_info.compare_format.connect(self.compare_specific_format)
@@ -640,4 +688,3 @@ class BookDetails(QWidget):  # {{{
         self.show_data(Metadata(_('Unknown')))
 
 # }}}
-
