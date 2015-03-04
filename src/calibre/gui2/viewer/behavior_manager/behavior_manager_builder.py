@@ -111,6 +111,7 @@ class BehaviorManagerBuilder (object):
             behavior_manager = self.default_manager
         else:
             main.action_toggle_adventurous_mode.setEnabled(True)
+            main.set_toc_view(self.behavior_manager.toc_interface)
             behavior_manager = self.behavior_manager
             toc_sections = TOCSections(toc, main.iterator.spine)
         
