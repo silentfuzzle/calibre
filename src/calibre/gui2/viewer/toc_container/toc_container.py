@@ -29,7 +29,7 @@ class TOCContainer(QWidget):
         
     # If the table of contents interface is a network,
     # add a connection between sections
-        # start_sec (SpineItem) - the node/section to start the edge from
+    # start_sec (SpineItem) - the node/section to start the edge from
     # end_sec (string) - the node/section to end the edge at
     # start_sec_checked (boolean) - true if the passed start section was already checked for existence in the ebook's TOC
     def update_connection(self, start_sec, end_sec, start_sec_checked=False):

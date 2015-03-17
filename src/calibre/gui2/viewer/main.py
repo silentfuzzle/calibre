@@ -86,7 +86,6 @@ class EbookViewer(MainWindow):
     def __init__(self, pathtoebook=None, debug_javascript=False, open_at=None,
                  start_in_fullscreen=False):
         MainWindow.__init__(self, debug_javascript)
-        self.behavior_manager = None
         self.behavior_manager = (
                 self.behavior_manager_builder.build_behavior_manager(self))
         self.view.magnification_changed.connect(self.magnification_changed)
