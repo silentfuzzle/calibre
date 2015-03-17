@@ -270,7 +270,7 @@ class TagsModel(QAbstractItemModel):  # {{{
 
     def set_database(self, db):
         self.beginResetModel()
-        hidden_cats = db.prefs.get('tag_browser_hidden_categories', None)
+        hidden_cats = db.new_api.pref('tag_browser_hidden_categories', None)
         # migrate from config to db prefs
         if hidden_cats is None:
             hidden_cats = config['tag_browser_hidden_categories']
@@ -279,7 +279,7 @@ class TagsModel(QAbstractItemModel):  # {{{
         for cat in hidden_cats:
             if cat in db.field_metadata:
                 self.hidden_categories.add(cat)
-        db.prefs.set('tag_browser_hidden_categories', list(self.hidden_categories))
+        db.new_api.set_pref('tag_browser_hidden_categories', list(self.hidden_categories))
 
         self.db = db
         self._run_rebuild()
@@ -732,7 +732,7 @@ class TagsModel(QAbstractItemModel):  # {{{
                                              is_uc, dest_key,
                                              self.get_node(idx))
 
-        self.db.prefs.set('user_categories', user_cats)
+        self.db.new_api.set_pref('user_categories', user_cats)
         self.refresh_required.emit()
 
         return True
@@ -801,7 +801,7 @@ class TagsModel(QAbstractItemModel):  # {{{
                 cat_contents |= set([(v, column) for v in value])
 
         categories[on_node.category_key[1:]] = [[v, c, 0] for v,c in cat_contents]
-        self.db.prefs.set('user_categories', categories)
+        self.db.new_api.set_pref('user_categories', categories)
         self.refresh_required.emit()
 
     def handle_drop(self, on_node, ids):
@@ -809,13 +809,13 @@ class TagsModel(QAbstractItemModel):  # {{{
         key = on_node.tag.category
         if (key == 'authors' and len(ids) >= 5):
             if not confirm('<p>'+_('Changing the authors for several books can '
-                           'take a while. Are you sure?')
-                        +'</p>', 'tag_browser_drop_authors', self.gui_parent):
+                           'take a while. Are you sure?') +
+                           '</p>', 'tag_browser_drop_authors', self.gui_parent):
                 return
         elif len(ids) > 15:
             if not confirm('<p>'+_('Changing the metadata for that many books '
-                           'can take a while. Are you sure?')
-                        +'</p>', 'tag_browser_many_changes', self.gui_parent):
+                           'can take a while. Are you sure?') +
+                           '</p>', 'tag_browser_many_changes', self.gui_parent):
                 return
 
         fm = self.db.metadata_for_field(key)
@@ -855,6 +855,14 @@ class TagsModel(QAbstractItemModel):  # {{{
         self.drag_drop_finished.emit(ids)
     # }}}
 
+    def get_in_vl(self):
+        return self.db.data.get_base_restriction() or self.db.data.get_search_restriction()
+
+    def get_book_ids_to_use(self):
+        if self.db.data.get_base_restriction() or self.db.data.get_search_restriction():
+            return self.db.search('', return_matches=True, sort_results=False)
+        return None
+
     def _get_category_nodes(self, sort):
         '''
         Called by __init__. Do not directly call this method.
@@ -863,21 +871,17 @@ class TagsModel(QAbstractItemModel):  # {{{
         self.categories = {}
 
         # Get the categories
-        if self.db.data.get_base_restriction() or self.db.data.get_search_restriction():
-            try:
-                data = self.db.new_api.get_categories(sort=sort,
-                        icon_map=self.category_icon_map,
-                        book_ids=self.db.search('', return_matches=True, sort_results=False),
-                        first_letter_sort = self.collapse_model == 'first letter')
-            except:
-                import traceback
-                traceback.print_exc()
-                data = self.db.new_api.get_categories(sort=sort, icon_map=self.category_icon_map,
-                        first_letter_sort = self.collapse_model == 'first letter')
-                self.restriction_error.emit()
-        else:
+        try:
+            data = self.db.new_api.get_categories(sort=sort,
+                    icon_map=self.category_icon_map,
+                    book_ids=self.get_book_ids_to_use(),
+                    first_letter_sort=self.collapse_model == 'first letter')
+        except:
+            import traceback
+            traceback.print_exc()
             data = self.db.new_api.get_categories(sort=sort, icon_map=self.category_icon_map,
-                        first_letter_sort = self.collapse_model == 'first letter')
+                    first_letter_sort=self.collapse_model == 'first letter')
+            self.restriction_error.emit()
 
         # Reconstruct the user categories, putting them into metadata
         self.db.field_metadata.remove_dynamic_categories()
@@ -1042,21 +1046,14 @@ class TagsModel(QAbstractItemModel):  # {{{
             item.tag.name = val
             self.search_item_renamed.emit()  # Does a refresh
         else:
-            if key == 'series':
-                self.db.rename_series(item.tag.id, val)
-            elif key == 'publisher':
-                self.db.rename_publisher(item.tag.id, val)
-            elif key == 'tags':
-                self.db.rename_tag(item.tag.id, val)
-            elif key == 'authors':
-                self.db.rename_author(item.tag.id, val)
-            elif self.db.field_metadata[key]['is_custom']:
-                self.db.rename_custom_item(item.tag.id, val,
-                                    label=self.db.field_metadata[key]['label'])
+            restrict_to_book_ids=self.get_book_ids_to_use() if item.use_vl else None
+            self.db.new_api.rename_items(key, {item.tag.id: val},
+                                         restrict_to_book_ids=restrict_to_book_ids)
             self.tag_item_renamed.emit()
             item.tag.name = val
             item.tag.state = TAG_SEARCH_STATES['clear']
-            self.rename_item_in_all_user_categories(name, key, val)
+            if not restrict_to_book_ids:
+                self.rename_item_in_all_user_categories(name, key, val)
             self.refresh_required.emit()
         return True
 
@@ -1075,7 +1072,7 @@ class TagsModel(QAbstractItemModel):  # {{{
                 else:
                     new_contents.append(tup)
             user_cats[k] = new_contents
-        self.db.prefs.set('user_categories', user_cats)
+        self.db.new_api.set_pref('user_categories', user_cats)
 
     def delete_item_from_all_user_categories(self, item_name, item_category):
         '''
@@ -1087,7 +1084,7 @@ class TagsModel(QAbstractItemModel):  # {{{
         for cat in user_cats.keys():
             self.delete_item_from_user_category(cat, item_name, item_category,
                                                 user_categories=user_cats)
-        self.db.prefs.set('user_categories', user_cats)
+        self.db.new_api.set_pref('user_categories', user_cats)
 
     def delete_item_from_user_category(self, category, item_name, item_category,
                                        user_categories=None):
@@ -1101,7 +1098,7 @@ class TagsModel(QAbstractItemModel):  # {{{
                 new_contents.append(tup)
         user_cats[category] = new_contents
         if user_categories is None:
-            self.db.prefs.set('user_categories', user_cats)
+            self.db.new_api.set_pref('user_categories', user_cats)
 
     def headerData(self, *args):
         return None
@@ -1431,4 +1428,3 @@ class TagsModel(QAbstractItemModel):  # {{{
             process_level(self.index(i, 0, QModelIndex()))
 
     # }}}
-

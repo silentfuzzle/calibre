@@ -20,6 +20,7 @@ import regex
 
 from calibre import prepare_string_for_xml
 from calibre.gui2 import error_dialog, info_dialog, choose_files, choose_save_file
+from calibre.gui2.dialogs.confirm_delete import confirm
 from calibre.gui2.dialogs.message_box import MessageBox
 from calibre.gui2.widgets2 import HistoryComboBox
 from calibre.gui2.tweak_book import tprefs, editors, current_container
@@ -541,15 +542,11 @@ class SearchesModel(QAbstractListModel):
         self.endResetModel()
 
     def remove_searches(self, rows):
-        rows = sorted(set(rows), reverse=True)
-        indices = [self.filtered_searches[row] for row in rows]
-        for row in rows:
-            self.beginRemoveRows(QModelIndex(), row, row)
-            del self.filtered_searches[row]
-            self.endRemoveRows()
+        indices = {self.filtered_searches[row] for row in frozenset(rows)}
         for idx in sorted(indices, reverse=True):
             del self.searches[idx]
         tprefs['saved_searches'] = self.searches
+        self.do_filter('')
 
 class EditSearch(QFrame):  # {{{
 
@@ -1030,9 +1027,11 @@ class SavedSearches(QWidget):
     def remove_search(self):
         if self.editing_search:
             return
-        rows = {index.row() for index in self.searches.selectionModel().selectedIndexes()} - {-1}
-        self.model.remove_searches(rows)
-        self.show_details()
+        if confirm(_('Are you sure you want to permanently delete the selected saved searches?'),
+                   'confirm-remove-editor-saved-search', config_set=tprefs):
+            rows = {index.row() for index in self.searches.selectionModel().selectedIndexes()} - {-1}
+            self.model.remove_searches(rows)
+            self.show_details()
 
     def add_search(self):
         if self.editing_search:
@@ -1060,7 +1059,10 @@ class SavedSearches(QWidget):
         self.description.setText(' \n \n ')
         i = self.searches.currentIndex()
         if i.isValid():
-            search_index, search = i.data(Qt.UserRole)
+            try:
+                search_index, search = i.data(Qt.UserRole)
+            except TypeError:
+                return  # no saved searches
             cs = '✓' if search.get('case_sensitive', SearchWidget.DEFAULT_STATE['case_sensitive']) else '✗'
             da = '✓' if search.get('dot_all', SearchWidget.DEFAULT_STATE['dot_all']) else '✗'
             if search.get('mode', SearchWidget.DEFAULT_STATE['mode']) in ('regex', 'function'):

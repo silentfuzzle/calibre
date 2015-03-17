@@ -441,8 +441,6 @@ calibre allows you to save a frequently used search under a special name and the
 
 Now you can access your saved search in the Tag Browser under "Searches". A single click will allow you to reuse any arbitrarily complex search easily, without needing to re-create it.
 
-.. _config_filename_metadata:
-
 Virtual Libraries
 -------------------
 
@@ -452,21 +450,33 @@ partition your large collection of books into smaller, manageable chunks. To
 learn how to create and use virtual libraries, see the tutorial:
 :ref:`virtual_libraries`.
 
+.. _config_filename_metadata:
+
 Guessing metadata from file names
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the :guilabel:`Add/Save` section of the configuration dialog, you can specify a regular expression that calibre will use to try and guess metadata from the names of ebook files
-that you add to the library. The default regular expression is::
+------------------------------------
+
+Normally, calibre reads metadata from inside the book file. However, it can
+be configured to read metadata from the file name instead, via
+:guilabel:`Preferences->Adding Books->Read metadata from file contents`.
+
+You can also control how metadata is read from the filename using regular
+expressions (see :doc:`regexp`).  In the :guilabel:`Adding Books` section of
+the configuration dialog, you can specify a regular expression that calibre
+will use to try and guess metadata from the names of ebook files that you add
+to the library. The default regular expression is::
 
     title - author
 
-i.e., it assumes that all characters up to the first ``-`` are the title of the book and subsequent characters are the author of the book. For example, the filename::
+that is, it assumes that all characters up to the first ``-`` are the title of
+the book and subsequent characters are the author of the book. For example, the
+filename::
 
     Foundation and Earth - Isaac Asimov.txt
 
 will be interpreted to have the title: Foundation and Earth and author: Isaac Asimov
 
 .. tip::
-    If the filename does not contain the hyphen, the regular expression will fail.
+    If the filename does not contain the hyphen, the above regular expression will fail.
 
 .. _book_details:
 
@@ -488,11 +498,15 @@ automatically show you links pointing to the web pages for the book on amazon,
 worldcat, etc. from where the metadata was downloaded.
 
 You can right click on individual ebook formats in the Book Details panel to
-delete them, compare them to their original versions, save them to disk, etc.
+delete them, compare them to their original versions, save them to disk, open
+them with an external program, etc.
 
 You can change the cover of the book by simply drag and dropping an
-image onto the book details panel. You can also add ebook files to the current
-book by drag and dropping the files onto the book details panel.
+image onto the book details panel. If you wish to edit the cover image in
+an external program, simply right click on it and choose :guilabel:`Open With`.
+
+You can also add ebook files to the current book by drag and dropping the files
+onto the book details panel.
 
 Double clicking the book details panel will open it up in a separate popup
 window.

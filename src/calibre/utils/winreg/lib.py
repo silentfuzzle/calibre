@@ -28,6 +28,9 @@ HKEY_CLASSES_ROOT  = HKCR = HKEY(ULONG(winreg.HKEY_CLASSES_ROOT).value)
 HKEY_LOCAL_MACHINE = HKLM = HKEY(ULONG(winreg.HKEY_LOCAL_MACHINE).value)
 KEY_READ = winreg.KEY_READ
 KEY_ALL_ACCESS = winreg.KEY_ALL_ACCESS
+RRF_RT_ANY = 0x0000ffff
+RRF_NOEXPAND = 0x10000000
+RRF_ZEROONFAILURE = 0x20000000
 
 class FILETIME(ctypes.Structure):
     _fields_ = [("dwLowDateTime", DWORD), ("dwHighDateTime", DWORD)]
@@ -147,6 +150,22 @@ RegEnumKeyEx = cwrap(
     'RegEnumKeyExW', LONG, a('key', HKEY), a('index', DWORD), a('name', LPWSTR), a('name_size', LPDWORD), a('reserved', LPDWORD, None),
     a('cls', LPWSTR, None), a('cls_size', LPDWORD, None), a('last_write_time', ctypes.POINTER(FILETIME), in_arg=False),
     errcheck=enum_value_errcheck)
+def get_value_errcheck(result, func, args):
+    if result == winerror.ERROR_SUCCESS:
+        return args
+    if result == winerror.ERROR_MORE_DATA:
+        raise ValueError('buffer too small')
+    if result == winerror.ERROR_FILE_NOT_FOUND:
+        raise KeyError('No such value found')
+    raise ctypes.WinError(result)
+RegGetValue = cwrap(
+    'RegGetValueW', LONG, a('key', HKEY), a('sub_key', LPCWSTR, None), a('value_name', LPCWSTR, None), a('flags', DWORD, RRF_RT_ANY),
+    a('data_type', LPDWORD, 0), a('data', ctypes.c_void_p, 0), a('size', LPDWORD, 0), errcheck=get_value_errcheck
+)
+RegLoadMUIString = cwrap(
+    'RegLoadMUIStringW', LONG, a('key', HKEY), a('value_name', LPCWSTR, None), a('data', LPWSTR, None), a('buf_size', DWORD, 0),
+    a('size', LPDWORD, 0), a('flags', DWORD, 0), a('directory', LPCWSTR, None), errcheck=get_value_errcheck
+)
 
 
 def filetime_to_datettime(ft):
@@ -168,6 +187,41 @@ class Key(object):
             self.hkey = RegOpenKey(root, open_at, 0, open_mode)
         else:
             self.hkey = HKEY()
+
+    def get(self, value_name=None, default=None, sub_key=None):
+        data_buf = ctypes.create_string_buffer(1024)
+        len_data_buf = DWORD(len(data_buf))
+        data_type = DWORD(0)
+        while True:
+            len_data_buf.value = len(data_buf)
+            try:
+                RegGetValue(self.hkey, sub_key, value_name, RRF_RT_ANY | RRF_NOEXPAND | RRF_ZEROONFAILURE,
+                            ctypes.byref(data_type), data_buf, len_data_buf)
+                break
+            except ValueError:
+                data_buf = ctypes.create_string_buffer(2 * len(data_buf))
+            except KeyError:
+                return default
+        return convert_registry_data(data_buf, len_data_buf.value, data_type.value)
+
+    def get_mui_string(self, value_name=None, default=None, directory=None, fallback=True):
+        data_buf = ctypes.create_unicode_buffer(1024)
+        len_data_buf = DWORD(len(data_buf))
+        size = DWORD(0)
+        while True:
+            len_data_buf.value = len(data_buf)
+            try:
+                RegLoadMUIString(self.hkey, value_name, data_buf, 2 * len(data_buf), ctypes.byref(size), 0, directory)
+                break
+            except ValueError:
+                data_buf = ctypes.create_unicode_buffer(max(2 * len(data_buf), size.value // 2))
+            except KeyError:
+                return default
+            except WindowsError as err:
+                if fallback and err.errno == winerror.ERROR_BAD_COMMAND:
+                    return self.get(value_name=value_name, default=default)
+                raise
+        return data_buf.value
 
     def iterkeynames(self, get_last_write_times=False):
         ' Iterate over the names of all keys in this key '
@@ -263,7 +317,7 @@ class Key(object):
         return bool(self.hkey)
 
     def close(self):
-        if not self.hkey:
+        if not getattr(self, 'hkey', None):
             return
         if RegCloseKey is None or HKEY is None:
             return  # globals become None during exit
@@ -283,6 +337,7 @@ if __name__ == '__main__':
     k.set('none test')
     k.set_default_value(r'other\key', '%PATH%', has_expansions=True)
     pprint(tuple(k.itervalues(get_data=True)))
+    pprint(k.get('unicode test'))
     k.set_default_value(r'delete\me\please', 'xxx')
     pprint(tuple(k.iterkeynames(get_last_write_times=True)))
     k.delete_tree('delete')

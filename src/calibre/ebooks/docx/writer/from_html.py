@@ -15,6 +15,7 @@ from calibre.ebooks.docx.names import namespaces
 from calibre.ebooks.docx.writer.styles import w, StylesManager
 from calibre.ebooks.oeb.stylizer import Stylizer as Sz, Style as St
 from calibre.ebooks.oeb.base import XPath, barename
+from calibre.ebooks.pdf.render.common import PAPER_SIZES
 
 class Style(St):
 
@@ -67,6 +68,9 @@ class TextRun(object):
     def serialize(self, p):
         r = p.makeelement(w('r'))
         p.append(r)
+        rpr = r.makeelement(w('rPr'))
+        rpr.append(rpr.makeelement(w('rStyle'), **{w('val'):self.style.id}))
+        r.append(rpr)
         for text, preserve_whitespace in self.texts:
             if text is None:
                 r.append(r.makeelement(w('br'), **{w('clear'):preserve_whitespace}))
@@ -76,6 +80,13 @@ class TextRun(object):
                 t.text = text or ''
                 if preserve_whitespace:
                     t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+
+    def is_empty(self):
+        if not self.texts:
+            return True
+        if len(self.texts) == 1 and self.texts[0] == ('', False):
+            return True
+        return False
 
 class Block(object):
 
@@ -120,8 +131,15 @@ class Block(object):
         p.append(ppr)
         if self.keep_next:
             ppr.append(ppr.makeelement(w('keepNext')))
+        ppr.append(ppr.makeelement(w('pStyle'), **{w('val'):self.style.id}))
         for run in self.runs:
             run.serialize(p)
+
+    def is_empty(self):
+        for run in self.runs:
+            if not run.is_empty():
+                return False
+        return True
 
 class Convert(object):
 
@@ -140,6 +158,7 @@ class Convert(object):
         for item in self.oeb.spine:
             self.process_item(item)
 
+        self.styles_manager.finalize(self.blocks)
         self.write()
 
     def process_item(self, item):
@@ -151,6 +170,8 @@ class Convert(object):
             self.blocks.append(b)
             is_first_block = False
             self.process_block(body, b, stylizer, ignore_tail=True)
+        if self.blocks and self.blocks[0].is_empty():
+            del self.blocks[0]
 
     def process_block(self, html_block, docx_block, stylizer, ignore_tail=False):
         block_style = stylizer.style(html_block)
@@ -215,6 +236,18 @@ class Convert(object):
         doc.append(body)
         for block in self.blocks:
             block.serialize(body)
+        width, height = PAPER_SIZES[self.opts.docx_page_size]
+        if self.opts.docx_custom_page_size is not None:
+            width, height = map(float, self.opts.docx_custom_page_size.partition('x')[0::2])
+        width, height = int(20 * width), int(20 * height)
+        def margin(which):
+            return w(which), str(int(getattr(self.opts, 'margin_'+which) * 20))
+        body.append(E.sectPr(
+            E.pgSz(**{w('w'):str(width), w('h'):str(height)}),
+            E.pgMar(**dict(map(margin, 'left top right bottom'.split()))),
+            E.cols(**{w('space'):'720'}),
+            E.docGrid(**{w('linePitch'):"360"}),
+        ))
 
         dn = {k:v for k, v in namespaces.iteritems() if k in 'wr'}
         E = ElementMaker(namespace=dn['w'], nsmap=dn)
@@ -235,3 +268,4 @@ class Convert(object):
                 )
             )
         )
+        self.styles_manager.serialize(self.docx.styles)

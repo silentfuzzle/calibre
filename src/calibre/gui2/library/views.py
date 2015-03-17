@@ -489,7 +489,7 @@ class BooksView(QTableView):  # {{{
         db = getattr(self.model(), 'db', None)
         name = unicode(self.objectName())
         if name and db is not None:
-            db.prefs.set(name + ' books view state', state)
+            db.new_api.set_pref(name + ' books view state', state)
 
     def save_state(self):
         # Only save if we have been initialized (set_database called)
@@ -610,7 +610,7 @@ class BooksView(QTableView):  # {{{
                     except:
                         pass
                     if ans is not None:
-                        db.prefs[name] = ans
+                        db.new_api.set_pref(name, ans)
                 else:
                     injected = False
                     if not ans.get('last_modified_injected', False):
@@ -626,7 +626,7 @@ class BooksView(QTableView):  # {{{
                         if 'languages' not in hc:
                             hc.append('languages')
                     if injected:
-                        db.prefs[name] = ans
+                        db.new_api.set_pref(name, ans)
         return ans
 
     def restore_state(self):
