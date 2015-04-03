@@ -91,7 +91,6 @@ var vis;
 var force;
 var node = 0;
 var link;
-var numLinks = 0;
 var allVisible = false;
   
 // Set the viewer window to fill the TOC panel
@@ -129,7 +128,6 @@ var linkColorer = new LinkColorer();
 function dataLoaded(data, pageNum, historyOffset) {
     var links = data.links;
     var nodes = data.nodes;
-    numLinks = links.length;
     
     var nodeDictionary = new Object();
     if (node != 0) {
@@ -414,7 +412,7 @@ function setTextDefault(nodeSVG) {
 
 // Returns the default opacity to set all node labels to
 function getDefaultTextOpacity() {
-    if (numLinks == 0 || allVisible) {
+    if (allVisible) {
         // All labels are visible if selected by the user or no links exist
         return textVisibleOpacity;
     }
@@ -538,7 +536,6 @@ function colorLinks(currNode) {
         var linkSVG = d3.select(endPoints[i]);
         linkSVG.select("path").style("stroke", linkHighlightColor);
         linkSVG.attr("marker-end", "url(#highlight)");
-        setEndpointTextOpacity(linkSVG);
     }
 }
 
@@ -853,8 +850,6 @@ function removeZoomListener() {
     svg.on("mousemove.zoom", null);
     svg.on("dblclick.zoom", null);
     svg.on("touchstart.zoom", null);
-    svg.on("wheel.zoom", null);
-    svg.on("mousewheel.zoom", null);
     svg.on("MozMousePixelScroll.zoom", null);
     node.call(force.drag);
 }
