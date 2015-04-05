@@ -25,8 +25,7 @@ class SwitchBehaviorManager (BehaviorManager):
         # Setup the interface behavior toggle button
         main.action_toggle_adventurous_mode.toggled[bool].connect(
                 self.toggle_adventurous_mode)
-        self.toggle_adventurous_mode(
-                main.action_toggle_adventurous_mode.isChecked())
+        self.action_toggle_adventurous_mode = main.action_toggle_adventurous_mode
             
     # Returns the value from the current page behavior
     # b1_return (object) - the value returned by a method from the main page behavior
@@ -67,6 +66,9 @@ class SwitchBehaviorManager (BehaviorManager):
         
         self.b1_toc_interface.setup_ebook(toc_sections, toc_model, title, pathtoebook)
         self.b2_toc_interface.setup_ebook(toc_sections, toc_model, title, pathtoebook)
+        
+        self.toggle_adventurous_mode(
+                self.action_toggle_adventurous_mode.isChecked())
         
     # Performs any actions required before closing an ebook
     def close_ebook(self):
