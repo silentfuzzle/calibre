@@ -90,6 +90,7 @@ class EbookViewer(MainWindow):
         self.behavior_manager = (
                 self.behavior_manager_builder.build_behavior_manager(self))
         self.view.magnification_changed.connect(self.magnification_changed)
+        self.closed = False
         self.show_toc_on_open = False
         self.current_book_has_toc = False
         self.iterator          = None
@@ -269,7 +270,11 @@ class EbookViewer(MainWindow):
             QApplication.instance().quit()
 
     def closeEvent(self, e):
+        if self.closed:
+            e.ignore()
+            return
         if self.shutdown():
+            self.closed = True
             return MainWindow.closeEvent(self, e)
         else:
             e.ignore()
@@ -323,11 +328,6 @@ class EbookViewer(MainWindow):
             traceback.print_exc()
             url = default_lookup_website(canonicalize_lang(self.view.current_language) or 'en').format(word=word)
         open_url(url)
-
-    def get_remember_current_page_opt(self):
-        from calibre.gui2.viewer.documentview import config
-        c = config().parse()
-        return c.remember_current_page
 
     def print_book(self):
         p = Printing(self.iterator, self)
@@ -730,10 +730,10 @@ class EbookViewer(MainWindow):
         if self.view.document.in_paged_mode and num > 1 and num % 2 == 0:
             two, one = self.page_position_on_footnote_toggle.pop(), self.page_position_on_footnote_toggle.pop()
             if (
-                    time.time() - two.time < 1 and not two.is_visible and one.is_visible
-                    and one.last_loaded_path == two.last_loaded_path and two.last_loaded_path == self.view.last_loaded_path
-                    and one.page_dimensions == self.view.document.page_dimensions and one.multiplier == self.view.multiplier
-                    and one.after_resize_page_number == self.view.document.page_number
+                    time.time() - two.time < 1 and not two.is_visible and one.is_visible and
+                    one.last_loaded_path == two.last_loaded_path and two.last_loaded_path == self.view.last_loaded_path and
+                    one.page_dimensions == self.view.document.page_dimensions and one.multiplier == self.view.multiplier and
+                    one.after_resize_page_number == self.view.document.page_number
             ):
                 return one.page_number
 
@@ -807,6 +807,8 @@ class EbookViewer(MainWindow):
     def do_config(self):
         self.view.config(self)
         self.load_theme_menu()
+        if self.iterator is not None:
+            self.iterator.copy_bookmarks_to_file = self.view.document.copy_bookmarks_to_file
         from calibre.gui2 import config
         if not config['viewer_search_history']:
             self.search.clear_history()
@@ -845,7 +847,7 @@ class EbookViewer(MainWindow):
         self.existing_bookmarks = []
         for bm in bookmarks:
             if bm['title'] == 'calibre_current_page_bookmark':
-                if self.get_remember_current_page_opt():
+                if self.view.document.remember_current_page:
                     current_page = bm
             else:
                 self.existing_bookmarks.append(bm['title'])
@@ -864,7 +866,7 @@ class EbookViewer(MainWindow):
         return bm
 
     def save_current_position(self):
-        if not self.get_remember_current_page_opt():
+        if not self.view.document.remember_current_page:
             return
         if hasattr(self, 'current_index'):
             try:
@@ -877,7 +879,7 @@ class EbookViewer(MainWindow):
         if self.iterator is not None:
             self.save_current_position()
             self.iterator.__exit__()
-        self.iterator = EbookIterator(pathtoebook)
+        self.iterator = EbookIterator(pathtoebook, copy_bookmarks_to_file=self.view.document.copy_bookmarks_to_file)
         self.history.clear()
         self.open_progress_indicator(_('Loading ebook...'))
         worker = Worker(target=partial(self.iterator.__enter__, view_kepub=True))

@@ -6,26 +6,69 @@ from __future__ import (unicode_literals, division, absolute_import,
 __license__ = 'GPL v3'
 __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 
-import textwrap
-from io import BytesIO
+import textwrap, os
 
 from lxml import etree
 from lxml.builder import ElementMaker
 
 from calibre import guess_type
 from calibre.constants import numeric_version, __appname__
-from calibre.ebooks.docx.names import namespaces, STYLES, WEB_SETTINGS
+from calibre.ebooks.docx.names import namespaces, STYLES, WEB_SETTINGS, IMAGES, FONTS
 from calibre.ebooks.metadata import authors_to_string
-from calibre.ebooks.metadata.opf2 import OPF as ReadOPF
-from calibre.ebooks.oeb.base import OPF, OPF2_NS
 from calibre.utils.date import utcnow
 from calibre.utils.localization import canonicalize_lang, lang_as_iso639_1
 from calibre.utils.zipfile import ZipFile
+from calibre.ebooks.pdf.render.common import PAPER_SIZES
 
 def xml2str(root, pretty_print=False, with_tail=False):
+    if hasattr(etree, 'cleanup_namespaces'):
+        etree.cleanup_namespaces(root)
     ans = etree.tostring(root, encoding='utf-8', xml_declaration=True,
                           pretty_print=pretty_print, with_tail=with_tail)
     return ans
+
+def create_skeleton(opts):
+    def w(x):
+        return '{%s}%s' % (namespaces['w'], x)
+    dn = {k:v for k, v in namespaces.iteritems() if k in {'w', 'r', 'm', 've', 'o', 'wp', 'w10', 'wne', 'a', 'pic'}}
+    E = ElementMaker(namespace=dn['w'], nsmap=dn)
+    doc = E.document()
+    body = E.body()
+    doc.append(body)
+    width, height = PAPER_SIZES[opts.docx_page_size]
+    if opts.docx_custom_page_size is not None:
+        width, height = map(float, opts.docx_custom_page_size.partition('x')[0::2])
+    width, height = int(20 * width), int(20 * height)
+    def margin(which):
+        return w(which), str(int(getattr(opts, 'margin_'+which) * 20))
+    body.append(E.sectPr(
+        E.pgSz(**{w('w'):str(width), w('h'):str(height)}),
+        E.pgMar(**dict(map(margin, 'left top right bottom'.split()))),
+        E.cols(**{w('space'):'720'}),
+        E.docGrid(**{w('linePitch'):"360"}),
+    ))
+
+    dn = {k:v for k, v in namespaces.iteritems() if k in tuple('wra') + ('wp',)}
+    E = ElementMaker(namespace=dn['w'], nsmap=dn)
+    styles = E.styles(
+        E.docDefaults(
+            E.rPrDefault(
+                E.rPr(
+                    E.rFonts(**{w('asciiTheme'):"minorHAnsi", w('eastAsiaTheme'):"minorEastAsia", w('hAnsiTheme'):"minorHAnsi", w('cstheme'):"minorBidi"}),
+                    E.sz(**{w('val'):'22'}),
+                    E.szCs(**{w('val'):'22'}),
+                    E.lang(**{w('val'):'en-US', w('eastAsia'):"en-US", w('bidi'):"ar-SA"})
+                )
+            ),
+            E.pPrDefault(
+                E.pPr(
+                    E.spacing(**{w('after'):"0", w('line'):"276", w('lineRule'):"auto"})
+                )
+            )
+        )
+    )
+    return doc, styles, body
+
 
 def update_doc_props(root, mi):
     def setm(name, text=None, ns='dc'):
@@ -51,10 +94,10 @@ class DocumentRelationships(object):
 
     def __init__(self):
         self.rmap = {}
-        self.counter = 0
         for typ, target in {
                 STYLES: 'styles.xml',
                 WEB_SETTINGS: 'webSettings.xml',
+                FONTS: 'fontTable.xml',
         }.iteritems():
             self.add_relationship(target, typ)
 
@@ -64,10 +107,12 @@ class DocumentRelationships(object):
     def add_relationship(self, target, rtype, target_mode=None):
         ans = self.get_relationship_id(target, rtype, target_mode)
         if ans is None:
-            self.counter += 1
-            ans = 'rId%d' % self.counter
+            ans = 'rId%d' % (len(self.rmap) + 1)
             self.rmap[(target, rtype, target_mode)] = ans
         return ans
+
+    def add_image(self, target):
+        return self.add_relationship(target, IMAGES)
 
     def serialize(self):
         E = ElementMaker(namespace=namespaces['pr'], nsmap={None:namespaces['pr']})
@@ -84,6 +129,11 @@ class DOCX(object):
     def __init__(self, opts, log):
         self.opts, self.log = opts, log
         self.document_relationships = DocumentRelationships()
+        self.font_table = etree.Element('{%s}fonts' % namespaces['w'], nsmap={k:namespaces[k] for k in 'wr'})
+        E = ElementMaker(namespace=namespaces['pr'], nsmap={None:namespaces['pr']})
+        self.embedded_fonts = E.Relationships()
+        self.fonts = {}
+        self.images = {}
 
     # Boilerplate {{{
     @property
@@ -113,8 +163,13 @@ class DOCX(object):
         }.iteritems():
             added.add(ext)
             types.append(E.Default(Extension=ext, ContentType=mt))
-        # TODO: Iterate over all resources and add mimetypes for any that are
-        # not already added
+        for fname in self.images:
+            ext = fname.rpartition(os.extsep)[-1]
+            if ext not in added:
+                added.add(ext)
+                mt = guess_type('a.' + ext)[0]
+                if mt:
+                    types.append(E.Default(Extension=ext, ContentType=mt))
         return xml2str(types)
 
     @property
@@ -152,7 +207,7 @@ class DOCX(object):
 
     # }}}
 
-    def convert_metadata(self, oeb):
+    def convert_metadata(self, mi):
         E = ElementMaker(namespace=namespaces['cp'], nsmap={x:namespaces[x] for x in 'cp dc dcterms xsi'.split()})
         cp = E.coreProperties(E.revision("1"), E.lastModifiedBy('calibre'))
         ts = utcnow().isoformat(str('T')).rpartition('.')[0] + 'Z'
@@ -160,22 +215,31 @@ class DOCX(object):
             x = cp.makeelement('{%s}%s' % (namespaces['dcterms'], x), **{'{%s}type' % namespaces['xsi']:'dcterms:W3CDTF'})
             x.text = ts
             cp.append(x)
-        package = etree.Element(OPF('package'), attrib={'version': '2.0'}, nsmap={None: OPF2_NS})
-        oeb.metadata.to_opf2(package)
-        self.mi = ReadOPF(BytesIO(xml2str(package)), populate_spine=False, try_to_guess_cover=False).to_book_metadata()
+        self.mi = mi
         update_doc_props(cp, self.mi)
         return xml2str(cp)
 
-    def write(self, path_or_stream, oeb):
+    def create_empty_document(self, mi):
+        self.document, self.styles = create_skeleton(self.opts)[:2]
+
+    def write(self, path_or_stream, mi, create_empty_document=False):
+        if create_empty_document:
+            self.create_empty_document(mi)
         with ZipFile(path_or_stream, 'w') as zf:
             zf.writestr('[Content_Types].xml', self.contenttypes)
             zf.writestr('_rels/.rels', self.containerrels)
-            zf.writestr('docProps/core.xml', self.convert_metadata(oeb))
+            zf.writestr('docProps/core.xml', self.convert_metadata(mi))
             zf.writestr('docProps/app.xml', self.appproperties)
             zf.writestr('word/webSettings.xml', self.websettings)
             zf.writestr('word/document.xml', xml2str(self.document))
             zf.writestr('word/styles.xml', xml2str(self.styles))
+            zf.writestr('word/fontTable.xml', xml2str(self.font_table))
             zf.writestr('word/_rels/document.xml.rels', self.document_relationships.serialize())
+            zf.writestr('word/_rels/fontTable.xml.rels', xml2str(self.embedded_fonts))
+            for fname, data_getter in self.images.iteritems():
+                zf.writestr(fname, data_getter())
+            for fname, data in self.fonts.iteritems():
+                zf.writestr(fname, data)
 
 if __name__ == '__main__':
     d = DOCX(None, None)

@@ -33,20 +33,21 @@ def html_css_stylesheet():
     return _html_css_stylesheet
 
 
-INHERITED = set(['azimuth', 'border-collapse', 'border-spacing',
-                 'caption-side', 'color', 'cursor', 'direction', 'elevation',
-                 'empty-cells', 'font-family', 'font-size', 'font-style',
-                 'font-variant', 'font-weight', 'letter-spacing',
-                 'line-height', 'list-style-image', 'list-style-position',
-                 'list-style-type', 'orphans', 'page-break-inside',
-                 'pitch-range', 'pitch', 'quotes', 'richness', 'speak-header',
-                 'speak-numeral', 'speak-punctuation', 'speak', 'speech-rate',
-                 'stress', 'text-align', 'text-indent', 'text-transform',
-                 'visibility', 'voice-family', 'volume', 'white-space',
-                 'widows', 'word-spacing', 'text-shadow'])
+INHERITED = {
+    'azimuth', 'border-collapse', 'border-spacing', 'caption-side', 'color',
+    'cursor', 'direction', 'elevation', 'empty-cells', 'font-family',
+    'font-size', 'font-style', 'font-variant', 'font-weight', 'letter-spacing',
+    'line-height', 'list-style-image', 'list-style-position',
+    'list-style-type', 'orphans', 'page-break-inside', 'pitch-range', 'pitch',
+    'quotes', 'richness', 'speak-header', 'speak-numeral', 'speak-punctuation',
+    'speak', 'speech-rate', 'stress', 'text-align', 'text-indent',
+    'text-transform', 'visibility', 'voice-family', 'volume', 'white-space',
+    'widows', 'word-spacing', 'text-shadow',
+}
 
-FONT_SIZE_NAMES = set(['xx-small', 'x-small', 'small', 'medium', 'large',
-                       'x-large', 'xx-large'])
+FONT_SIZE_NAMES = {
+    'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
+}
 
 class Stylizer(object):
     STYLESHEETS = WeakKeyDictionary()
@@ -500,6 +501,40 @@ class Style(object):
             self._fontSize = result
         return self._fontSize
 
+    def img_dimension(self, attr, img_size):
+        ans = None
+        parent = self._get_parent()
+        if parent is not None:
+            base = getattr(parent, attr)
+        else:
+            base = getattr(self._profile, attr + '_pts')
+        x = self._style.get(attr)
+        if x is not None:
+            if x == 'auto':
+                ans = base
+            else:
+                x = self._unit_convert(x, base=base)
+                if isinstance(x, (float, int, long)):
+                    ans = x
+        if ans is None:
+            x = self._element.get(attr)
+            if x is not None:
+                x = self._unit_convert(x + 'px', base=base)
+                if isinstance(x, (float, int, long)):
+                    ans = x
+        if ans is None:
+            ans = self._unit_convert(str(img_size) + 'px', base=base)
+        maa = self._style.get('max-' + attr)
+        if maa is not None:
+            x = self._unit_convert(maa, base=base)
+            if isinstance(x, (int, float, long)) and (ans is None or x < ans):
+                ans = x
+        return ans
+
+    def img_size(self, width, height):
+        ' Return the final size of an <img> given that it points to an imafe of size widthxheight '
+        return self.img_dimension('width', width), self.img_dimension('height', height)
+
     @property
     def width(self):
         if self._width is None:
@@ -529,6 +564,13 @@ class Style(object):
                     self._width = result
 
         return self._width
+
+    @property
+    def parent_width(self):
+        parent = self._get_parent()
+        if parent is None:
+            return self.width
+        return parent.width
 
     @property
     def height(self):
@@ -604,22 +646,42 @@ class Style(object):
     @property
     def marginTop(self):
         return self._unit_convert(
-            self._get('margin-top'), base=self.height)
+            self._get('margin-top'), base=self.parent_width)
 
     @property
     def marginBottom(self):
         return self._unit_convert(
-            self._get('margin-bottom'), base=self.height)
+            self._get('margin-bottom'), base=self.parent_width)
+
+    @property
+    def marginLeft(self):
+        return self._unit_convert(
+            self._get('margin-left'), base=self.parent_width)
+
+    @property
+    def marginRight(self):
+        return self._unit_convert(
+            self._get('margin-right'), base=self.parent_width)
 
     @property
     def paddingTop(self):
         return self._unit_convert(
-            self._get('padding-top'), base=self.height)
+            self._get('padding-top'), base=self.parent_width)
 
     @property
     def paddingBottom(self):
         return self._unit_convert(
-            self._get('padding-bottom'), base=self.height)
+            self._get('padding-bottom'), base=self.parent_width)
+
+    @property
+    def paddingLeft(self):
+        return self._unit_convert(
+            self._get('padding-left'), base=self.parent_width)
+
+    @property
+    def paddingRight(self):
+        return self._unit_convert(
+            self._get('padding-right'), base=self.parent_width)
 
     def __str__(self):
         items = sorted(self._style.iteritems())

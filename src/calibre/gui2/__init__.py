@@ -990,7 +990,8 @@ class Application(QApplication):
             if not depth_ok:
                 prints('Color depth is less than 32 bits disabling modern look')
 
-        self.using_calibre_style = force_calibre_style or (depth_ok and gprefs['ui_style'] != 'system')
+        self.using_calibre_style = force_calibre_style or 'CALIBRE_IGNORE_SYSTEM_THEME' in os.environ or (
+            depth_ok and gprefs['ui_style'] != 'system')
         if self.using_calibre_style:
             self.load_calibre_style()
 
@@ -1288,15 +1289,3 @@ def event_type_name(ev_or_etype):
         if num == etype:
             return name
     return 'UnknownEventType'
-
-if islinux or isbsd:
-    def workaround_broken_under_mouse(ch):
-        import sip
-        from PyQt5.Qt import QCursor, QToolButton
-        # See https://bugreports.qt-project.org/browse/QTBUG-40233
-        if isinstance(ch, QToolButton) and not sip.isdeleted(ch):
-            ch.setAttribute(Qt.WA_UnderMouse, ch.rect().contains(ch.mapFromGlobal(QCursor.pos())))
-            ch.update()
-else:
-    workaround_broken_under_mouse = None
-

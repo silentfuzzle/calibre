@@ -25,11 +25,13 @@ Environment variables
 
     * ``CALIBRE_CONFIG_DIRECTORY`` - sets the directory where configuration files are stored/read.
     * ``CALIBRE_TEMP_DIR`` - sets the temporary directory used by calibre
+    * ``CALIBRE_CACHE_DIRECTORY`` - sets the directory calibre uses to cache persistent data between sessions
     * ``CALIBRE_OVERRIDE_DATABASE_PATH`` - allows you to specify the full path to metadata.db. Using this variable you can have metadata.db be in a location other than the library folder. Useful if your library folder is on a networked drive that does not support file locking.
     * ``CALIBRE_DEVELOP_FROM`` - Used to run from a calibre development environment. See :ref:`develop`.
     * ``CALIBRE_OVERRIDE_LANG`` - Used to force the language used by the interface (ISO 639 language code)
     * ``CALIBRE_NO_NATIVE_FILEDIALOGS`` - Causes calibre to not use native file dialogs for selecting files/directories. Set it to 1 to enable.
     * ``CALIBRE_NO_NATIVE_MENUBAR`` - Causes calibre to not create a native (global) menu on Ubuntu Unity and similar linux desktop environments. The menu is instead placed inside the window, as traditional.
+    * ``CALIBRE_IGNORE_SYSTEM_THEME`` - Causes calibre to ignore any system Qt style plugins and use its builtin style plugin instead. Useful to workaround crashes caused by the system Qt plugin being incompatible with the version of Qt shipped with calibre.
     * ``SYSFS_PATH`` - Use if sysfs is mounted somewhere other than /sys
     * ``http_proxy`` - Used on linux to specify an HTTP proxy
 
