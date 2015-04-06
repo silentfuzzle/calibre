@@ -7,6 +7,7 @@ __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
 import os
+from PyQt5.QtWidgets import QMessageBox
 from PyQt5.Qt import (Qt, QWebView, QWidget, QToolButton, QHBoxLayout, QSizePolicy, pyqtSlot)
 from calibre.ebooks.oeb.display.webview import load_html
 from calibre.gui2.viewer.toc import TOCSearch
@@ -113,8 +114,14 @@ class TOCNetworkView (QWebView):
         
     # Clears all the links from the network
     def clear_network(self):
-        self.ebook_network.refresh_network()
-        self.create_toc_network(-2)
+        reply = QMessageBox.question(self, 'Confirm Clear All Links', 
+                'This action will remove all the links in this e-book\'s network and can\'t be undone. Are you sure you want to proceed?', 
+                QMessageBox.Yes | QMessageBox.No, 
+                QMessageBox.No)
+                
+        if reply == QMessageBox.Yes:
+            self.ebook_network.refresh_network()
+            self.create_toc_network(-2)
                 
     # Searches through the titles of the nodes in the network for the given search term
     # text (string) - the text to search for
