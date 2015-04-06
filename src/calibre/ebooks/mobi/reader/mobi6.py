@@ -385,8 +385,7 @@ class MobiReader(object):
         svg_tags = []
         forwardable_anchors = []
         pagebreak_anchors = []
-        BLOCK_TAGS = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-                                'div', 'p'}
+        BLOCK_TAGS = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'p'}
         for i, tag in enumerate(root.iter(etree.Element)):
             tag.attrib.pop('xmlns', '')
             for x in tag.attrib:
@@ -524,8 +523,8 @@ class MobiReader(object):
                     attrib['href'] = "#filepos%d" % int(filepos)
                 except ValueError:
                     pass
-            if (tag.tag == 'a' and attrib.get('id', '').startswith('filepos')
-                    and not tag.text and len(tag) == 0 and (tag.tail is None or not
+            if (tag.tag == 'a' and attrib.get('id', '').startswith('filepos') and
+                    not tag.text and len(tag) == 0 and (tag.tail is None or not
                         tag.tail.strip()) and getattr(tag.getnext(), 'tag',
                             None) in BLOCK_TAGS):
                 # This is an empty anchor immediately before a block tag, move
@@ -582,6 +581,10 @@ class MobiReader(object):
                 block.insert(0, tag)
             else:
                 block.attrib['id'] = tag.attrib['id']
+
+        # WebKit fails to navigate to anchors located on <br> tags
+        for br in root.xpath('/body/br[@id]'):
+            br.tag = 'div'
 
     def get_left_whitespace(self, tag):
 

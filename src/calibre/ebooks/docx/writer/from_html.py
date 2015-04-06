@@ -8,14 +8,13 @@ __copyright__ = '2013, Kovid Goyal <kovid at kovidgoyal.net>'
 
 import re
 
-from lxml import etree
-from lxml.builder import ElementMaker
-
-from calibre.ebooks.docx.names import namespaces
+from calibre.ebooks.docx.writer.container import create_skeleton
 from calibre.ebooks.docx.writer.styles import w, StylesManager
+from calibre.ebooks.docx.writer.images import ImagesManager
+from calibre.ebooks.docx.writer.fonts import FontsManager
+from calibre.ebooks.docx.writer.tables import Table
 from calibre.ebooks.oeb.stylizer import Stylizer as Sz, Style as St
 from calibre.ebooks.oeb.base import XPath, barename
-from calibre.ebooks.pdf.render.common import PAPER_SIZES
 
 class Style(St):
 
@@ -65,6 +64,9 @@ class TextRun(object):
     def add_break(self, clear='none'):
         self.texts.append((None, clear))
 
+    def add_image(self, drawing):
+        self.texts.append((drawing, None))
+
     def serialize(self, p):
         r = p.makeelement(w('r'))
         p.append(r)
@@ -74,6 +76,8 @@ class TextRun(object):
         for text, preserve_whitespace in self.texts:
             if text is None:
                 r.append(r.makeelement(w('br'), **{w('clear'):preserve_whitespace}))
+            elif hasattr(text, 'xpath'):
+                r.append(text)
             else:
                 t = r.makeelement(w('t'))
                 r.append(t)
@@ -90,16 +94,17 @@ class TextRun(object):
 
 class Block(object):
 
-    def __init__(self, styles_manager, html_block, style, is_first_block=False):
+    def __init__(self, styles_manager, html_block, style):
         self.html_block = html_block
         self.html_style = style
-        self.style = styles_manager.create_block_style(style, html_block, is_first_block=is_first_block)
+        self.style = styles_manager.create_block_style(style, html_block)
         self.styles_manager = styles_manager
         self.keep_next = False
+        self.page_break_before = False
         self.runs = []
 
-    def add_text(self, text, style, ignore_leading_whitespace=False, html_parent=None):
-        ts = self.styles_manager.create_text_style(style)
+    def add_text(self, text, style, ignore_leading_whitespace=False, html_parent=None, is_parent_style=False):
+        ts = self.styles_manager.create_text_style(style, is_parent_style=is_parent_style)
         ws = style['white-space']
         if self.runs and ts == self.runs[-1].style:
             run = self.runs[-1]
@@ -124,6 +129,14 @@ class Block(object):
             self.runs.append(run)
         run.add_break(clear=clear)
 
+    def add_image(self, drawing):
+        if self.runs:
+            run = self.runs[-1]
+        else:
+            run = TextRun(self.styles_manager.create_text_style(self.html_style), self.html_block)
+            self.runs.append(run)
+        run.add_image(drawing)
+
     def serialize(self, body):
         p = body.makeelement(w('p'))
         body.append(p)
@@ -131,6 +144,8 @@ class Block(object):
         p.append(ppr)
         if self.keep_next:
             ppr.append(ppr.makeelement(w('keepNext')))
+        if self.page_break_before:
+            ppr.append(ppr.makeelement(w('pageBreakBefore')))
         ppr.append(ppr.makeelement(w('pStyle'), **{w('val'):self.style.id}))
         for run in self.runs:
             run.serialize(p)
@@ -141,131 +156,193 @@ class Block(object):
                 return False
         return True
 
+class Blocks(object):
+
+    def __init__(self, styles_manager):
+        self.styles_manager = styles_manager
+        self.all_blocks = []
+        self.pos = 0
+        self.current_block = None
+        self.items = []
+        self.tables = []
+        self.current_table = None
+        self.open_html_blocks = set()
+
+    def current_or_new_block(self, html_tag, tag_style):
+        return self.current_block or self.start_new_block(html_tag, tag_style)
+
+    def end_current_block(self):
+        if self.current_block is not None:
+            self.all_blocks.append(self.current_block)
+            if self.current_table is not None:
+                self.current_table.add_block(self.current_block)
+            else:
+                self.block_map[self.current_block] = len(self.items)
+                self.items.append(self.current_block)
+        self.current_block = None
+
+    def start_new_block(self, html_block, style):
+        self.end_current_block()
+        self.current_block = Block(self.styles_manager, html_block, style)
+        self.open_html_blocks.add(html_block)
+        return self.current_block
+
+    def start_new_table(self, html_tag, tag_style=None):
+        self.current_table = Table(html_tag, tag_style)
+        self.tables.append(self.current_table)
+
+    def start_new_row(self, html_tag, tag_style):
+        if self.current_table is None:
+            self.start_new_table(html_tag)
+        self.current_table.start_new_row(html_tag, tag_style)
+
+    def start_new_cell(self, html_tag, tag_style):
+        if self.current_table is None:
+            self.start_new_table(html_tag)
+        self.current_table.start_new_cell(html_tag, tag_style)
+
+    def finish_tag(self, html_tag):
+        if self.current_block is not None and html_tag in self.open_html_blocks:
+            self.end_current_block()
+            self.open_html_blocks.discard(html_tag)
+
+        if self.current_table is not None:
+            table_finished = self.current_table.finish_tag(html_tag)
+            if table_finished:
+                table = self.tables[-1]
+                del self.tables[-1]
+                if self.tables:
+                    self.current_table = self.tables[-1]
+                    self.current_table.add_table(table)
+                else:
+                    self.current_table = None
+                    self.block_map[table] = len(self.items)
+                    self.items.append(table)
+
+    def serialize(self, body):
+        for item in self.items:
+            item.serialize(body)
+
+    def __enter__(self):
+        self.pos = len(self.all_blocks)
+        self.block_map = {}
+
+    def __exit__(self, *args):
+        if self.current_block is not None:
+            self.all_blocks.append(self.current_block)
+        self.current_block = None
+        if len(self.all_blocks) > self.pos and self.all_blocks[self.pos].is_empty():
+            # Delete the empty block corresponding to the <body> tag when the
+            # body tag has no inline content before its first sub-block
+            block = self.all_blocks[self.pos]
+            del self.all_blocks[self.pos]
+            del self.items[self.block_map.pop(block)]
+        if self.pos > 0 and self.pos < len(self.all_blocks):
+            # Insert a page break corresponding to the start of the html file
+            self.all_blocks[self.pos].page_break_before = True
+
 class Convert(object):
 
     def __init__(self, oeb, docx):
         self.oeb, self.docx = oeb, docx
         self.log, self.opts = docx.log, docx.opts
 
-        self.blocks = []
-
     def __call__(self):
         from calibre.ebooks.oeb.transforms.rasterize import SVGRasterizer
-        SVGRasterizer()(self.oeb, self.opts)
+        self.svg_rasterizer = SVGRasterizer()
+        self.svg_rasterizer(self.oeb, self.opts)
 
         self.styles_manager = StylesManager()
+        self.images_manager = ImagesManager(self.oeb, self.docx.document_relationships)
+        self.fonts_manager = FontsManager(self.oeb, self.opts)
+        self.blocks = Blocks(self.styles_manager)
 
         for item in self.oeb.spine:
             self.process_item(item)
 
-        self.styles_manager.finalize(self.blocks)
+        self.styles_manager.finalize(self.blocks.all_blocks)
         self.write()
 
     def process_item(self, item):
-        stylizer = Stylizer(item.data, item.href, self.oeb, self.opts, self.opts.output_profile)
+        stylizer = self.svg_rasterizer.stylizer_cache.get(item)
+        if stylizer is None:
+            stylizer = Stylizer(item.data, item.href, self.oeb, self.opts, self.opts.output_profile)
+        self.abshref = self.images_manager.abshref = item.abshref
 
-        is_first_block = True
-        for body in XPath('//h:body')(item.data):
-            b = Block(self.styles_manager, body, stylizer.style(body), is_first_block=is_first_block)
-            self.blocks.append(b)
-            is_first_block = False
-            self.process_block(body, b, stylizer, ignore_tail=True)
-        if self.blocks and self.blocks[0].is_empty():
-            del self.blocks[0]
+        for i, body in enumerate(XPath('//h:body')(item.data)):
+            with self.blocks:
+                self.process_tag(body, stylizer, is_first_tag=i == 0)
 
-    def process_block(self, html_block, docx_block, stylizer, ignore_tail=False):
-        block_style = stylizer.style(html_block)
-        if block_style.is_hidden:
+    def process_tag(self, html_tag, stylizer, is_first_tag=False):
+        tagname = barename(html_tag.tag)
+        if tagname in {'script', 'style', 'title', 'meta'}:
             return
-        if html_block.text:
-            docx_block.add_text(html_block.text, block_style, ignore_leading_whitespace=True)
-
-        for child in html_block.iterchildren(etree.Element):
-            tag = barename(child.tag)
-            style = stylizer.style(child)
-            display = style._get('display')
-            if tag == 'img':
-                pass  # TODO: Handle images
-            if display == 'block' and tag != 'br':
-                b = Block(self.styles_manager, child, style)
-                self.blocks.append(b)
-                self.process_block(child, b, stylizer)
-            else:
-                self.process_inline(child, self.blocks[-1], stylizer)
-
-        if ignore_tail is False and html_block.tail and html_block.tail.strip():
-            b = docx_block
-            if b is not self.blocks[-1]:
-                b = Block(self.styles_manager, html_block, block_style)
-                self.blocks.append(b)
-            b.add_text(html_block.tail, stylizer.style(html_block.getparent()))
-        if block_style['page-break-after'] == 'avoid':
-            self.blocks[-1].keep_next = True
-
-    def process_inline(self, html_child, docx_block, stylizer):
-        tag = barename(html_child.tag)
-        style = stylizer.style(html_child)
-        if style.is_hidden:
+        tag_style = stylizer.style(html_tag)
+        if tag_style.is_hidden:
             return
-        if tag == 'br':
-            if html_child.tail or html_child is not html_child.getparent()[-1]:
-                docx_block.add_break(clear={'both':'all', 'left':'left', 'right':'right'}.get(style['clear'], 'none'))
-        elif tag == 'img':
-            return  # TODO: Handle images
+        display = tag_style._get('display')
+        if display in {'inline', 'inline-block'} or tagname == 'br':  # <br> has display:block but we dont want to start a new paragraph
+            self.add_inline_tag(tagname, html_tag, tag_style, stylizer)
+        elif display == 'list-item':
+            # TODO: Implement this
+            self.add_block_tag(tagname, html_tag, tag_style, stylizer)
+        elif display.startswith('table') or display == 'inline-table':
+            if display == 'table-cell':
+                self.blocks.start_new_cell(html_tag, tag_style)
+                self.add_block_tag(tagname, html_tag, tag_style, stylizer)
+            elif display == 'table-row':
+                self.blocks.start_new_row(html_tag, tag_style)
+            elif display in {'table', 'inline-table'}:
+                self.blocks.start_new_table(html_tag, tag_style)
         else:
-            if html_child.text:
-                docx_block.add_text(html_child.text, style, html_parent=html_child)
-            for child in html_child.iterchildren(etree.Element):
-                style = stylizer.style(child)
-                display = style.get('display', 'inline')
-                if display == 'block':
-                    b = Block(self.styles_manager, child, style)
-                    self.blocks.append(b)
-                    self.process_block(child, b, stylizer)
-                else:
-                    self.process_inline(child, self.blocks[-1], stylizer)
+            if tagname == 'img' and tag_style['float'] in {'left', 'right'}:
+                # Image is floating so dont start a new paragraph for it
+                self.add_inline_tag(tagname, html_tag, tag_style, stylizer)
+            else:
+                self.add_block_tag(tagname, html_tag, tag_style, stylizer)
 
-        if html_child.tail:
-            self.blocks[-1].add_text(html_child.tail, stylizer.style(html_child.getparent()), html_parent=html_child.getparent())
+        for child in html_tag.iterchildren('*'):
+            self.process_tag(child, stylizer)
+
+        is_block = html_tag in self.blocks.open_html_blocks
+        self.blocks.finish_tag(html_tag)
+        if is_block and tag_style['page-break-after'] == 'avoid':
+            self.blocks.all_blocks[-1].keep_next = True
+
+        if display == 'table-row':
+            return  # We ignore the tail for these tags
+
+        if not is_first_tag and html_tag.tail and (not is_block or not html_tag.tail.isspace()):
+            # Ignore trailing space after a block tag, as otherwise it will
+            # become a new empty paragraph
+            block = self.blocks.current_or_new_block(html_tag.getparent(), stylizer.style(html_tag.getparent()))
+            block.add_text(html_tag.tail, stylizer.style(html_tag.getparent()), is_parent_style=True)
+
+    def add_block_tag(self, tagname, html_tag, tag_style, stylizer):
+        block = self.blocks.start_new_block(html_tag, tag_style)
+        if tagname == 'img':
+            self.images_manager.add_image(html_tag, block, stylizer)
+        else:
+            if html_tag.text:
+                block.add_text(html_tag.text, tag_style, ignore_leading_whitespace=True, is_parent_style=True)
+
+    def add_inline_tag(self, tagname, html_tag, tag_style, stylizer):
+        if tagname == 'br':
+            if html_tag.tail or html_tag is not tuple(html_tag.getparent().iterchildren('*'))[-1]:
+                block = self.blocks.current_or_new_block(html_tag.getparent(), stylizer.style(html_tag.getparent()))
+                block.add_break(clear={'both':'all', 'left':'left', 'right':'right'}.get(tag_style['clear'], 'none'))
+        elif tagname == 'img':
+            block = self.blocks.current_or_new_block(html_tag.getparent(), stylizer.style(html_tag.getparent()))
+            self.images_manager.add_image(html_tag, block, stylizer)
+        else:
+            if html_tag.text:
+                block = self.blocks.current_or_new_block(html_tag.getparent(), stylizer.style(html_tag.getparent()))
+                block.add_text(html_tag.text, tag_style, is_parent_style=False)
 
     def write(self):
-        dn = {k:v for k, v in namespaces.iteritems() if k in {'w', 'r', 'm', 've', 'o', 'wp', 'w10', 'wne'}}
-        E = ElementMaker(namespace=dn['w'], nsmap=dn)
-        self.docx.document = doc = E.document()
-        body = E.body()
-        doc.append(body)
-        for block in self.blocks:
-            block.serialize(body)
-        width, height = PAPER_SIZES[self.opts.docx_page_size]
-        if self.opts.docx_custom_page_size is not None:
-            width, height = map(float, self.opts.docx_custom_page_size.partition('x')[0::2])
-        width, height = int(20 * width), int(20 * height)
-        def margin(which):
-            return w(which), str(int(getattr(self.opts, 'margin_'+which) * 20))
-        body.append(E.sectPr(
-            E.pgSz(**{w('w'):str(width), w('h'):str(height)}),
-            E.pgMar(**dict(map(margin, 'left top right bottom'.split()))),
-            E.cols(**{w('space'):'720'}),
-            E.docGrid(**{w('linePitch'):"360"}),
-        ))
-
-        dn = {k:v for k, v in namespaces.iteritems() if k in 'wr'}
-        E = ElementMaker(namespace=dn['w'], nsmap=dn)
-        self.docx.styles = E.styles(
-            E.docDefaults(
-                E.rPrDefault(
-                    E.rPr(
-                        E.rFonts(**{w('asciiTheme'):"minorHAnsi", w('eastAsiaTheme'):"minorEastAsia", w('hAnsiTheme'):"minorHAnsi", w('cstheme'):"minorBidi"}),
-                        E.sz(**{w('val'):'22'}),
-                        E.szCs(**{w('val'):'22'}),
-                        E.lang(**{w('val'):'en-US', w('eastAsia'):"en-US", w('bidi'):"ar-SA"})
-                    )
-                ),
-                E.pPrDefault(
-                    E.pPr(
-                        E.spacing(**{w('after'):"0", w('line'):"276", w('lineRule'):"auto"})
-                    )
-                )
-            )
-        )
+        self.docx.document, self.docx.styles, body = create_skeleton(self.opts)
+        self.blocks.serialize(body)
+        body.append(body[0])  # Move <sectPr> to the end
         self.styles_manager.serialize(self.docx.styles)
+        self.images_manager.serialize(self.docx.images)
+        self.fonts_manager.serialize(self.styles_manager.text_styles, self.docx.font_table, self.docx.embedded_fonts, self.docx.fonts)
