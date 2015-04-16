@@ -41,7 +41,7 @@ class NetworkTOCContainer(TOCContainer):
         ebook_network = EBookNetwork(toc_sections.spine, toc_sections.toc, title, pathtoebook)
         self.toc.set_ebook_network(ebook_network)
         self.toc_sections = toc_sections
-        self.history_offset = 0
+        self.history_offset = -3
 
     # Saves the ebook network to a JSON file before closing the ebook
     def close_ebook(self):

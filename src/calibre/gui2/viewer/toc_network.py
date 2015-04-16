@@ -99,7 +99,7 @@ class TOCNetworkView (QWebView):
         self.loaded = True
         self.page().mainFrame().addToJavaScriptWindowObject("container", self)
         if (self.curr_page != -1 and self.toc_created == False):
-            self.create_toc_network(0)
+            self.create_toc_network(-3)
             
     # Stores a new edge to add to the network
     # start_sec (SpineItem) - the source node
@@ -149,6 +149,7 @@ class TOCNetworkView (QWebView):
     #      1 - the user navigated to the next section in their history
     #      -1 - the user navigated to the previous section in their history
     #      -2 - the user navigated to another section without adding to their history
+    #      -3 - the user opened a new ebook
     def create_toc_network(self, history_offset):
         jScript = """dataLoaded({jsonCode}, {page}, {offset}); """
         jScriptFormat = jScript.format(jsonCode=str(self.ebook_network.data), 
@@ -163,6 +164,7 @@ class TOCNetworkView (QWebView):
     #      1 - the user navigated to the next section in their history
     #      -1 - the user navigated to the previous section in their history
     #      -2 - the user navigated to another section without adding to their history
+    #      -3 - the user opened a new ebook
     def set_curr_page(self, page, history_offset):
         self.curr_page = page
         if (self.loaded):

@@ -111,8 +111,8 @@ var zoomListener = d3.behavior.zoom()
   .on("zoom", redraw);
 
 // Stores the history of positions the user has navigated to
-var history = new DoubleList();
-var linkColorer = new LinkColorer();
+var history;
+var linkColorer;
 
 ///////////////////////////////////////////////////////////////////////////////
 //CALLED FROM PYTHON
@@ -126,13 +126,14 @@ var linkColorer = new LinkColorer();
 //      1 - the user navigated to the next section in their history
 //      -1 - the user navigated to the previous section in their history
 //      -2 - the user navigated to another section without adding to their history
+//      -3 - the user opened a new ebook
 function dataLoaded(data, pageNum, historyOffset) {
     var links = data.links;
     var nodes = data.nodes;
     numLinks = links.length;
     
     var nodeDictionary = new Object();
-    if (node != 0) {
+    if (node != 0 && historyOffset != -3) {
         // The user has created a new link, prepare to reload the network
         force.stop();
         
@@ -162,10 +163,13 @@ function dataLoaded(data, pageNum, historyOffset) {
             }
             n.r = nodeDefaultRadius;
             n.topacity = defaultOpacity;
-            linkColorer.updateMinNodeID(n.id);
         });
     }
     else {
+        if (historyOffset == -3) {
+            linkColorer = new LinkColorer();
+        }
+        
         // Set the default value for nodes when the network is initialized for the first time
         nodes.forEach(function(n) {
             n.r = nodeDefaultRadius;
@@ -279,7 +283,8 @@ function dataLoaded(data, pageNum, historyOffset) {
 //      1 - the user navigated to the next section in their history
 //      -1 - the user navigated to the previous section in their history
 //      -2 - the user navigated to another section without adding to their history
-function changePage(pageNum, historyOffset) {    
+//      -3 - the user opened a new ebook
+function changePage(pageNum, historyOffset) {
     // Update the user's position in their history
     var currNode = null;
     if (historyOffset == 0) {
@@ -291,8 +296,12 @@ function changePage(pageNum, historyOffset) {
     else if (historyOffset == -1) {
         currNode = history.prevNode(pageNum);
     }
-    else {
+    else if (historyOffset == -2) {
         currNode = history.replaceNode(pageNum);
+    }
+    else {
+        history = new DoubleList();
+        currNode = history.addNode(pageNum);
     }
     
     // Color the links, titles, and nodes
