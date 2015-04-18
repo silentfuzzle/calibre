@@ -360,6 +360,7 @@ class Boss(QObject):
     @in_thread_job
     def delete_requested(self, spine_items, other_items):
         self.add_savepoint(_('Before: Delete files'))
+        self.commit_dirty_opf()
         c = current_container()
         c.remove_from_spine(spine_items)
         for name in other_items:
@@ -379,6 +380,8 @@ class Boss(QObject):
             toc = find_existing_toc(current_container())
             if toc and toc in editors:
                 editors[toc].replace_data(c.raw_data(toc))
+        if c.opf_name in editors:
+            editors[c.opf_name].replace_data(c.raw_data(c.opf_name))
 
     def commit_dirty_opf(self):
         c = current_container()
@@ -927,7 +930,8 @@ class Boss(QObject):
             f.write(ed.data)
         if name == container.opf_name:
             container.refresh_mime_map()
-            set_book_locale(container.mi.language)
+            lang = container.opf_xpath('//dc:language/text()') or [self.current_metadata.language]
+            set_book_locale(lang[0])
         if container is current_container():
             ed.is_synced_to_container = True
             if name == container.opf_name:
@@ -1165,6 +1169,9 @@ class Boss(QObject):
         self.gui.image_browser.raise_()
 
     def show_reports(self):
+        if current_container() is None:
+            return error_dialog(self.gui, _('No book open'), _(
+                'You must first open a book in order to see the report.'), show=True)
         self.gui.reports.refresh()
         self.gui.reports.show()
         self.gui.reports.raise_()
