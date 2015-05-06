@@ -60,13 +60,17 @@ class NetworkTOCContainer(TOCContainer):
             # Don't add an edge if the user skipped sections in the book using the scrollbar or position label
             if (next_index == curr_index + 1 or next_index == curr_index - 1):
                 self.update_connection(self.toc_sections.corrected_curr_sec, 
-                        next_sec, True)
+                        next_sec, True, EBookNetwork.SCROLL_LINK)
 
     # Adds an edge to the ebook network
     # start_sec (SpineItem) - the node/section to start the edge from
     # end_sec (string) - the node/section to end the edge at
-    # start_sec_checked (boolean) - true if the passed start section was already checked for existence in the ebook's TOC
-    def update_connection(self, start_sec, end_sec, start_sec_checked=False):
+    # start_sec_checked (boolean) - true if the passed start section was already checked for in the TOC
+    # link_type (string) - A string representing the type of link to create
+    #       "hyperlink" - A link representing a hyperlink between sections
+    #       "scroll" - A link representing that the user can scroll between sections
+    def update_connection(self, start_sec, end_sec, start_sec_checked=False, 
+            link_type=EBookNetwork.HYPERLINK_LINK):
         # Get the TOC and SpineItem entries for the passed end section
         end_toc, corrected_end_sec = self.toc_sections.check_and_get_toc(end_sec)
         
@@ -76,7 +80,8 @@ class NetworkTOCContainer(TOCContainer):
         
         # Add an edge to the network
         if (corrected_end_sec != start_sec):
-            self.toc.add_edge(start_sec, corrected_end_sec)
+            print(link_type)
+            self.toc.add_edge(start_sec, corrected_end_sec, link_type)
                  
     # Update the user's position and history in the network view
     # curr_index (int) - the position if the current section in the spine

@@ -8,6 +8,8 @@ from networkx.readwrite.json_graph import node_link
 
 # This class stores data to display in the TOCNetworkView
 class EBookNetwork (object):
+    SCROLL_LINK = "scroll"
+    HYPERLINK_LINK = "hyperlink"
 
     # Constructor
     # toc_sections (TOCSections) - a object that determines how the HTML files of the ebook are grouped
@@ -72,24 +74,34 @@ class EBookNetwork (object):
     # Add an edge from a start to an end node/section
     # start_page (float) - the first page of the start section
     # end_page (float) - the first page of the end section
-    def add_edge(self, start_page, end_page):
-        if (str(end_page) in self.bookGraph[str(start_page)]):
-            # Don't add an edge if it already exists
-            return False
-        else:
-            if (str(end_page) not in self.bookGraph.node or 
-                    str(start_page) not in self.bookGraph.node):
-                # The JSON or e-book has been modified, regenerate the graph of nodes
-                old_edges = self.bookGraph.edges()
-                self.generate_network()
+    # link_type (string) - A string representing the type of link to create
+    #       "hyperlink" - A link representing a hyperlink between sections
+    #       "scroll" - A link representing that the user can scroll between sections
+    def add_edge(self, start_page, end_page, link_type):
+        str_start_page = str(start_page)
+        str_end_page = str(end_page)
+        
+        if (str_end_page not in self.bookGraph.node or 
+                str_start_page not in self.bookGraph.node):
+            # The JSON or e-book has been modified, regenerate the graph of nodes
+            old_edges = self.bookGraph.edges()
+            self.generate_network()
+            self.bookGraph.add_edges_from(old_edges)
+            
+        if (str_end_page in self.bookGraph[str_start_page]):
+            if (self.bookGraph[str_start_page][str_end_page]['type'] == EBookNetwork.SCROLL_LINK and
+                    link_type == EBookNetwork.HYPERLINK_LINK):
+                # Allow "scroll" type links to be replaced with "hyperlink" type links
+                self.bookGraph.remove_edge(str_start_page, str_end_page)
+            else:
+                # Don't add an edge if it already exists
+                return False
                 
-                # Add the edges the user created to the new network
-                self.bookGraph.add_edges_from(old_edges)
-                
-            # Add an edge from the start to the end node
-            self.bookGraph.add_edge(str(start_page), str(end_page))
-            self.update_network()
-            return True
+        # Add an edge from the start to the end node
+        self.bookGraph.add_edge(str_start_page, str_end_page,
+                type=link_type)
+        self.update_network()
+        return True
             
     # Generate a new network of nodes
     def refresh_network(self):

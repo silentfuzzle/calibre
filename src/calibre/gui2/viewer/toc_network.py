@@ -105,8 +105,12 @@ class TOCNetworkView (QWebView):
     # Stores a new edge to add to the network
     # start_sec (SpineItem) - the source node
     # end_sec (SpineItem) - the target node
-    def add_edge(self, start_sec, end_sec):
-        edge_added = self.ebook_network.add_edge(start_sec.start_page, end_sec.start_page)
+    # link_type (string) - A string representing the type of link to create
+    #       "hyperlink" - A link representing a hyperlink between sections
+    #       "scroll" - A link representing that the user can scroll between sections
+    def add_edge(self, start_sec, end_sec, link_type):
+        edge_added = self.ebook_network.add_edge(start_sec.start_page, 
+                end_sec.start_page, link_type)
         
         # Add the new edge to the network display
         if (edge_added):

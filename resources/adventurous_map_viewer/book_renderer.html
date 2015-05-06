@@ -19,6 +19,10 @@ fill: #666;
 fill: red;
 }
 
+.link.scroll {
+stroke-dasharray: 0,2 1;
+}
+
 .node circle { 
 stroke: #fff; 
 opacity: 0.3;
@@ -219,11 +223,12 @@ function dataLoaded(data, pageNum, historyOffset) {
     // Create an object that stores all links added to the network
     // "marker-end" - associates a triangle with a link to create a directed arrow
     // .style - used for resizing the links as the user zooms in or out of the network
-    // .attr("class", "link") - sets the .link css attributes to links
+    // .attr("class", ...) - sets the .link css attributes to links
+    //                     - sets the .link.scroll attributes to links of type "scroll"
     link = vis.selectAll("path")
         .data(force.links())
       .enter().append("g")
-        .attr("class", "link")
+        .attr("class", function(d) { return "link " + d.type; })
         .attr("marker-end", "url(#default)")
         .attr("tpage", function(d) { return d.target.id; })
         .attr("spage", function(d) { return d.source.id; })
