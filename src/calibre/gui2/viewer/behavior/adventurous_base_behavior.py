@@ -42,7 +42,6 @@ class BaseAdventurousBehavior (BaseBehavior):
     def calculate_page_label(self, frac):
         section_position = frac*float(self.get_section_pages(self.curr_sec))
         self.absolute_position = self.curr_sec.start_page + section_position
-        print (self.absolute_position)
         return section_position + 1
             
     # Moves the user to the passed page number using the passed method
