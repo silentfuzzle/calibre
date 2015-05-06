@@ -37,20 +37,16 @@ class TOCSections (object):
     # curr_sec (SpineItem) - the currect section being viewed
     def set_curr_sec(self, curr_index, curr_sec):
         curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)
-        if (self.curr_section is None):
-            self.curr_section = self.get_curr_sec(curr_index, curr_toc)
-            return True
-            
-        if (self.curr_section.includes_section(curr_index) == False):
-            self.curr_section = self.get_curr_sec(curr_index, curr_toc)
-            
+        if (self.curr_section is None or 
+                self.curr_section.includes_section(curr_index) == False):
+            self.curr_section = self.get_section(curr_index, curr_toc)
             return True
         return False
         
     # Return the section that contains the given index
     # curr_index (int) - the index of the current section in the spine
     # curr_toc (calibre.ebooks.metadata.toc.TOC) - the TOC entry of the current section
-    def get_curr_sec(self, curr_index, curr_toc):
+    def get_section(self, curr_index, curr_toc=None):
     
         # Check if the entry appears in any sections that have been calculated already
         done = False
@@ -65,6 +61,11 @@ class TOCSections (object):
         if done:
             return sec
         else:
+            if (curr_toc is None):
+                # Find the TOC entry for this file if it hasn't been found
+                curr_sec = self.spine[curr_index]
+                curr_toc, curr_sec = self.check_and_get_toc(curr_sec)
+            
             # Calculate the section containing the file
             toc_section = self.find_include_sections(curr_toc)
             self.toc_sections.append(toc_section)

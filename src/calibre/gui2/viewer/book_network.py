@@ -10,14 +10,12 @@ from networkx.readwrite.json_graph import node_link
 class EBookNetwork (object):
 
     # Constructor
-    # spine - (List(SpineItem)) the current ebook's ordering of sections
-    # toc - (calibre.ebooks.metadata.toc.TOC) the current ebook's TOC
+    # toc_sections (TOCSections) - a object that determines how the HTML files of the ebook are grouped
     # title (string) - the title of the ebook
     # basedir (string) - the full path to the ebook's location
-    def __init__(self, spine, toc, title, basedir):
-        self.savePath = str(os.path.dirname(basedir)) + "/" + str(title) + "Network.json"
-        self.toc = toc
-        self.spine = spine
+    def __init__(self, toc_sections, title, basedir):
+        self.savePath = str(os.path.dirname(basedir)) + "/" + str(title) + " Network.json"
+        self.toc_sections = toc_sections
         
         # Stores the users last search
         self.start_search = 0
@@ -100,13 +98,23 @@ class EBookNetwork (object):
                 
     # Generate a new network of nodes from sections in the TOC
     def generate_network(self):
+        spine = self.toc_sections.spine
+        first_section = self.toc_sections.get_section(0)
         self.bookGraph = digraph.DiGraph()
-        for t in self.toc.flat():
-            if (t.parent is not None and t.abspath in self.spine):
-                spine_index = self.spine.index(t.abspath)
-                self.bookGraph.add_node(str(self.spine[spine_index].start_page),
-                        label=str(self.spine[spine_index].start_page),
-                        title=t.text)
+        for t in self.toc_sections.toc.flat():
+            if (t.parent is not None and t.abspath in spine):
+            
+                # Mark nodes that are scrollable from the beginning of the book
+                spine_index = spine.index(t.abspath)
+                in_first = first_section.includes_section(spine_index)
+                node_type = 2
+                if (in_first):
+                    node_type = 1
+                    
+                self.bookGraph.add_node(str(spine[spine_index].start_page),
+                        label=str(spine[spine_index].start_page),
+                        title=t.text,
+                        type=node_type)
             
     # Updates the network JSON data with newly added/removed links
     def update_network(self):

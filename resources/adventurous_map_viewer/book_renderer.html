@@ -65,6 +65,7 @@ var nodeDefaultRadius = 8;
 var nodeMaxRadius = nodeDefaultRadius * growthFactor;
 var nodeDefaultColor = "#3182bd";
 var nodeHighlightColor = "#FF0000";
+var nodeBeginColor = "green";
 
 var straightLinks = false;
 var maxHighlightLinks = 5;
@@ -463,6 +464,10 @@ function colorNodes(currPage) {
                 setEndpointTextOpacity(d3.select(l));
             });
         } 
+        else if (n.type == 1) {
+            // Emphasize nodes at the beginning of the book
+            d3.select(this).select("circle").style("fill", nodeBeginColor);
+        }
         else {
             d3.select(this).select("circle").style("fill", nodeDefaultColor);
         }
