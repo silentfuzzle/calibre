@@ -12,7 +12,6 @@ from PyQt5.Qt import (
     QPropertyAnimation, QUrl, QInputDialog, QAction, QVBoxLayout, QWidget)
 
 from calibre.gui2.viewer.ui import Main as MainWindow
-from calibre.gui2.viewer.printing import Printing
 from calibre.gui2.viewer.toc import TOC
 from calibre.gui2.viewer.behavior.base_behavior import BaseBehavior
 from calibre.gui2.widgets import ProgressIndicator
@@ -164,7 +163,6 @@ class EbookViewer(MainWindow):
         self.clock_timer.timeout.connect(self.update_clock)
 
         self.action_print.triggered.connect(self.print_book)
-        self.print_menu.actions()[0].triggered.connect(self.print_preview)
         self.clear_recent_history_action = QAction(
                 _('Clear list of recently opened books'), self)
         self.clear_recent_history_action.triggered.connect(self.clear_recent_history)
@@ -330,12 +328,11 @@ class EbookViewer(MainWindow):
         open_url(url)
 
     def print_book(self):
-        p = Printing(self.iterator, self)
-        p.start_print()
-
-    def print_preview(self):
-        p = Printing(self.iterator, self)
-        p.start_preview()
+        if self.iterator is None:
+            return error_dialog(self, _('No book opened'), _(
+                'Cannot print as no book is opened'), show=True)
+        from calibre.gui2.viewer.printing import print_book
+        print_book(self.iterator.pathtoebook, self, self.current_title)
 
     def toggle_fullscreen(self):
         if self.isFullScreen():
@@ -516,7 +513,7 @@ class EbookViewer(MainWindow):
         if self.current_page is not None:
             self.behavior_manager.goto_page(new_page, self.goto_page)
             
-    def goto_page(self, new_page, loaded_check=True, allow_page_turn=True):
+    def goto_page(self, new_page, loaded_check=True, check_allow_page_turn=False):
         if self.current_page is not None or not loaded_check:
             for page in self.iterator.spine:
                 checkPages = self.behavior_manager.check_pages(new_page, page)
@@ -529,10 +526,11 @@ class EbookViewer(MainWindow):
                     if page == self.current_page:
                         self.view.scroll_to(frac)
                     else:
-                        if (allow_page_turn == False):
+                        allow_page_turn = True
+                        if (check_allow_page_turn):
                             allow_page_turn = self.behavior_manager.allow_page_turn(page)
                             
-                        if (allow_page_turn == True):
+                        if (allow_page_turn):
                             self.load_path(page, pos=frac)
                         else:
                             frac = float(self.current_page.max_page-self.current_page.start_page)/(self.current_page.pages)
@@ -1027,6 +1025,7 @@ class EbookViewer(MainWindow):
             'Bookmark': bac,
             'Reload': self.action_reload,
             'Table of Contents': self.action_table_of_contents,
+            'Print': self.action_print,
         }.get(key, None)
         if action is not None:
             event.accept()

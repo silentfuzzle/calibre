@@ -42,7 +42,6 @@ class BaseAdventurousBehavior (BaseBehavior):
     def calculate_page_label(self, frac):
         section_position = frac*float(self.get_section_pages(self.curr_sec))
         self.absolute_position = self.curr_sec.start_page + section_position
-        print (self.absolute_position)
         return section_position + 1
             
     # Moves the user to the passed page number using the passed method
@@ -50,7 +49,7 @@ class BaseAdventurousBehavior (BaseBehavior):
     # goto_page_method (method) - the method to use to move with
     def goto_page(self, new_page, goto_page_method):
         abs_pos = self.update_page_label(new_page)
-        goto_page_method(abs_pos, allow_page_turn=False)
+        goto_page_method(abs_pos, check_allow_page_turn=True)
             
     # Returns the user's absolute position in the ebook given a position set by the scrollbar or position label
     # new_page (number) - the page to move the user to as set by the scrollbar or position label

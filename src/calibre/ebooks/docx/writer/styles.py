@@ -40,6 +40,67 @@ def css_font_family_to_docx(raw):
 def bmap(x):
     return 'on' if x else 'off'
 
+def is_dropcaps(html_tag, tag_style):
+    return len(html_tag) < 2 and len(etree.tostring(html_tag, method='text', encoding=unicode, with_tail=False)) < 5 and tag_style['float'] == 'left'
+
+class FloatSpec(object):
+
+    def __init__(self, namespace, html_tag, tag_style):
+        self.makeelement = namespace.makeelement
+        self.is_dropcaps = is_dropcaps(html_tag, tag_style)
+        self.blocks = []
+        if self.is_dropcaps:
+            self.dropcaps_lines = 3
+        else:
+            self.x_align = tag_style['float']
+            self.w = self.h = None
+            if tag_style._get('width') != 'auto':
+                self.w = int(20 * max(tag_style['min-width'], tag_style['width']))
+            if tag_style._get('height') == 'auto':
+                self.h_rule = 'auto'
+            else:
+                if tag_style['min-height'] > 0:
+                    self.h_rule, self.h = 'atLeast', tag_style['min-height']
+                else:
+                    self.h_rule, self.h = 'exact', tag_style['height']
+                self.h = int(20 * self.h)
+            self.h_space = int(20 * max(tag_style['margin-right'], tag_style['margin-left']))
+            self.v_space = int(20 * max(tag_style['margin-top'], tag_style['margin-bottom']))
+
+        read_css_block_borders(self, tag_style)
+
+    def serialize(self, block, parent):
+        if self.is_dropcaps:
+            attrs = dict(w_dropCap='drop', w_lines=str(self.dropcaps_lines), w_wrap='around', w_vAnchor='text', w_hAnchor='text')
+        else:
+            attrs = dict(
+                w_wrap='around', w_vAnchor='text', w_hAnchor='text', w_xAlign=self.x_align, w_y='1',
+                w_hSpace=str(self.h_space), w_vSpace=str(self.v_space), w_hRule=self.h_rule
+            )
+            if self.w is not None:
+                attrs['w_w'] = str(self.w)
+            if self.h is not None:
+                attrs['w_h'] = str(self.h)
+        self.makeelement(parent, 'w:framePr', **attrs)
+        # Margins are already applied by the frame style, so override them to
+        # be zero on individual blocks
+        self.makeelement(parent, 'w:ind', w_left='0', w_leftChars='0', w_right='0', w_rightChars='0')
+        attrs = {}
+        if block is self.blocks[0]:
+            attrs.update(dict(w_before='0', w_beforeLines='0'))
+        if block is self.blocks[-1]:
+            attrs.update(dict(w_after='0', w_afterLines='0'))
+        if attrs:
+            self.makeelement(parent, 'w:spacing', **attrs)
+        # Similarly apply the same border and padding properties to all blocks
+        # in this floatspec
+        bdr = self.makeelement(parent, 'w:pBdr')
+        for edge in border_edges:
+            padding = getattr(self, 'padding_' + edge)
+            width = getattr(self, 'border_%s_width' % edge)
+            bstyle = getattr(self, 'border_%s_style' % edge)
+            self.makeelement(bdr, 'w:'+edge, w_space=str(padding), w_val=bstyle, w_sz=str(width), w_color=getattr(self, 'border_%s_color' % edge))
+
 class DOCXStyle(object):
 
     ALL_PROPS = ()
@@ -129,7 +190,15 @@ class TextStyle(DOCXStyle):
             self.spacing = int(float(css['letter-spacing']) * 20)
         except (ValueError, TypeError, AttributeError):
             self.spacing = None
-        self.vertical_align = css['vertical-align']
+        va = css.first_vertical_align
+        if isinstance(va, (int, float)):
+            self.vertical_align = str(int(self.vertical_align * 2))
+        else:
+            val = {
+                'top':'superscript', 'text-top':'superscript', 'sup':'superscript', 'super':'superscript',
+                'bottom':'subscript', 'text-bottom':'subscript', 'sub':'subscript'}.get(va)
+            self.vertical_align = val or 'baseline'
+
         self.padding = self.border_color = self.border_width = self.border_style = None
         if not is_parent_style:
             # DOCX does not support individual borders/padding for inline content
@@ -213,16 +282,11 @@ class TextStyle(DOCXStyle):
             style.append(makeelement(style, 'shadow', val=bmap(self.shadow)))
         if check_attr('spacing'):
             style.append(makeelement(style, 'spacing', val=str(self.spacing or 0)))
-        if isinstance(self.vertical_align, (int, float)):
-            val = int(self.vertical_align * 2)
-            style.append(makeelement(style, 'position', val=str(val)))
-        elif isinstance(self.vertical_align, basestring):
-            val = {
-                'top':'superscript', 'text-top':'superscript', 'sup':'superscript', 'super':'superscript',
-                'bottom':'subscript', 'text-bottom':'subscript', 'sub':'subscript'}.get(
-                self.vertical_align.lower())
-            if val:
-                style.append(makeelement(style, 'vertAlign', val=val))
+        if (self is normal_style and self.vertical_align in {'superscript', 'subscript'}) or self.vertical_align != normal_style.vertical_align:
+            if self.vertical_align in {'superscript', 'subscript', 'baseline'}:
+                style.append(makeelement(style, 'vertAlign', val=self.vertical_align))
+            else:
+                style.append(makeelement(style, 'position', val=self.vertical_align))
 
         bdr = self.serialize_borders(makeelement(style, 'bdr'), normal_style)
         if bdr.attrib:
@@ -292,7 +356,7 @@ class BlockStyle(DOCXStyle):
         else:
             self.page_break_before = css['page-break-before'] == 'always'
             self.keep_lines = css['page-break-inside'] == 'avoid'
-            self.text_indent = max(0, int(css['text-indent'] * 20))
+            self.text_indent = int(css['text-indent'] * 20)
             self.css_text_indent = css._get('text-indent')
             self.line_height = max(0, int(css.lineHeight * 20))
             self.background_color = None if is_table_cell else convert_color(css['background-color'])
@@ -359,15 +423,26 @@ class BlockStyle(DOCXStyle):
                 val = getter(self)
                 if (self is normal_style and val > 0) or val != getter(normal_style):
                     ind.set(w(edge), str(val))
+                    ind.set(w(edge + 'Chars'), '0')  # This is needed to override any declaration in the parent style
         css_val, css_unit = parse_css_length(self.css_text_indent)
         if css_unit in ('em', 'ex'):
-            chars = max(0, int(css_val * (50 if css_unit == 'ex' else 100)))
-            if (self is normal_style and chars > 0) or self.css_text_indent != normal_style.css_text_indent:
-                ind.set('firstLineChars', str(chars))
+            chars = int(css_val * (50 if css_unit == 'ex' else 100))
+            if css_val >= 0:
+                if (self is normal_style and chars > 0) or self.css_text_indent != normal_style.css_text_indent:
+                    ind.set(w('firstLineChars'), str(chars))
+            else:
+                if (self is normal_style and chars < 0) or self.css_text_indent != normal_style.css_text_indent:
+                    ind.set(w('hangingChars'), str(abs(chars)))
         else:
             val = self.text_indent
-            if (self is normal_style and val > 0) or self.text_indent != normal_style.text_indent:
-                ind.set('firstLine', str(val))
+            if val >= 0:
+                if (self is normal_style and val > 0) or self.text_indent != normal_style.text_indent:
+                    ind.set(w('firstLine'), str(val))
+                    ind.set(w('firstLineChars'), '0')  # This is needed to override any declaration in the parent style
+            else:
+                if (self is normal_style and val < 0) or self.text_indent != normal_style.text_indent:
+                    ind.set(w('hanging'), str(abs(val)))
+                    ind.set(w('hangingChars'), '0')
         if ind.attrib:
             style.append(ind)
 
@@ -425,24 +500,24 @@ class StylesManager(object):
             block_counts[block.style] += 1
             block_rmap[block.style].append(block)
             for run in block.runs:
-                run_counts[run.style] += 1
+                run_counts[run.style] += (0 if run.is_empty() else 1)
                 run_rmap[run.style].append(run)
+        bnum = len(str(max(1, len(block_counts) - 1)))
         for i, (block_style, count) in enumerate(block_counts.most_common()):
             if i == 0:
                 self.normal_block_style = block_style
                 block_style.id = 'ParagraphNormal'
-                block_style.name = 'Normal'
             else:
                 block_style.id = 'Paragraph%d' % i
-                block_style.name = 'Paragraph %d' % i
+            block_style.name = '%0{}d Para'.format(bnum) % i
+        rnum = len(str(max(1, len(run_counts) - 1)))
         for i, (text_style, count) in enumerate(run_counts.most_common()):
             if i == 0:
                 self.normal_text_style = text_style
                 text_style.id = 'TextNormal'
-                text_style.name = 'Normal'
             else:
                 text_style.id = 'Text%d' % i
-                text_style.name = 'Text %d' % i
+            text_style.name = '%0{}d Text'.format(rnum) % i
         for s in tuple(self.block_styles):
             if s.id is None:
                 self.block_styles.pop(s)

@@ -143,12 +143,17 @@ function LinkColorer() {
     // currNodeID - The position to start the shortest path search from
     // historicLinks - The links from the user's current position to currNodeID
     this.colorLinksFromMinNodeDistance = function(currNodeID, historicLinks) {
+        var endpoints = [];
         
         // Get the shortest path from the given position to the beginning of the book
+        // The length will be > 0 if it exists
         var crumb = this.linkDictionary[currNodeID].crumb;
+        if (crumb.length > 0) {
         
-        // Merge the paths found from the user's history and the shortest path
-        var endpoints = this.mergeEndPointLists(historicLinks, crumb);
+            // Merge the paths found from the user's history and the shortest path
+            endpoints = this.mergeEndPointLists(historicLinks, crumb);
+        }
+        
         return endpoints;
     };
     
@@ -276,6 +281,9 @@ function LinkColorer() {
                     this.linkDictionary.hasOwnProperty(currNodeID)) {
                 colorInfo.lastHistory = historyNode;
                 endpoints = this.colorLinksFromDistance(currNodeID, colorInfo);
+            }
+            else {
+                endpoints = [];
             }
         }
         

@@ -11,7 +11,7 @@ class CalibreBehavior (BaseBehavior):
     # Sets the new absolute position in the book
     # frac (number) - the scrollbar's position in relation to the current displayed section of the book
     def calculate_page_label(self, frac):
-        self.absolute_position = self.curr_sec.start_page + frac*float(self.curr_sec.pages-1)
+        self.absolute_position = float(self.curr_sec.start_page) + frac*float(self.curr_sec.pages)
         return self.absolute_position
         
     # Returns whether the user can move from the current section to the passed section
@@ -24,7 +24,7 @@ class CalibreBehavior (BaseBehavior):
     # new_page (number) - the page to move the user to
     # goto_page_method (method) - the method to use to move with
     def goto_page(self, new_page, goto_page_method):
-        goto_page_method(new_page)
+        goto_page_method(new_page, check_allow_page_turn=True)
         
     def update_page_label(self, new_page):
         return new_page

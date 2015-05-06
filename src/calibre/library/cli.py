@@ -21,10 +21,11 @@ from calibre.ebooks.metadata.opf2 import OPFCreator, OPF
 from calibre.utils.date import isoformat
 from calibre.utils.localization import canonicalize_lang
 
-FIELDS = set(['title', 'authors', 'author_sort', 'publisher', 'rating',
-    'timestamp', 'size', 'tags', 'comments', 'series', 'series_index',
-    'formats', 'isbn', 'uuid', 'pubdate', 'cover', 'last_modified',
-    'identifiers'])
+FIELDS = {
+    'title', 'authors', 'author_sort', 'publisher', 'rating', 'timestamp',
+    'size', 'tags', 'comments', 'series', 'series_index', 'formats', 'isbn',
+    'uuid', 'pubdate', 'cover', 'last_modified', 'identifiers', 'languages'
+}
 
 do_notify = True
 def send_message(msg=''):
@@ -102,6 +103,8 @@ def do_list(db, fields, afields, sort_by, ascending, search_text, line_width, se
                     record[key] = isoformat(val, as_utc=True)
                 elif val is None:
                     del record[key]
+                elif key == 'languages' and val:
+                    record[key] = val.split(',')
         return json.dumps(data, indent=2, sort_keys=True)
 
     fields = list(map(field_name, fields))
@@ -203,8 +206,8 @@ List the books available in the calibre database.
 
 def command_list(args, dbpath):
     pre = get_parser('')
-    pargs = [x for x in args if x.startswith('--with-library') or x.startswith('--library-path')
-        or not x.startswith('-')]
+    pargs = [x for x in args if x.startswith('--with-library') or x.startswith('--library-path') or
+             not x.startswith('-')]
     opts = pre.parse_args(sys.argv[:1] + pargs)[0]
     db = get_db(dbpath, opts)
     parser = list_option_parser(db=db)
@@ -1318,6 +1321,7 @@ def command_restore_database(args, dbpath):
         dbpath = dbpath.decode(preferred_encoding)
 
     class Progress(object):
+
         def __init__(self):
             self.total = 1
 
@@ -1555,4 +1559,3 @@ def main(args=sys.argv):
 
 if __name__ == '__main__':
     sys.exit(main())
-
