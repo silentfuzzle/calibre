@@ -2,24 +2,37 @@
 __license__   = 'GPL v3'
 __copyright__ = '2015, Emily Palmieri <silentfuzzle@gmail.com>'
 
+from sets import Set
+
 # This class stores a list of HTML files that appear in a section.
 class TOCSection (object):
 
     # Constructor
-    # include_sections (Set) - A list of file indices included in this section
-    # spine - (List(SpineItem)) the current ebook's order of sections
-    def __init__(self, include_sections, spine):
-        self.include_sections = include_sections
-        self.num_pages = self.calculate_num_pages(spine)
-        
-        # Calculate the beginning and end file index of the section
+    def __init__(self):
+        self.include_sections = Set()
+        self.num_pages = 0
         self.start_spine = -1
         self.end_spine = -1
-        for i in self.include_sections:
-            if (self.start_spine == -1 or self.start_spine > i):
-                self.start_spine = i
-            if (self.end_spine == -1 or self.end_spine < i):
-                self.end_spine = i
+    
+    # Adds a file to the section
+    # curr_index (int) - The index of the file in the spine
+    # curr_sec (SpineItem) - an object containing information about the file
+    def add(self, curr_index, curr_sec):
+        self.include_sections.add(curr_index)
+        
+        # Set the beginning and end indices of this section in the spine
+        if (self.start_spine == -1 or self.start_spine > curr_index):
+            self.start_spine = curr_index
+        if (self.end_spine == -1 or self.end_spine < curr_index):
+            self.end_spine = curr_index
+            
+        # Add to the number of pages
+        self.num_pages = self.num_pages + curr_sec.pages
+        
+    # Make sure there is at least one page in the section after all the files have been added
+    def finish_building(self):
+        if (self.num_pages == 0):
+            self.num_pages = 1
     
     # Returns true if the passed file index appears in this section
     # section_index (int) - The index of the file in the spine
@@ -28,27 +41,6 @@ class TOCSection (object):
             return True
         return False
         
-    # Calculates the number of pages in the current group of files
-    # spine - (List(SpineItem)) the current ebook's order of sections
-    def calculate_num_pages(self, spine):      
-        num_pages = 0
-        num_found = 0
-        spine_index = 0
-        start = False
-        end = False
-        num_sections = len(self.include_sections)
-        while (num_found < num_sections and end == False):
-            if (spine_index in self.include_sections):
-                start = True
-                num_found = num_found + 1
-                curr_path = spine[spine_index]
-                num_pages = num_pages + curr_path.pages
-            else:
-                if (start == True):
-                    end = True
-            spine_index = spine_index + 1
-        
-        if (num_pages == 0):
-            num_pages = 1
-            
-        return num_pages
+    # Returns the number of files in this section
+    def num_files(self):
+        return len(self.include_sections)

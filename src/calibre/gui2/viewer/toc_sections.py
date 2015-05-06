@@ -16,8 +16,8 @@ class TOCSections (object):
         self.spine = spine
         
         self.toc_sections = []
-        self.curr_section = None
-        self.generate_toc_sections()
+        self.curr_section = TOCSection()
+        #self.generate_toc_sections()
         
     # Generate all the sections found in the e-book
     def generate_toc_sections(self):
@@ -26,11 +26,10 @@ class TOCSections (object):
             if (t.parent is not None and t.abspath in self.spine):
                 spine_index = self.spine.index(t.abspath)
                 if (spine_index not in found_sections):
-                    include_sections = self.find_include_sections(t)
-                    toc_section = TOCSection(include_sections, self.spine)
+                    toc_section = self.find_include_sections(t)
                     self.toc_sections.append(toc_section)
                     
-                    for s in include_sections:
+                    for s in toc_section.include_sections:
                         found_sections.add(s)
         
     # Set the sections included in the current group, returns True if included sections were updated
@@ -56,7 +55,7 @@ class TOCSections (object):
         # Check if the entry appears in any sections that have been calculated already
         done = False
         i = 0
-        while done == False:
+        while done == False and i < len(self.toc_sections):
             sec = self.toc_sections[i]
             if (sec.includes_section(curr_index)):
                 done = True
@@ -67,15 +66,14 @@ class TOCSections (object):
             return sec
         else:
             # Calculate the section containing the file
-            include_sections = self.find_include_sections(curr_toc)
-            toc_section = TOCSection(include_sections, self.spine)
+            toc_section = self.find_include_sections(curr_toc)
             self.toc_sections.append(toc_section)
             return toc_section
  
     # Returns the sections to include in this group of sections
     # curr_toc (calibre.ebooks.metadata.toc.TOC) - the TOC entry of the current section
     def find_include_sections(self, curr_toc):
-        include_sections = Set()
+        toc_section = TOCSection()
         
         # Include the root of the TOC tree with this section and all TOC entries in it
         curr_parent = curr_toc
@@ -83,43 +81,39 @@ class TOCSections (object):
             curr_parent = curr_parent.parent
             
         for t in curr_parent.flat():
-            include_sections.add(t.abspath)
-        
-        # Determine where to check for sections that aren't in the toc
-        in_toc = Set()
-        spine_len = len(self.spine)
-        for s in include_sections:
-            spine_index = self.spine.index(s)
-            in_toc.add(spine_index)
+            spine_index = self.spine.index(t.abspath)
+            toc_section.add(spine_index, self.spine[spine_index])
         
         # Include adjacent sections that aren't in the toc
-        in_toc = self.search_in_toc(0, 0, in_toc)
-        return in_toc
+        toc_section = self.search_in_toc(0, 0, toc_section)
+        toc_section.finish_building()
+        return toc_section
         
     # Find adjacent sections in the spine that aren't in the TOC that should be included in the section group
     # index (integer) - the index to search from
     # num_found (integer) - the number of entries in the section group that were found in this recursive search
     # in_toc (List(integer)) - the indicies of the sections included in the section group
     # found_first_toc_entry (boolean) - whether the first section in the TOC has been found yet
-    def search_in_toc(self, index, num_found, in_toc, found_first_toc_entry=False):
+    def search_in_toc(self, index, num_found, toc_section, found_first_toc_entry=False):
         next_index = index + 1
         
-        if (index not in in_toc):
+        if (toc_section.includes_section(index) == False):
             # Check if the first section in the toc has been found
-            page_in_toc = self.get_in_toc(self.spine[index])
             if (found_first_toc_entry == False):
+                page_in_toc = self.get_in_toc(self.spine[index])
                 if (page_in_toc is not None):
                     found_first_toc_entry = True
                     
             # Add this section if the previous section is in the included sections
             # and this section isn't in the toc
-            if (index - 1 in in_toc):
+            if (toc_section.includes_section(index - 1)):
+                page_in_toc = self.get_in_toc(self.spine[index])
                 if (page_in_toc is None):
-                    in_toc.add(index)
+                    toc_section.add(index, self.spine[index])
                 
             # Only check the next section if not all the sections included in the toc have been found
-            if (next_index < len(self.spine) and num_found < len(in_toc)):
-                in_toc = self.search_in_toc(next_index, num_found, in_toc, 
+            if (next_index < len(self.spine) and num_found < toc_section.num_files()):
+                toc_section = self.search_in_toc(next_index, num_found, toc_section, 
                         found_first_toc_entry)
         else:
             # Include all sections not included in the toc at the beginning of the book
@@ -127,7 +121,7 @@ class TOCSections (object):
                 found_first_toc_entry = True
                 i = index - 1
                 while (i >= 0):
-                    in_toc.add(i)
+                    toc_section.add(i, self.spine[i])
                     
                     i = i - 1
                     
@@ -135,10 +129,10 @@ class TOCSections (object):
             
             # Always check the section after the last included in the toc
             if (next_index < len(self.spine)):
-                in_toc = self.search_in_toc(next_index, num_found, in_toc, 
+                toc_section = self.search_in_toc(next_index, num_found, toc_section, 
                         found_first_toc_entry)
             
-        return in_toc  
+        return toc_section  
         
     # Return a section's TOC and SpineItem entries if it exists in the TOC
     # Return the section's parent's TOC and SpineItem entries if it doesn't exist in the TOC
