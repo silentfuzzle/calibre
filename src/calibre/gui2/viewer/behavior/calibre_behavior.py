@@ -24,7 +24,7 @@ class CalibreBehavior (BaseBehavior):
     # new_page (number) - the page to move the user to
     # goto_page_method (method) - the method to use to move with
     def goto_page(self, new_page, goto_page_method):
-        goto_page_method(new_page)
+        goto_page_method(new_page, check_allow_page_turn=True)
         
     def update_page_label(self, new_page):
         return new_page

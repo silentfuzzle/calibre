@@ -516,7 +516,7 @@ class EbookViewer(MainWindow):
         if self.current_page is not None:
             self.behavior_manager.goto_page(new_page, self.goto_page)
             
-    def goto_page(self, new_page, loaded_check=True, allow_page_turn=True):
+    def goto_page(self, new_page, loaded_check=True, check_allow_page_turn=False):
         if self.current_page is not None or not loaded_check:
             for page in self.iterator.spine:
                 checkPages = self.behavior_manager.check_pages(new_page, page)
@@ -529,10 +529,11 @@ class EbookViewer(MainWindow):
                     if page == self.current_page:
                         self.view.scroll_to(frac)
                     else:
-                        if (allow_page_turn == False):
+                        allow_page_turn = True
+                        if (check_allow_page_turn):
                             allow_page_turn = self.behavior_manager.allow_page_turn(page)
                             
-                        if (allow_page_turn == True):
+                        if (allow_page_turn):
                             self.load_path(page, pos=frac)
                         else:
                             frac = float(self.current_page.max_page-self.current_page.start_page)/(self.current_page.pages)
