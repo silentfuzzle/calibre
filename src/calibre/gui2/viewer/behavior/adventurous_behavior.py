@@ -33,13 +33,7 @@ class AdventurousBehavior (BaseAdventurousBehavior):
         updated_include_sections = self.toc_sections.set_curr_sec(curr_index, curr_sec)
         if (updated_include_sections):
             # Determine the part of the spine included in the sections
-            self.start_spine = -1
-            self.end_spine = -1
-            for i in self.toc_sections.include_sections:
-                if (self.start_spine == -1 or self.start_spine > i):
-                    self.start_spine = i
-                if (self.end_spine == -1 or self.end_spine < i):
-                    self.end_spine = i
+            self.start_spine = self.toc_sections.curr_section.start_spine
         
             # Determine the number of pages in the group of sections
             self.num_pages = self.calculate_num_pages()
@@ -55,7 +49,7 @@ class AdventurousBehavior (BaseAdventurousBehavior):
             return True
         
         next_index = self.spine.index(next_sec)
-        if (next_index in self.toc_sections.include_sections):            
+        if (self.toc_sections.curr_section.includes_section(next_index)):            
             # Don't add an edge if the user skipped sections in the book using the scrollbar or position label
             if (next_index == self.curr_index + 1 or next_index == self.curr_index - 1):                    
                 return True
@@ -75,26 +69,6 @@ class AdventurousBehavior (BaseAdventurousBehavior):
     def update_page_label(self, user_input):
         return user_input + self.spine[self.start_spine].start_page - 1
             
-    # Calculates the number of pages in the current group of sections
-    def calculate_num_pages(self):      
-        num_pages = 0
-        num_found = 0
-        spine_index = 0
-        start = False
-        end = False
-        num_sections = len(self.toc_sections.include_sections)
-        while (num_found < num_sections and end == False):
-            if (spine_index in self.toc_sections.include_sections):
-                start = True
-                num_found = num_found + 1
-                curr_path = self.spine[spine_index]
-                num_pages = num_pages + curr_path.pages
-            else:
-                if (start == True):
-                    end = True
-            spine_index = spine_index + 1
-        
-        if (num_pages == 0):
-            num_pages = 1
-            
-        return num_pages       
+    # Returns the number of pages in the current group of files
+    def calculate_num_pages(self):            
+        return self.toc_sections.curr_section.num_pages       

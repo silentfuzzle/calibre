@@ -3,28 +3,74 @@ __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
 from sets import Set
+from calibre.gui2.viewer.toc_section import TOCSection
 
-# This object determines returns a TOC given a SpineItem for all sections in an ebook.
+# This object determines how all the HTML files in the spine are displayed in sections.
 class TOCSections (object):
 
     # Constructor
     # toc - (calibre.ebooks.metadata.toc.TOC) the current ebook's TOC
     # spine - (List(SpineItem)) the current ebook's order of sections
     def __init__(self, toc, spine):
-        self.include_sections = Set()
         self.toc = toc
         self.spine = spine
+        
+        self.toc_sections = []
+        self.curr_section = None
+        self.generate_toc_sections()
+        
+    # Generate all the sections found in the e-book
+    def generate_toc_sections(self):
+        found_sections = Set()
+        for t in self.toc.flat():
+            if (t.parent is not None and t.abspath in self.spine):
+                spine_index = self.spine.index(t.abspath)
+                if (spine_index not in found_sections):
+                    include_sections = self.find_include_sections(t)
+                    toc_section = TOCSection(include_sections, self.spine)
+                    self.toc_sections.append(toc_section)
+                    
+                    for s in include_sections:
+                        found_sections.add(s)
         
     # Set the sections included in the current group, returns True if included sections were updated
     # curr_index (int) - the index of the current section in the spine
     # curr_sec (SpineItem) - the currect section being viewed
     def set_curr_sec(self, curr_index, curr_sec):
-        curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)        
-        if (curr_index not in self.include_sections):
-            self.include_sections = self.find_include_sections(curr_toc)
+        curr_toc, self.corrected_curr_sec = self.check_and_get_toc(curr_sec)
+        if (self.curr_section is None):
+            self.curr_section = self.get_curr_sec(curr_index, curr_toc)
+            return True
+            
+        if (self.curr_section.includes_section(curr_index) == False):
+            self.curr_section = self.get_curr_sec(curr_index, curr_toc)
             
             return True
         return False
+        
+    # Return the section that contains the given index
+    # curr_index (int) - the index of the current section in the spine
+    # curr_toc (calibre.ebooks.metadata.toc.TOC) - the TOC entry of the current section
+    def get_curr_sec(self, curr_index, curr_toc):
+    
+        # Check if the entry appears in any sections that have been calculated already
+        done = False
+        i = 0
+        while done == False:
+            sec = self.toc_sections[i]
+            if (sec.includes_section(curr_index)):
+                done = True
+            else:
+                i = i + 1
+        
+        if done:
+            return sec
+        else:
+            # Calculate the section containing the file
+            include_sections = self.find_include_sections(curr_toc)
+            toc_section = TOCSection(include_sections, self.spine)
+            self.toc_sections.append(toc_section)
+            return toc_section
  
     # Returns the sections to include in this group of sections
     # curr_toc (calibre.ebooks.metadata.toc.TOC) - the TOC entry of the current section

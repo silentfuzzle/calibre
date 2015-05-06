@@ -54,7 +54,7 @@ class NetworkTOCContainer(TOCContainer):
     def check_update_connection(self, curr_sec, next_sec):
         next_index = self.toc_sections.spine.index(next_sec)
         if (curr_sec is not None and 
-                next_index in self.toc_sections.include_sections): 
+                self.toc_sections.curr_section.includes_section(next_index)): 
             curr_index = self.toc_sections.spine.index(curr_sec)
             
             # Don't add an edge if the user skipped sections in the book using the scrollbar or position label
