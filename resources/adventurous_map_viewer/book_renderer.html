@@ -5,7 +5,6 @@
 
 .link {
 fill: none;
-opacity: 0.3;
 }
 
 /* Arrows inherit opacity from .link style */
@@ -24,8 +23,7 @@ stroke-dasharray: 0,2 1;
 }
 
 .node circle { 
-stroke: #fff; 
-opacity: 0.3;
+stroke: #fff;
 stroke-width: 1.5px; 
 }
 
@@ -78,6 +76,8 @@ var linkMaxWidth = linkDefaultWidth * growthFactor;
 var linkDefaultColor = "#666";
 var linkHighlightColor = "red";
 
+var nodeLinkDefaultOpacity = 0.2;
+var nodeLinkHighlightOpacity = 0.5;
 var staticArrows = false;
 var markerSize = 4;
 if (staticArrows) {
@@ -166,6 +166,7 @@ function dataLoaded(data, pageNum, historyOffset) {
             }
             n.r = nodeDefaultRadius;
             n.topacity = defaultOpacity;
+            n.nopacity = nodeLinkDefaultOpacity;
         });
     }
     else {
@@ -178,6 +179,7 @@ function dataLoaded(data, pageNum, historyOffset) {
             n.r = nodeDefaultRadius;
             n.fixed = false;
             n.topacity = defaultOpacity;
+            n.nopacity = nodeLinkDefaultOpacity;
             linkColorer.updateMinNodeID(n.id);
         });
     }
@@ -240,7 +242,8 @@ function dataLoaded(data, pageNum, historyOffset) {
     
     // Make path attributes accessible for animation/modification
     link.append("path")
-        .style("stroke-width", linkDefaultWidth + "px"); 
+        .style("stroke-width", linkDefaultWidth + "px")
+        .style("opacity", function(d) { return nodeLinkDefaultOpacity; }); 
         
     // Create an object that stores all the nodes added to the network
     // .attr("class", "node") - sets the .node circle attributes to node circles
@@ -255,7 +258,8 @@ function dataLoaded(data, pageNum, historyOffset) {
         .on("dblclick", dblclick); 
 
     // Set the appearance of the node to be a circle
-    node.append("circle") 
+    node.append("circle")
+        .attr("opacity", function(d) { return d.nopacity; })
         .attr("r", function(d) { return d.r; });
 
     // Set the text appearing next to the node and other data the node stores
@@ -309,13 +313,12 @@ function changePage(pageNum, historyOffset) {
     }
     
     // Color the links, titles, and nodes
-    resetTextOpacities();
-    colorLinks(currNode);
-    colorNodes(pageNum);
+    resetNodeOpacities();
+    colorNetwork(currNode);
 }
 
 // Toggle the visibility of all node labels on and off
-// True (1) if all labels should be visible, false (0) if not
+// makeVisible - True (1) if all labels should be visible, false (0) if not
 function toggleLabels(makeVisible) {
     allVisible = makeVisible;
     
@@ -327,9 +330,20 @@ function toggleLabels(makeVisible) {
     else {
         // Set the text opacities from the user's position
         var currNode = history.currNode;
-        colorLinks(currNode);
-        colorNodes(currNode.pos);
+        colorNetwork(currNode);
     }
+}
+
+// Color the links, titles, and nodes in the network based on the user's current state
+// currNode - The current node in the user's history
+function colorNetwork(currNode) {
+    pageNum = currNode.pos;
+    
+    colorLinks(currNode);
+    colorNodes(pageNum);
+    applyTextOpacities();
+    applyNodeOpacities();
+    applyLinkOpacities();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -436,7 +450,7 @@ function getDefaultTextOpacity() {
     }
 }
 
-// Set the opacities of all nodes back to the default before coloring
+// Set the opacities of all text back to the default before coloring
 function resetTextOpacities() {
     var defaultOpacity = getDefaultTextOpacity();
     node.each(function(n) {
@@ -444,7 +458,7 @@ function resetTextOpacities() {
     });
 }
 
-// Apply the set opacities to the network interface
+// Apply the set opacities to the node's text
 function applyTextOpacities() {
     node.selectAll("text")
         .selectAll('tspan')
@@ -462,6 +476,7 @@ function colorNodes(currPage) {
         if (n.id == currPage) {
             d3.select(this).select("circle").style("fill", nodeHighlightColor);
             n.topacity = textVisibleOpacity;
+            n.nopacity = nodeLinkHighlightOpacity;
             
             // Set the text of all connected nodes to visible
             var nodeLinks = getUpdateLinks(n.id);
@@ -472,13 +487,45 @@ function colorNodes(currPage) {
         else if (n.type == 1) {
             // Emphasize nodes at the beginning of the book
             d3.select(this).select("circle").style("fill", nodeBeginColor);
+            n.nopacity = nodeLinkHighlightOpacity;
         }
         else {
             d3.select(this).select("circle").style("fill", nodeDefaultColor);
         }
     });
-    
-    applyTextOpacities();
+}
+
+// Set the opacities of all node circles back to the default before coloring
+function resetNodeOpacities() {
+    var defaultTextOpacity = getDefaultTextOpacity();
+    node.each(function(n) {
+        n.nopacity = nodeLinkDefaultOpacity;
+        n.topacity = defaultTextOpacity;
+    });
+}
+
+// Apply the set opacities to the node circles
+function applyNodeOpacities() {
+    node.selectAll("circle")
+        .attr("opacity", function(d) { return d.nopacity; });
+}
+
+// Emphasize the given node by increasing its opacity
+// nodeSVG - the node's SVG element
+function makeNodeOpaque(nodeSVG) {
+    d3.select(nodeSVG).select("circle").transition() 
+        .duration(750)
+        .attrTween("r", shrinkRadius)
+        .attr("opacity", nodeLinkHighlightOpacity);
+}
+
+// De-emphasize the given node by decreasing its opacity
+// nodeSVG - the node's SVG element
+function makeNodeTransparent(nodeSVG) {
+    d3.select(nodeSVG).select("circle").transition() 
+        .duration(750)
+        .attrTween("r", shrinkRadius)
+        .attr("opacity", function(d) { return d.nopacity; });
 }
 
 // Grows the radius of a node to its maximum size and repositions its title
@@ -486,7 +533,8 @@ function colorNodes(currPage) {
 function growRadiusWrapper(nodeSVG) {
     d3.select(nodeSVG).select("circle").transition() 
         .duration(750) 
-        .attrTween("r", growRadius);
+        .attrTween("r", growRadius)
+        .attr("opacity", nodeLinkHighlightOpacity);
     
     animateText(nodeSVG, true, false);
 }
@@ -514,7 +562,8 @@ function growRadius(d) {
 function shrinkRadiusWrapper(nodeSVG) {
     d3.select(nodeSVG).select("circle").transition() 
         .duration(750) 
-        .attrTween("r", shrinkRadius);
+        .attrTween("r", shrinkRadius)
+        .attr("opacity", function(d) { return d.nopacity; });
     
     setTextDefault(nodeSVG);
 }
@@ -548,6 +597,7 @@ function colorLinks(currNode) {
         // Make sure all links start at their default color
         d3.select(this).select("path").style("stroke", linkDefaultColor);
         d3.select(this).attr("marker-end", "url(#default)");
+        d.opacity = nodeLinkDefaultOpacity;
     });
     
     var endPoints = linkColorer.getPathToColor(currNode);
@@ -555,6 +605,12 @@ function colorLinks(currNode) {
         var linkSVG = d3.select(endPoints[i]);
         linkSVG.select("path").style("stroke", linkHighlightColor);
         linkSVG.attr("marker-end", "url(#highlight)");
+        linkSVG.select("path").style("opacity", function(d) {
+            d.target.nopacity = nodeLinkHighlightOpacity;
+            d.source.nopacity = nodeLinkHighlightOpacity;
+            d.opacity = nodeLinkHighlightOpacity;
+            return nodeLinkHighlightOpacity;
+        });
     }
 }
 
@@ -564,8 +620,17 @@ function setEndpointTextOpacity(linkSVG) {
     linkSVG.attr("topacity", function(d) { 
         d.target.topacity = textVisibleOpacity;
         d.source.topacity = textVisibleOpacity;
+        d.target.nopacity = nodeLinkHighlightOpacity;
+        d.source.nopacity = nodeLinkHighlightOpacity;
+        d.opacity = nodeLinkHighlightOpacity;
         return textVisibleOpacity;
     });
+}
+
+// Apply the set opacities to the links
+function applyLinkOpacities() {
+    link.selectAll("path")
+        .style("opacity", function(d) { return d.opacity; });
 }
 
 // Grows the width of a link's stroke to its maximum size
@@ -573,7 +638,8 @@ function setEndpointTextOpacity(linkSVG) {
 function growStroke(linkSVG) {
     d3.select(linkSVG).select("path").transition()
         .duration(750)
-        .style("stroke-width", linkMaxWidth + "px");
+        .style("stroke-width", linkMaxWidth + "px")
+        .style("opacity", nodeLinkHighlightOpacity);
 }
 
 // Shrinks the width of a link's stroke to its default size
@@ -581,7 +647,8 @@ function growStroke(linkSVG) {
 function shrinkStroke(linkSVG) {
     d3.select(linkSVG).select("path").transition()
         .duration(750)
-        .style("stroke-width", linkDefaultWidth + "px");
+        .style("stroke-width", linkDefaultWidth + "px")
+        .style("opacity", function(d) { return d.opacity; });
 }
 
 // Animate a link so that's end points remain at the edge of an animated node
@@ -656,8 +723,9 @@ function drawCurve(d) {
 // When the user hovers the mouse over a node, this method animates associated elements
 // nodeSVG - the SVG element of the hovered node
 // strokeMethod - a method to apply to each associated link
-// textMethod - a method to apply to each associated node
-function animateConnections(nodeSVG, strokeMethod, textMethod) {
+// textMethod - a method to apply to the text of each associated node
+// opacityMethod - a method to apply to the circle of each associated node
+function animateConnections(nodeSVG, strokeMethod, textMethod, opacityMethod) {
     var page = d3.select(nodeSVG).attr("page");
     var connectedNodes = [];
     
@@ -687,6 +755,10 @@ function animateConnections(nodeSVG, strokeMethod, textMethod) {
         while (i < connectedNodes.length && !found) {
             if (npage == connectedNodes[i]) {
                 textMethod(this);
+                if (npage != page) {
+                    // Avoid applying multiple animations to the calling node
+                    opacityMethod(this);
+                }
                 found = true;
             }
             else {
@@ -704,8 +776,9 @@ function animateConnections(nodeSVG, strokeMethod, textMethod) {
 // When the user hovers the mouse over a link, this method animates the source and target node
 // linkSVG - the SVG element of the hovered link
 // radiusMethod - a method to apply to the link's target
-// textMethod - a method to apply to the link's source
-function animateSourceAndTarget(linkSVG, radiusMethod, textMethod) {
+// textMethod - a method to apply to the text of the link's source
+// opacityMethod - a method to apply to the circle of the link's source
+function animateSourceAndTarget(linkSVG, radiusMethod, textMethod, opacityMethod) {
     var tpage = d3.select(linkSVG).attr("tpage");
     var spage = d3.select(linkSVG).attr("spage");
     node.each(function(d) {
@@ -714,6 +787,7 @@ function animateSourceAndTarget(linkSVG, radiusMethod, textMethod) {
         }
         else if (d.id == spage) {
             textMethod(this);
+            opacityMethod(this);
         }
     });
 }
@@ -808,7 +882,7 @@ function mouseoverNode() {
     setZoomListener();
     
     growRadiusWrapper(this);
-    animateConnections(this, growStroke, setTextVisible);
+    animateConnections(this, growStroke, setTextVisible, makeNodeOpaque);
 }
 
 // Deemphasize a node and its associated links on mouse out
@@ -818,7 +892,7 @@ function mouseoutNode() {
     setZoomListener();
     
     shrinkRadiusWrapper(this);
-    animateConnections(this, shrinkStroke, setTextDefault);
+    animateConnections(this, shrinkStroke, setTextDefault, makeNodeTransparent);
 } 
 
 // Unfix a node's position on mouse double click
@@ -840,13 +914,15 @@ function clickLink() {
 // Emphasize a link and its target node on mouse hover
 function mouseoverLink() {
     growStroke(this);
-    animateSourceAndTarget(this, growRadiusWrapper, setTextVisible);
+    animateSourceAndTarget(this, growRadiusWrapper, setTextVisible, 
+            makeNodeOpaque);
 }
 
 // Deemphasize a link and its target node on mouse out
 function mouseoutLink() {
     shrinkStroke(this);
-    animateSourceAndTarget(this, shrinkRadiusWrapper, setTextDefault);
+    animateSourceAndTarget(this, shrinkRadiusWrapper, setTextDefault, 
+            makeNodeTransparent);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
