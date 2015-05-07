@@ -13,7 +13,7 @@ function NetworkNode(nID) {
     
     // Returns the link object from the node with the given ID to this node if it exists
     // sourceID - The ID of the source node
-    this.getLink = function(sourceID) {
+    this.getInLink = function(sourceID) {
         var source = null;
         var n = 0;
         while (n < this.inLinks.length && source == null) {
@@ -23,6 +23,20 @@ function NetworkNode(nID) {
             n++;
         }
         return source;
+    };
+    
+    // Returns the link object from this node to the node with the given ID if it exists
+    // targetID - The ID of the target node
+    this.getOutLink = function(targetID) {
+        var target = null;
+        var n = 0;
+        while (n < this.outLinks.length && target == null) {
+            if (this.outLinks[n].target.nodeID == targetID) {
+                target = this.outLinks[n];
+            }
+            n++;
+        }
+        return target;
     };
     
     // Performs a shortest distance search by following the links pointing to this node

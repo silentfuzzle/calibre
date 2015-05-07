@@ -274,7 +274,7 @@ function dataLoaded(data, pageNum, historyOffset) {
         .call(wrap, 100);
     
     // Set the color of the nodes
-    linkColorer.buildLinkDictionary(link);
+    var newLink = linkColorer.buildLinkDictionary(link);
     changePage(pageNum, historyOffset);
     
     // Make sure the display is set to the current scale and location
@@ -282,6 +282,11 @@ function dataLoaded(data, pageNum, historyOffset) {
     zoomListener.translate(zoomListener.translate());
     zoomListener.event(vis);
     setZoomListener();
+    
+    if (newLink != null) {
+        // Center the view over a newly created link
+        centerLink(newLink);
+    }
 }
 
 // Set the color of the nodes and links based on the user's history and position
@@ -811,6 +816,25 @@ function redraw() {
   vis.attr("transform",
       "translate(" + d3.event.translate + ")"
       + " scale(" + d3.event.scale + ")");
+}
+
+// Centers a newly formed link on screen
+// linkObj - a NetworkNode object containing a link to center the view over
+function centerLink(linkObj) {
+    link.each(function(d) {
+        if (d.source.id == linkObj.source.nodeID && 
+                d.target.id == linkObj.target.nodeID) {
+            // Center the view over the average position between the two nodes
+            // The node with more weight will move less after the link is added
+            // Weighting the average makes it more likely that the final view will show the link on screen
+            var totWeight = d.source.weight + d.target.weight;
+            var sw = d.source.weight / totWeight;
+            var tw = d.target.weight / totWeight;
+            var x = d.source.x*sw + d.target.x*tw;
+            var y = d.source.y*sw + d.target.y*tw;
+            centerNode(x, y);
+        }
+    });
 }
 
 // Centers a node on the screen

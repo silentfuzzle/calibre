@@ -80,7 +80,6 @@ class NetworkTOCContainer(TOCContainer):
         
         # Add an edge to the network
         if (corrected_end_sec != start_sec):
-            print(link_type)
             self.toc.add_edge(start_sec, corrected_end_sec, link_type)
                  
     # Update the user's position and history in the network view
