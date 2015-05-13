@@ -363,7 +363,7 @@ function setLayout(newLayout) {
         
         node.each(function(d) {
             d.fixed = true;
-            d.topacity = textVisibleOpacity;
+            d.topacity = textHighlightOpacity;
             
             // Place the nodes based on their position in the spine
             d3.select(this).transition()
