@@ -17,10 +17,10 @@ class TOCSections (object):
         
         self.toc_sections = []
         self.curr_section = TOCSection()
-        #self.generate_toc_sections()
         
     # Generate all the sections found in the e-book
     def generate_toc_sections(self):
+        self.toc_sections = []
         found_sections = Set()
         for t in self.toc.flat():
             if (t.parent is not None and t.abspath in self.spine):
@@ -42,6 +42,57 @@ class TOCSections (object):
             self.curr_section = self.get_section(curr_index, curr_toc)
             return True
         return False
+        
+    # Returns the number of pages that are in a node
+    # part_index (int) - The ID of the node and its position in the spine
+    def get_pages_in_node(self, part_index):
+        section = self.get_section(part_index)
+        
+        # Add any files not included in the toc that appear before the node
+        temp_include_count = []
+        in_toc, temp_include_count = self.get_included_files_in_node(
+                part_index, -1, section, temp_include_count)
+            
+        # If any nodes before this node in the section are in the toc,
+        # any files found before this node will be grouped with it
+        # Do not include page counts from these files in this node
+        if (in_toc is not None):
+            temp_include_count = []
+        temp_include_count.append(part_index)
+            
+        # Add any files not included in the toc that appear after the node
+        in_toc, temp_include_count = self.get_included_files_in_node(
+                part_index, 1, section, temp_include_count)
+            
+        # Add up the number of pages in each file included in the node
+        num_pages = 0
+        for c in temp_include_count:
+            num_pages = num_pages + self.spine[c].pages
+        return num_pages
+        
+    # Returns a list of indices in the spine that are included in a node
+    # part_index (int) - The ID of the node and its position in the spine
+    # incrementor (int) - -1 if checking files that appear before the node,
+    #                     1 if checking files that appear after the node
+    # section (TOCSection) - The section that contains the node
+    # temp_include_count (list) - The list of indices to include so far
+    def get_included_files_in_node(self, part_index, incrementor, section, 
+            temp_include_count):
+        curr_index = part_index + incrementor
+        includes_section = True
+        in_toc = None
+        
+        while (includes_section and in_toc is None):
+            if (section.includes_section(curr_index)):
+                in_toc = self.get_in_toc(self.spine[curr_index])
+                if (in_toc is None):
+                    temp_include_count.append(curr_index)
+            else:
+                includes_section = False
+            curr_index = curr_index + incrementor
+            
+        return (in_toc, temp_include_count)
+        
         
     # Return the section that contains the given index
     # curr_index (int) - the index of the current section in the spine

@@ -4,7 +4,8 @@ __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
 from PyQt5.Qt import (QVBoxLayout, QWidget)
 from calibre.gui2.viewer.book_network import EBookNetwork
-from calibre.gui2.viewer.toc_network import TOCNetworkView, TOCNetworkSearch, TOCNetworkTools
+from calibre.gui2.viewer.toc_network import (TOCNetworkView, TOCNetworkSearch, 
+        TOCNetworkTools, TOCNetworkInfo)
 from calibre.gui2.viewer.toc_container.toc_container import TOCContainer
 
 # This class defines a network table of contents interface and control set.
@@ -22,11 +23,13 @@ class NetworkTOCContainer(TOCContainer):
         self.toc.set_manager(manager)
         
         # Build the network interface tools
+        self.info = TOCNetworkInfo(parent=w)
         tools = TOCNetworkTools(self.toc, parent=w)                
         self.toc_search = TOCNetworkSearch(self.toc, parent=w)
         
         # Layout the interface
         w.l = QVBoxLayout(w)
+        w.l.addWidget(self.info)
         w.l.addWidget(self.toc)
         w.l.addWidget(tools)
         w.l.addWidget(self.toc_search)
@@ -41,6 +44,7 @@ class NetworkTOCContainer(TOCContainer):
         ebook_network = EBookNetwork(toc_sections, title, pathtoebook)
         self.toc.set_ebook_network(ebook_network)
         self.toc_sections = toc_sections
+        self.info.setup_ebook(ebook_network.pages_viewed, sum(self.toc.manager.iterator.pages))
         self.history_offset = -3
 
     # Saves the ebook network to a JSON file before closing the ebook
@@ -81,6 +85,7 @@ class NetworkTOCContainer(TOCContainer):
         # Add an edge to the network
         if (corrected_end_sec != start_sec):
             self.toc.add_edge(start_sec, corrected_end_sec, link_type)
+            self.info.update_label(self.toc.ebook_network.pages_viewed)
                  
     # Update the user's position and history in the network view
     # curr_index (int) - the position if the current section in the spine

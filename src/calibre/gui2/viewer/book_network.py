@@ -6,6 +6,7 @@ from sets import Set
 import json, os
 from networkx.classes import digraph
 from networkx.readwrite.json_graph import node_link
+from networkx.classes.function import degree
 
 # This class stores data to display in the TOCNetworkView
 class EBookNetwork (object):
@@ -24,6 +25,7 @@ class EBookNetwork (object):
         self.start_search = 0
         self.prev_search = None
         
+        refresh = False
         if os.path.exists(self.savePath):
             try:
                 # Read the existing ebook's network file
@@ -33,10 +35,22 @@ class EBookNetwork (object):
                 self.data = json.dumps(self.data)
             except Exception:
                 # The JSON is unreadable, regenerate it
-                self.refresh_network()
+                refresh = True
         else:
             # Create a new file to store the ebook's network in
+            refresh = True
+        
+        self.pages_viewed = 0
+        if (refresh):
             self.refresh_network()
+        else:
+            # Calculate the number of pages viewed so far
+            # Nodes with links are considered viewed
+            for n in self.bookGraph.node:
+                node_degree = degree(self.bookGraph, n)
+                
+                if (node_degree > 0):
+                    self.pages_viewed = self.pages_viewed + self.bookGraph.node[n]['pages']
             
     # Search the titles of the nodes in the network by a user query
     # text (string) - the text the user has searched for
@@ -88,16 +102,30 @@ class EBookNetwork (object):
             old_edges = self.bookGraph.edges()
             self.generate_network()
             self.bookGraph.add_edges_from(old_edges)
-            
+        
         if (str_end_page in self.bookGraph[str_start_page]):
             if (self.bookGraph[str_start_page][str_end_page]['type'] == EBookNetwork.SCROLL_LINK and
                     link_type == EBookNetwork.HYPERLINK_LINK):
                 # Allow "scroll" type links to be replaced with "hyperlink" type links
                 self.bookGraph.remove_edge(str_start_page, str_end_page)
+                
+                # Decrement the number of pages viewed
+                # if nodes that did have links no longer have links
+                if (degree(self.bookGraph, str_start_page) == 0):
+                    self.pages_viewed = self.pages_viewed - self.bookGraph.node[str_start_page]['pages']
+                if (degree(self.bookGraph, str_end_page) == 0):
+                    self.pages_viewed = self.pages_viewed - self.bookGraph.node[str_end_page]['pages']
             else:
                 # Don't add an edge if it already exists
                 return False
                 
+        # Increment the number of pages viewed
+        # if nodes that didn't have links now have links
+        if (degree(self.bookGraph, str_start_page) == 0):
+            self.pages_viewed = self.pages_viewed + self.bookGraph.node[str_start_page]['pages']
+        if (degree(self.bookGraph, str_end_page) == 0):
+            self.pages_viewed = self.pages_viewed + self.bookGraph.node[str_end_page]['pages']
+            
         # Add an edge from the start to the end node
         self.bookGraph.add_edge(str_start_page, str_end_page,
                 type=link_type)
@@ -108,14 +136,16 @@ class EBookNetwork (object):
     def refresh_network(self):
         self.generate_network()
         self.update_network()
+        self.pages_viewed = 0
                 
     # Generate a new network of nodes from sections in the TOC
     def generate_network(self):
         spine = self.toc_sections.spine
+        self.toc_sections.generate_toc_sections()
         first_section = self.toc_sections.get_section(0)
         seen_sections = Set()
         self.bookGraph = digraph.DiGraph()
-        curr_index = 1
+        curr_index = 0
         for t in self.toc_sections.toc.flat():
             if (t.parent is not None and t.abspath in spine):
             
@@ -123,17 +153,22 @@ class EBookNetwork (object):
                 spine_index = spine.index(t.abspath)
                 if (spine_index not in seen_sections):
                     seen_sections.add(spine_index)
+                    
+                    # Calculate node properties
                     in_first = first_section.includes_section(spine_index)
                     node_type = 2
                     if (in_first):
                         node_type = 1
+                    curr_index = curr_index + 1
+                    num_pages = self.toc_sections.get_pages_in_node(spine_index)
                         
+                    # Add node to network
                     self.bookGraph.add_node(str(spine[spine_index].start_page),
                             label=str(spine[spine_index].start_page),
                             title=t.text,
                             type=node_type,
-                            spine=curr_index)
-                    curr_index = curr_index + 1
+                            spine=curr_index,
+                            pages=num_pages)
             
     # Updates the network JSON data with newly added/removed links
     def update_network(self):

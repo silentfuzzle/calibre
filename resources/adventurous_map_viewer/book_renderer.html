@@ -289,7 +289,7 @@ function dataLoaded(data, pageNum, historyOffset) {
     zoomListener.event(vis);
     setZoomListener();
     
-    if (newLink != null) {
+    if (newLink != null && historyOffset != -3) {
         // Center the view over a newly created link or node
         centerLink(newLink);
     }

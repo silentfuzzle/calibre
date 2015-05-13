@@ -9,12 +9,46 @@ __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 import os
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.Qt import (Qt, QWebView, QWidget, QToolButton, QMenu, QAction, 
-        QActionGroup, QHBoxLayout, QSizePolicy, pyqtSlot)
+        QActionGroup, QLabel, QHBoxLayout, QSizePolicy, pyqtSlot)
 from calibre.ebooks.oeb.display.webview import load_html
 from calibre.gui2.viewer.toc import TOCSearch
 from calibre.gui2 import error_dialog
 
-# The class stores controls that allow users to modify the network interface
+# This class stores the user's progress through the ebook based on the links in the network.
+class TOCNetworkInfo(QWidget):
+
+    # Constructor
+    # parent (QWidget) - the object containing the network interface and information
+    def __init__(self, parent=None):
+        QWidget.__init__(self, parent)
+        
+        self.l = QHBoxLayout(self)
+        self.l.setContentsMargins(0, 0, 0, 0)
+        
+        self.label = QLabel(self)
+        self.label.setAlignment(Qt.AlignHCenter)
+        self.l.addWidget(self.label)
+        
+    # Sets the total number of pages viewed and the number of pages viewed so far
+    # pages_viewed (float) - The number of pages the user viewed in previous reading sessions
+    # total_pages (float) - The total number of pages in the book
+    def setup_ebook(self, pages_viewed, total_pages):
+        self.total_pages = total_pages
+        self.set_label(pages_viewed)
+        
+    # Updates the number of pages viewed
+    # pages_viewed (float) - The new number of pages the user's viewed
+    def update_label(self, pages_viewed):
+        self.set_label(pages_viewed)
+                
+    # Updates the label displaying the user's progress
+    # pages_viewed (float) - The new number of pages the user's viewed
+    def set_label(self, pages_viewed):
+        self.label.setText("You've viewed " + str(pages_viewed) + " out of " + 
+                str(self.total_pages) + " pages.")
+        
+        
+# This class stores controls that allow users to modify the network interface
 class TOCNetworkTools(QWidget):
 
     # Constructor
@@ -24,6 +58,7 @@ class TOCNetworkTools(QWidget):
         QWidget.__init__(self, parent)
         
         self.toc_view = toc_view
+        self.info = parent.info
         
         # Layout controls
         self.l = QHBoxLayout(self)
@@ -72,13 +107,18 @@ class TOCNetworkTools(QWidget):
         btn = QToolButton(self)
         btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
         btn.setText("Clear All Links")
-        btn.clicked.connect(toc_view.clear_network)
+        btn.clicked.connect(self.clear_network)
         btn.setToolTip(_('Clear all links in the network'))
         self.l.addWidget(btn)
         
     # Goes to the first page of the book
     def go_to_cover(self):
         self.toc_view.change_page(1)
+            
+    # Clears all the links from the network
+    def clear_network(self):
+        self.toc_view.clear_network()
+        self.info.update_label(self.toc_view.ebook_network.pages_viewed)
         
     # Sets the layout of the nodes to force-directed
     # checked (boolean) - True if the option is checked in the Layout menu
