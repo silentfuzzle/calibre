@@ -87,6 +87,10 @@ var markerOffset = -0.1;
 if (straightLinks) {
     markerOffset = 0;
 }
+
+var FORCE_DIRECTED = 1;
+var RAINBOW_GRAPH = 2;
+var rainbowNodeSpacing = 50;
     
 ///////////////////////////////////////////////////////////////////////////////
 //SETUP
@@ -97,6 +101,7 @@ var force;
 var node = 0;
 var link;
 var allVisible = false;
+var layout = FORCE_DIRECTED;
   
 // Set the viewer window to fill the TOC panel
 var svg = d3.select("body")
@@ -172,6 +177,7 @@ function dataLoaded(data, pageNum, historyOffset) {
     else {
         if (historyOffset == -3) {
             linkColorer = new LinkColorer();
+            layout = FORCE_DIRECTED;
         }
         
         // Set the default value for nodes when the network is initialized for the first time
@@ -284,7 +290,7 @@ function dataLoaded(data, pageNum, historyOffset) {
     setZoomListener();
     
     if (newLink != null) {
-        // Center the view over a newly created link
+        // Center the view over a newly created link or node
         centerLink(newLink);
     }
 }
@@ -322,6 +328,62 @@ function changePage(pageNum, historyOffset) {
     colorNetwork(currNode);
 }
 
+// Set the automated layout to use for placing the nodes
+// newLayout (int) - An integer representing the layout to use
+//      1 - force-directed layout
+//      2 - rainbow graph layout
+function setLayout(newLayout) {
+    layout = newLayout;
+    resetTextOpacities();
+    
+    if (layout == FORCE_DIRECTED) {
+        // Allow the nodes to move by force-directed layout
+        force.start();
+        allVisible = false;
+        var defaultTextOpacity = getDefaultTextOpacity();
+        
+        node.each(function(d) {
+            d.fixed = false;
+            d.topacity = defaultTextOpacity;
+        });
+        
+        // Recalculate what nodes to label
+        var currNode = history.currNode;
+        colorNetwork(currNode);
+        
+        // Make sure the view is centered over the cloud of nodes
+        centerNode(svgWidth/2, svgHeight/2);
+    }
+    else {
+        // Fix the nodes in place and arrange them in a rainbow graph
+        force.stop();
+        var x = 0;
+        var y = 0;
+        allVisible = true;
+        
+        node.each(function(d) {
+            d.fixed = true;
+            d.topacity = textVisibleOpacity;
+            
+            // Place the nodes based on their position in the spine
+            d3.select(this).transition()
+                    .duration(750)
+                    .attrTween("transform", moveNode);
+                    
+            // Note the final position of the node with the user's current position
+            if (history.currNode.pos == d.id) {
+                x = svgWidth/2;
+                y = d.spine * rainbowNodeSpacing;
+            }
+        });
+        
+        applyTextOpacities();
+        
+        // Center the view over the user's current position
+        centerNode(x, y);
+    }
+}
+
 // Toggle the visibility of all node labels on and off
 // makeVisible - True (1) if all labels should be visible, false (0) if not
 function toggleLabels(makeVisible) {
@@ -337,18 +399,6 @@ function toggleLabels(makeVisible) {
         var currNode = history.currNode;
         colorNetwork(currNode);
     }
-}
-
-// Color the links, titles, and nodes in the network based on the user's current state
-// currNode - The current node in the user's history
-function colorNetwork(currNode) {
-    pageNum = currNode.pos;
-    
-    colorLinks(currNode);
-    colorNodes(pageNum);
-    applyTextOpacities();
-    applyNodeOpacities();
-    applyLinkOpacities();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -591,6 +641,26 @@ function shrinkRadius(d) {
     }
 }
 
+// Manually moves a node and its links to a new location
+// d - node data
+function moveNode(d) {
+    // Create a function that returns the node's position at time t
+    var interpolationX = d3.interpolateNumber(d.x, svgWidth/2);
+    var interpolationY = d3.interpolateNumber(d.y, d.spine * rainbowNodeSpacing);
+    
+    // Get the links associated with the node
+    var nodeLinks = getUpdateLinks(d.id);
+    
+    // Animate the node and its associated links
+    return function(t) {
+        d.y = interpolationY(t);
+        d.x = interpolationX(t);
+        nodeLinks.forEach(updateLinkNodes);
+        
+        return "translate(" + d.x + "," + d.y + ")";
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //DRAW LINK METHODS
 ///////////////////////////////////////////////////////////////////////////////
@@ -657,9 +727,19 @@ function shrinkStroke(linkSVG) {
 }
 
 // Animate a link so that's end points remain at the edge of an animated node
-// link - a link sgv element
+// link - a link svg element
 function updateLinkPath(link) {
     d3.select(link).select("path").attr("d", drawCurve);
+}
+
+// Manually move a link's endpoints with its associated nodes
+// link - a link svg element
+function updateLinkNodes(link) {
+    updateLinkPath(link);
+    
+    // Update references to the node's position
+    d3.select(link).attr("tx", function(d) { return d.target.x; })
+        .attr("ty", function(d) { return d.target.y; });
 }
 
 // Draws a directed link between nodes
@@ -824,15 +904,23 @@ function centerLink(linkObj) {
     link.each(function(d) {
         if (d.source.id == linkObj.source.nodeID && 
                 d.target.id == linkObj.target.nodeID) {
-            // Center the view over the average position between the two nodes
-            // The node with more weight will move less after the link is added
-            // Weighting the average makes it more likely that the final view will show the link on screen
-            var totWeight = d.source.weight + d.target.weight;
-            var sw = d.source.weight / totWeight;
-            var tw = d.target.weight / totWeight;
-            var x = d.source.x*sw + d.target.x*tw;
-            var y = d.source.y*sw + d.target.y*tw;
-            centerNode(x, y);
+                
+            if (layout == FORCE_DIRECTED) {
+                // Center the view over the average position between the two nodes
+                // The node with more weight will move less after the link is added
+                // Weighting the average makes it more likely that the final view will show the link on screen
+                var totWeight = d.source.weight + d.target.weight;
+                var sw = d.source.weight / totWeight;
+                var tw = d.target.weight / totWeight;
+                var x = d.source.x*sw + d.target.x*tw;
+                var y = d.source.y*sw + d.target.y*tw;
+                centerNode(x, y);
+            }
+            else {
+                // The nodes are fixed in place in a rainbow graph layout
+                // Center the view over the target node
+                centerNode(d.target.x, d.target.y);
+            }
         }
     });
 }
@@ -921,7 +1009,11 @@ function mouseoutNode() {
 
 // Unfix a node's position on mouse double click
 function dblclick() {
-    d3.select(this).attr("fixed", function(d) { d.fixed = false; return d.fixed; });
+
+    // Disallow users from unfixing nodes in rainbow graph layout
+    if (layout == FORCE_DIRECTED) {
+        d3.select(this).attr("fixed", function(d) { d.fixed = false; return d.fixed; });
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -983,6 +1075,18 @@ function addZoomListener() {
 ///////////////////////////////////////////////////////////////////////////////
 //MISCELLANEOUS
 ///////////////////////////////////////////////////////////////////////////////
+
+// Color the links, titles, and nodes in the network based on the user's current state
+// currNode - The current node in the user's history
+function colorNetwork(currNode) {
+    pageNum = currNode.pos;
+    
+    colorLinks(currNode);
+    colorNodes(pageNum);
+    applyTextOpacities();
+    applyNodeOpacities();
+    applyLinkOpacities();
+}
 
 // Returns a list of link svg elements associated with a node with id page
 // page - the id of a node

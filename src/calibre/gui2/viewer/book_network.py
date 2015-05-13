@@ -2,6 +2,7 @@
 __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
+from sets import Set
 import json, os
 from networkx.classes import digraph
 from networkx.readwrite.json_graph import node_link
@@ -112,21 +113,27 @@ class EBookNetwork (object):
     def generate_network(self):
         spine = self.toc_sections.spine
         first_section = self.toc_sections.get_section(0)
+        seen_sections = Set()
         self.bookGraph = digraph.DiGraph()
+        curr_index = 1
         for t in self.toc_sections.toc.flat():
             if (t.parent is not None and t.abspath in spine):
             
                 # Mark nodes that are scrollable from the beginning of the book
                 spine_index = spine.index(t.abspath)
-                in_first = first_section.includes_section(spine_index)
-                node_type = 2
-                if (in_first):
-                    node_type = 1
-                    
-                self.bookGraph.add_node(str(spine[spine_index].start_page),
-                        label=str(spine[spine_index].start_page),
-                        title=t.text,
-                        type=node_type)
+                if (spine_index not in seen_sections):
+                    seen_sections.add(spine_index)
+                    in_first = first_section.includes_section(spine_index)
+                    node_type = 2
+                    if (in_first):
+                        node_type = 1
+                        
+                    self.bookGraph.add_node(str(spine[spine_index].start_page),
+                            label=str(spine[spine_index].start_page),
+                            title=t.text,
+                            type=node_type,
+                            spine=curr_index)
+                    curr_index = curr_index + 1
             
     # Updates the network JSON data with newly added/removed links
     def update_network(self):
