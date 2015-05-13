@@ -2,6 +2,7 @@
 __license__   = 'GPL v3'
 __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
+from PyQt5.Qt import QIcon
 from calibre.gui2.viewer.behavior_manager.behavior_manager import BehaviorManager
 
 # This class allows users to switch between two defined interface behaviors.
@@ -40,13 +41,16 @@ class SwitchBehaviorManager (BehaviorManager):
     # checked (bool) - True if the interface behavior switch is pressed
     def toggle_adventurous_mode(self, checked):
         if (not checked):
+            old_toc_view = self.b2_toc_interface
             new_toc_view = self.b1_toc_interface
             self.page_behavior = self.b1_page_behavior
         else:
+            old_toc_view = self.b1_toc_interface
             new_toc_view = self.b2_toc_interface
             self.page_behavior = self.b2_page_behavior
                 
         # Set the new TOC interface in EBookViewer
+        self.action_toggle_adventurous_mode.setIcon(QIcon(I(old_toc_view.image)))
         self.set_behavior_manager_method(checked, new_toc_view)
         
     ###########################################################################

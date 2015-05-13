@@ -14,7 +14,10 @@ class TreeTOCContainer(TOCContainer):
     # parent (EBookViewer) - the main interface
     def __init__(self, parent):
         QWidget.__init__(self, parent)
+        self.image = 'highlight_only_on.png'
+        self.tool_tip = 'Table of Contents'
         w = self
+        
         w.l = QVBoxLayout(w)
         self.toc = TOCView(w)
         self.toc_search = TOCSearch(self.toc, parent=w)

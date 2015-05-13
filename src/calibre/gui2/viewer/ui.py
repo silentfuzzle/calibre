@@ -344,12 +344,23 @@ class Main(MainWindow):
         self.footnotes_dock.close()
     
     # Set the table of contents interface to use
+    # toc_container (TOCContainer) - The table of contents panel
     def set_toc_view(self, toc_container):
         self.toc_container = w = toc_container
         self.toc = w.toc
         self.toc_search = w.toc_search
         self.toc_dock.setWidget(w)
+        if hasattr(self, 'action_table_of_contents'):
+            self.action_table_of_contents.setIcon(QIcon(I(toc_container.image)))
+            self.action_table_of_contents.setText(_(toc_container.tool_tip))
+            self.set_tool_tip(self.action_table_of_contents, 'Table of Contents')
 
+    # Set the tool tip for an action with shortcut keys
+    # ac (QAction) - The action
+    # sc_name (string) - The type of the action
+    def set_tool_tip(self, ac, sc_name):
+        ac.setToolTip(unicode(ac.text()) + (' [%s]' % _(' or ').join(self.view.shortcuts.get_shortcuts(sc_name))))
+        
     def create_actions(self):
         def a(name, text, icon, tb=None, sc_name=None, menu_name=None, popup_mode=QToolButton.MenuButtonPopup):
             name = 'action_' + name
@@ -362,7 +373,7 @@ class Main(MainWindow):
             ac.setObjectName(name)
             (tb or self.tool_bar).addAction(ac)
             if sc_name:
-                ac.setToolTip(unicode(ac.text()) + (' [%s]' % _(' or ').join(self.view.shortcuts.get_shortcuts(sc_name))))
+                self.set_tool_tip(ac, sc_name)
             if menu_name is not None:
                 menu_name += '_menu'
                 m = QMenu()

@@ -16,6 +16,8 @@ class NetworkTOCContainer(TOCContainer):
     # parent (EBookViewer) - the parent of this container
     def __init__(self, manager, parent=None):
         QWidget.__init__(self, parent)
+        self.image = 'plugboard.png'
+        self.tool_tip = 'Map'
         w = self
                     
         # Build the network interface
