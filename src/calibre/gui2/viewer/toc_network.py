@@ -8,7 +8,8 @@ __copyright__ = '2014, Emily Palmieri <silentfuzzle@gmail.com>'
 
 import os
 from PyQt5.QtWidgets import QMessageBox
-from PyQt5.Qt import (Qt, QWebView, QWidget, QToolButton, QHBoxLayout, QSizePolicy, pyqtSlot)
+from PyQt5.Qt import (Qt, QWebView, QWidget, QToolButton, QMenu, QAction, 
+        QActionGroup, QHBoxLayout, QSizePolicy, pyqtSlot)
 from calibre.ebooks.oeb.display.webview import load_html
 from calibre.gui2.viewer.toc import TOCSearch
 from calibre.gui2 import error_dialog
@@ -28,13 +29,35 @@ class TOCNetworkTools(QWidget):
         self.l = QHBoxLayout(self)
         self.l.setContentsMargins(0, 0, 0, 0)
         
-        # Create a button that makes all labels visible
+        # Create a menu button where users can select how to layout nodes
         btn = QToolButton(self)
         btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
         btn.setCheckable(True)
-        btn.setText("Show All Labels")
-        btn.toggled[bool].connect(toc_view.toggle_labels)
-        btn.setToolTip(_('Toggle all labels visible'))
+        btn.setText("Layout")
+        btn.setPopupMode(QToolButton.InstantPopup)
+        
+        menu = QMenu(btn)
+        actionGrp = QActionGroup(menu)
+        
+        # Create the force-directed graph menu option
+        action = QAction(actionGrp)
+        action.setText("Force-Directed Layout")
+        action.setCheckable(True)
+        action.setChecked(True)
+        action.triggered.connect(self.set_force_directed)
+        actionGrp.addAction(action)
+        menu.addAction(action)
+        
+        # Create the menu graph menu option
+        action = QAction(actionGrp)
+        action.setText("Rainbow Graph Layout")
+        action.setCheckable(True)
+        action.triggered.connect(self.set_rainbow_graph)
+        actionGrp.addAction(action)
+        menu.addAction(action)
+        
+        btn.setMenu(menu)
+        btn.setToolTip(_('Set the node layout'))
         self.l.addWidget(btn)
         
         # Create a button that sends the user to the first page of the book
@@ -56,6 +79,18 @@ class TOCNetworkTools(QWidget):
     # Goes to the first page of the book
     def go_to_cover(self):
         self.toc_view.change_page(1)
+        
+    # Sets the layout of the nodes to force-directed
+    # checked (boolean) - True if the option is checked in the Layout menu
+    def set_force_directed(self, checked):
+        if (checked):
+            self.toc_view.set_layout(1)
+        
+    # Sets the layout of the nodes to rainbow graph
+    # checked (boolean) - True if the option is checked in the Layout menu
+    def set_rainbow_graph(self, checked):
+        if (checked):
+            self.toc_view.set_layout(2)
        
 # This class controls the widget that allows users to search through node titles.
 class TOCNetworkSearch(TOCSearch):
@@ -189,7 +224,17 @@ class TOCNetworkView (QWebView):
                 # loading before this method was called, reload the network data
                 self.create_toc_network(history_offset)
     
-    # Toggle add the node labels visible or invisible by default
+    # Set how the nodes should be laid out automatically
+    # layout (int) - An integer representing the layout to use
+    #       1 - force-directed layout
+    #       2 - rainbow graph layout
+    def set_layout(self, layout):
+        if (self.loaded):
+            jScript = """setLayout({layout});"""
+            jScriptFormat = jScript.format(layout=layout)
+            self.page().mainFrame().evaluateJavaScript(jScriptFormat)
+            
+    # Toggle all the node labels visible or invisible by default
     # checked (bool) - True if the labels should be visible by default
     def toggle_labels(self, checked):
         if (self.loaded):
