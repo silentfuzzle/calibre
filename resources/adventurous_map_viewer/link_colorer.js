@@ -293,14 +293,20 @@ function LinkColorer() {
         // to the beginning of the book if a path exists
         if (colorInfo.lastHistory != null) {
             var currNodeID = colorInfo.lastHistory.pos;
-            if (currNodeID != this.minNodeID &&
-                    this.linkDictionary.hasOwnProperty(this.minNodeID) && 
-                    this.linkDictionary.hasOwnProperty(currNodeID)) {
-                colorInfo.lastHistory = historyNode;
-                endpoints = this.colorLinksFromDistance(currNodeID, colorInfo);
-            }
-            else {
-                endpoints = [];
+            if (currNodeID != this.minNodeID) {
+                if (this.linkDictionary.hasOwnProperty(this.minNodeID) && 
+                        this.linkDictionary.hasOwnProperty(currNodeID)) {
+                        
+                    // Find the path from the last position in the user's history
+                    // to the beginning of the book
+                    colorInfo.lastHistory = historyNode;
+                    endpoints = this.colorLinksFromDistance(currNodeID, 
+                            colorInfo);
+                }
+                else {
+                    // A path doesn't exist, don't highlight anything
+                    endpoints = [];
+                }
             }
         }
         
