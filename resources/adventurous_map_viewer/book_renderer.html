@@ -279,15 +279,15 @@ function dataLoaded(data, pageNum, historyOffset) {
     node.selectAll("text")
         .call(wrap, 100);
     
-    // Set the color of the nodes
-    var newLink = linkColorer.buildLinkDictionary(link);
-    changePage(pageNum, historyOffset);
-    
     // Make sure the display is set to the current scale and location
     zoomListener.scale(zoomListener.scale());
     zoomListener.translate(zoomListener.translate());
     zoomListener.event(vis);
     setZoomListener();
+    
+    // Set the color of the nodes
+    var newLink = linkColorer.buildLinkDictionary(link);
+    changePage(pageNum, historyOffset, 0);
     
     if (newLink != null && historyOffset != -3) {
         // Center the view over a newly created link or node
@@ -303,7 +303,9 @@ function dataLoaded(data, pageNum, historyOffset) {
 //      -1 - the user navigated to the previous section in their history
 //      -2 - the user navigated to another section without adding to their history
 //      -3 - the user opened a new ebook
-function changePage(pageNum, historyOffset) {
+// centerView (bool) - True (1) if the view should be centered over the given node, false (0) if not
+function changePage(pageNum, historyOffset, centerView) {
+    
     // Update the user's position in their history
     var currNode = null;
     if (historyOffset == 0) {
@@ -326,6 +328,25 @@ function changePage(pageNum, historyOffset) {
     // Color the links, titles, and nodes
     resetNodeOpacities();
     colorNetwork(currNode);
+    
+    // Make sure centerView has been set
+    if (centerView != 1 && centerView != 0) {
+        if (layout == RAINBOW_GRAPH) {
+            centerView = 1;
+        }
+        else {
+            centerView = 0;
+        }
+    }
+    
+    // Center the view over the current node
+    if (centerView == 1) {
+        node.each(function(d) {
+            if (d.id == pageNum) {
+                centerNode(d.x, d.y);
+            }
+        });
+    }
 }
 
 // Set the automated layout to use for placing the nodes
@@ -385,7 +406,7 @@ function setLayout(newLayout) {
 }
 
 // Toggle the visibility of all node labels on and off
-// makeVisible - True (1) if all labels should be visible, false (0) if not
+// makeVisible (bool) - True (1) if all labels should be visible, false (0) if not
 function toggleLabels(makeVisible) {
     allVisible = makeVisible;
     
@@ -951,7 +972,7 @@ function centerNode(x1, y1) {
     // Apply the transformation to the display
     zoomListener.scale(scale);
     zoomListener.translate([x2, y2]);
-    zoomListener.event(vis);
+    zoomListener.event(vis.transition().duration(750));
 }
 
 // Returns the position of the center of a node on the screen
