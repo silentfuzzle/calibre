@@ -82,6 +82,7 @@ class TOCNetworkTools(QWidget):
         action.triggered.connect(self.set_force_directed)
         actionGrp.addAction(action)
         menu.addAction(action)
+        self.action_set_force_directed = action
         
         # Create the menu graph menu option
         action = QAction(actionGrp)

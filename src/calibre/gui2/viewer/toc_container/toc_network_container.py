@@ -26,14 +26,14 @@ class NetworkTOCContainer(TOCContainer):
         
         # Build the network interface tools
         self.info = TOCNetworkInfo(parent=w)
-        tools = TOCNetworkTools(self.toc, parent=w)                
+        self.tools = TOCNetworkTools(self.toc, parent=w)                
         self.toc_search = TOCNetworkSearch(self.toc, parent=w)
         
         # Layout the interface
         w.l = QVBoxLayout(w)
         w.l.addWidget(self.info)
         w.l.addWidget(self.toc)
-        w.l.addWidget(tools)
+        w.l.addWidget(self.tools)
         w.l.addWidget(self.toc_search)
         w.l.setContentsMargins(0, 0, 0, 0)
         
@@ -47,6 +47,7 @@ class NetworkTOCContainer(TOCContainer):
         self.toc.set_ebook_network(ebook_network)
         self.toc_sections = toc_sections
         self.info.setup_ebook(ebook_network.pages_viewed, sum(self.toc.manager.iterator.pages))
+        self.tools.action_set_force_directed.setChecked(True)
         self.history_offset = -3
 
     # Saves the ebook network to a JSON file before closing the ebook

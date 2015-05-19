@@ -178,6 +178,7 @@ function dataLoaded(data, pageNum, historyOffset) {
         if (historyOffset == -3) {
             linkColorer = new LinkColorer();
             layout = FORCE_DIRECTED;
+            allVisible = false;
         }
         
         // Set the default value for nodes when the network is initialized for the first time
@@ -279,10 +280,17 @@ function dataLoaded(data, pageNum, historyOffset) {
     node.selectAll("text")
         .call(wrap, 100);
     
-    // Make sure the display is set to the current scale and location
-    zoomListener.scale(zoomListener.scale());
-    zoomListener.translate(zoomListener.translate());
-    zoomListener.event(vis);
+    if (historyOffset == -3) {
+        // Reset the view to make sure the network is on screen
+        zoomListener.scale(1)
+        centerNode(svgWidth/2, svgHeight/2)
+    }
+    else {
+        // Make sure the display is set to the current scale and location
+        zoomListener.scale(zoomListener.scale());
+        zoomListener.translate(zoomListener.translate());
+        zoomListener.event(vis);
+    }
     setZoomListener();
     
     // Set the color of the nodes
@@ -675,7 +683,9 @@ function moveNode(d) {
     // Animate the node and its associated links
     return function(t) {
         d.y = interpolationY(t);
+        d.py = interpolationY(t);
         d.x = interpolationX(t);
+        d.px = interpolationX(t);
         nodeLinks.forEach(updateLinkNodes);
         
         return "translate(" + d.x + "," + d.y + ")";
