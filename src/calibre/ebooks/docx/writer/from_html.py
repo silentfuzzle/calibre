@@ -63,7 +63,8 @@ class TextRun(object):
         self.link = None
         self.lang = lang
         self.parent_style = None
-        self.makelement = namespace.makeelement
+        self.makeelement = namespace.makeelement
+        self.descendant_style = None
 
     def add_text(self, text, preserve_whitespace, bookmark=None, link=None):
         if not preserve_whitespace:
@@ -82,12 +83,12 @@ class TextRun(object):
         self.texts.append((drawing, None, bookmark))
 
     def serialize(self, p, links_manager):
-        makeelement = self.makelement
+        makeelement = self.makeelement
         parent = p if self.link is None else links_manager.serialize_hyperlink(p, self.link)
         r = makeelement(parent, 'w:r')
         rpr = makeelement(r, 'w:rPr', append=False)
-        if self.parent_style is not self.style:
-            makeelement(rpr, 'w:rStyle', w_val=self.style.id)
+        if getattr(self.descendant_style, 'id', None) is not None:
+            makeelement(rpr, 'w:rStyle', w_val=self.descendant_style.id)
         if self.lang:
             makeelement(rpr, 'w:lang', w_bidi=self.lang, w_val=self.lang, w_eastAsia=self.lang)
         if len(rpr) > 0:
@@ -262,7 +263,7 @@ class Blocks(object):
     def end_current_block(self):
         if self.current_block is not None:
             self.all_blocks.append(self.current_block)
-            if self.current_table is not None:
+            if self.current_table is not None and self.current_table.current_row is not None:
                 self.current_table.add_block(self.current_block)
             else:
                 self.block_map[self.current_block] = len(self.items)
@@ -322,8 +323,9 @@ class Blocks(object):
         pos = self.pos if pos is None else pos
         block = self.all_blocks[pos]
         del self.all_blocks[pos]
-        if self.block_map:
-            del self.items[self.block_map.pop(block)]
+        bpos = self.block_map.pop(block, None)
+        if bpos is not None:
+            del self.items[bpos]
         else:
             items = self.items if block.parent_items is None else block.parent_items
             items.remove(block)
@@ -372,11 +374,11 @@ class Blocks(object):
                 count[run.lang] += 1
             if count:
                 block.block_lang = bl = count.most_common(1)[0][0]
-            for run in block.runs:
-                if run.lang == bl:
-                    run.lang = None
-            if bl == default_lang:
-                block.block_lang = None
+                for run in block.runs:
+                    if run.lang == bl:
+                        run.lang = None
+                if bl == default_lang:
+                    block.block_lang = None
 
     def __repr__(self):
         return 'Block(%r)' % self.runs
@@ -390,8 +392,8 @@ class Convert(object):
     a[href] { text-decoration: underline; color: blue }
     '''
 
-    def __init__(self, oeb, docx, mi, add_cover):
-        self.oeb, self.docx, self.add_cover = oeb, docx, add_cover
+    def __init__(self, oeb, docx, mi, add_cover, add_toc):
+        self.oeb, self.docx, self.add_cover, self.add_toc = oeb, docx, add_cover, add_toc
         self.log, self.opts = docx.log, docx.opts
         self.mi = mi
         self.cover_img = None
@@ -410,7 +412,10 @@ class Convert(object):
         self.current_link = self.current_lang = None
 
         for item in self.oeb.spine:
+            self.log.debug('Processing', item.href)
             self.process_item(item)
+        if self.add_toc:
+            self.links_manager.process_toc_links(self.oeb)
 
         if self.add_cover and self.oeb.metadata.cover and unicode(self.oeb.metadata.cover[0]) in self.oeb.manifest.ids:
             cover_id = unicode(self.oeb.metadata.cover[0])
@@ -557,6 +562,8 @@ class Convert(object):
         self.docx.document, self.docx.styles, body = create_skeleton(self.opts)
         self.blocks.serialize(body)
         body.append(body[0])  # Move <sectPr> to the end
+        if self.links_manager.toc:
+            self.links_manager.serialize_toc(body, self.styles_manager.primary_heading_style)
         if self.cover_img is not None:
             self.images_manager.write_cover_block(body, self.cover_img)
         self.styles_manager.serialize(self.docx.styles)
